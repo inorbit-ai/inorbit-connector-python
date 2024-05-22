@@ -1,0 +1,4 @@
+inorbit-edge>=1.13.0,<2.0
+pytz>=2024.1
+pydantic>=2.6,<3.0
+PyYAML>=6.0,<7.0

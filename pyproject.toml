@@ -1,0 +1,5 @@
+[tool.flake8]
+exclude = [".venv/", ".tox/"]
+max-line-length = 88
+show-source = true
+statistics = true

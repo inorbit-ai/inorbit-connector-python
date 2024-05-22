@@ -3,5 +3,5 @@
 # License: MIT License
 # Copyright 2024 InOrbit, Inc.
 
-__author__ = "InOrbit, Inc."
-__version__ = "0.0.0"
+# The default timezone to use if no timezone is supplied.
+DEFAULT_TIMEZONE = "UTC"
