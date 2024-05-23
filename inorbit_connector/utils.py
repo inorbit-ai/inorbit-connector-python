@@ -7,8 +7,10 @@
 # Standard
 from enum import Enum
 
-# Third Party
+# Third-party
 import yaml
+
+DEFAULT_TIMEZONE = "UTC"
 
 
 class LogLevels(str, Enum):
@@ -19,12 +21,13 @@ class LogLevels(str, Enum):
     See https://docs.python.org/3/library/logging.html#logging-levels
 
     Attributes:
-        DEBUG: Represents the debug log level.
-        INFO: Represents the info log level.
-        WARNING: Represents the warning log level.
-        ERROR: Represents the error log level.
-        CRITICAL: Represents the critical log level.
+        DEBUG: Represents the debug log level
+        INFO: Represents the info log level
+        WARNING: Represents the warning log level
+        ERROR: Represents the error log level
+        CRITICAL: Represents the critical log level
     """
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -42,15 +45,15 @@ def read_yaml(fname: str, robot_id: str = None) -> dict:
     * If the configuration file is empty, an empty dictionary is returned.
 
     Args:
-        fname (str): The file name or path of the YAML file.
-        robot_id (str, optional): The ID of the robot. If provided, returns the abstract
-                                  for the specified robot only. Defaults to None.
+        fname (str): The file name or path of the YAML file
+        robot_id (str, optional): The ID of the robot to retrieve from the YAML or None
+                                  to return the entire file
     Returns:
-        dict: The data read from the YAML file as a dictionary.
+        dict: The data read from the YAML file as a dictionary
     Raises:
-        IndexError: If the specified robot ID is not found in the abstract file.
-        FileNotFoundError: If the configuration file does not exist.
-        yaml.YAMLError: If the configuration file is not valid YAML.
+        IndexError: If the specified robot ID is not found in the abstract file
+        FileNotFoundError: If the configuration file does not exist
+        yaml.YAMLError: If the configuration file is not valid YAML
     """
     with open(fname, "r") as file:
         data = yaml.safe_load(file)
@@ -59,7 +62,7 @@ def read_yaml(fname: str, robot_id: str = None) -> dict:
         if not data:
             data = {}
 
-        # If the `robot_id` is not provided return the entire abstract.
+        # If the `robot_id` is not provided, return the entire abstract.
         if not robot_id:
             return data
 

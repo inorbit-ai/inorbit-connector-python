@@ -1,3 +1,7 @@
+[tool.coverage.run]
+# OpenCV files
+source = ["inorbit_connector/", "tests/"]
+
 [tool.flake8]
 exclude = [".venv/", ".tox/"]
 max-line-length = 88

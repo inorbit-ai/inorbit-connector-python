@@ -10,8 +10,25 @@ from unittest import mock
 import pytest
 import yaml
 
-# Local
+# InOrbit
 from inorbit_connector import utils
+from inorbit_connector.utils import LogLevels
+
+
+class TestLogLevels:
+    def test_values(self):
+        assert LogLevels.DEBUG == "DEBUG"
+        assert LogLevels.INFO == "INFO"
+        assert LogLevels.WARNING == "WARNING"
+        assert LogLevels.ERROR == "ERROR"
+        assert LogLevels.CRITICAL == "CRITICAL"
+
+    def test_isinstance(self):
+        assert isinstance(LogLevels.DEBUG, str)
+        assert isinstance(LogLevels.INFO, str)
+        assert isinstance(LogLevels.WARNING, str)
+        assert isinstance(LogLevels.ERROR, str)
+        assert isinstance(LogLevels.CRITICAL, str)
 
 
 @mock.patch(
@@ -19,7 +36,7 @@ from inorbit_connector import utils
     new_callable=mock.mock_open,
     read_data="id1: {k1: v1, k2: v2}\nid2: {k3: v3, k4: v4}",
 )
-def test_read_yaml_returns_entire_file(mock_file):
+def test_read_yaml_returns_entire_file(_):
     result = utils.read_yaml("dummy.yaml")
     expected = {"id1": {"k1": "v1", "k2": "v2"}, "id2": {"k3": "v3", "k4": "v4"}}
     assert result == expected
@@ -30,7 +47,7 @@ def test_read_yaml_returns_entire_file(mock_file):
     new_callable=mock.mock_open,
     read_data="id1: {k1: v1, k2: v2}\nid2: {k3: v3, k4: v4}",
 )
-def test_read_yaml_returns_specific_robot(mock_file):
+def test_read_yaml_returns_specific_robot(_):
     result = utils.read_yaml("dummy.yaml", "id1")
     expected = {"k1": "v1", "k2": "v2"}
     assert result == expected
@@ -41,13 +58,13 @@ def test_read_yaml_returns_specific_robot(mock_file):
     new_callable=mock.mock_open,
     read_data="id1: {k1: v1, k2: v2}\nid2: {k3: v3, k4: v4}",
 )
-def test_read_yaml_raises_error_when_robot_id_not_present(mock_file):
+def test_read_yaml_raises_error_when_robot_id_not_present(_):
     with pytest.raises(IndexError):
         utils.read_yaml("dummy.yaml", "id3")
 
 
 @mock.patch("builtins.open", new_callable=mock.mock_open, read_data="")
-def test_read_yaml_returns_empty_dict_when_file_empty(mock_file):
+def test_read_yaml_returns_empty_dict_when_file_empty(_):
     result = utils.read_yaml("dummy.yaml")
     expected = {}
     assert result == expected
@@ -58,7 +75,7 @@ def test_read_yaml_returns_empty_dict_when_file_empty(mock_file):
     new_callable=mock.mock_open,
     read_data="not: yaml: file: invalid: content",
 )
-def test_read_yaml_raises_error_when_invalid_yaml(mock_file):
+def test_read_yaml_raises_error_when_invalid_yaml(_):
     with pytest.raises(yaml.YAMLError):
         utils.read_yaml("dummy.yaml")
 
