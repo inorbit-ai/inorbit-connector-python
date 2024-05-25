@@ -61,10 +61,10 @@ class TestInorbitConnectorModel:
 
     def test_with_valid_input_and_cameras(self, base_model):
         model = InorbitConnectorModel(
-            **base_model, cameras=[CameraConfigModel(url="https://test.com/")]
+            **base_model, cameras=[CameraConfigModel(video_url="https://test.com/")]
         )
         assert len(model.cameras) == 1
-        assert str(model.cameras[0].url) == "https://test.com/"
+        assert str(model.cameras[0].video_url) == "https://test.com/"
 
     def test_invalid_api_key(self, base_model):
         init_input = base_model.copy()
@@ -129,7 +129,7 @@ class TestInorbitConnectorModel:
         from inorbit_connector.models import InorbitConnectorModel
 
         init_input = {
-            "api_url": "https://valid.url/",
+            "api_url": "https://valid.video_url/",
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
         }
