@@ -10,7 +10,7 @@ from typing import List
 
 # Third-party
 import pytz
-from inorbit_edge.models import CameraConfigModel
+from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 from pydantic import BaseModel, field_validator, HttpUrl
 
@@ -18,7 +18,7 @@ from pydantic import BaseModel, field_validator, HttpUrl
 from inorbit_connector.utils import LogLevels, DEFAULT_TIMEZONE
 
 
-class InorbitConnectorModel(BaseModel):
+class InorbitConnectorConfig(BaseModel):
     """Class representing an Inorbit connector model.
 
     This should not be instantiated on its own.
@@ -36,7 +36,7 @@ class InorbitConnectorModel(BaseModel):
         api_key (str | None, optional): The InOrbit API key
         api_url (HttpUrl, optional): The URL of the API or inorbit_edge's
                                      INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
-        cameras (List[CameraConfigModel], optional): The list of cameras
+        cameras (List[CameraConfig], optional): The list of cameras
         connector_type (str): The type of connector (see Class comment above)
         connector_config (BaseModel): The configuration for the connector
         update_freq (float, optional): Update frequency or 1 Hz by default
@@ -47,7 +47,7 @@ class InorbitConnectorModel(BaseModel):
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
     api_url: HttpUrl = os.getenv("INORBIT_API_URL", INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL)
-    cameras: List[CameraConfigModel] = []
+    cameras: List[CameraConfig] = []
     connector_type: str
     connector_config: BaseModel
     update_freq: float = 1.0

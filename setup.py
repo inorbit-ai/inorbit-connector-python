@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# License: MIT License
+# Copyright 2024 InOrbit, Inc.
 
 """The setup script."""
 
@@ -43,7 +45,7 @@ setup(
     long_description_content_type="text/markdown",
     maintainer="Russell Toris",
     maintainer_email="russell@inorbit.ai",
-    name="inorbit-connector-python",
+    name="inorbit-connector",
     packages=find_packages(),
     platforms=["Linux", "Windows", "macOS"],
     project_urls={

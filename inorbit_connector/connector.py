@@ -14,7 +14,7 @@ from inorbit_edge.robot import RobotSession
 from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
-from inorbit_connector.models import InorbitConnectorModel
+from inorbit_connector.models import InorbitConnectorConfig
 
 
 class Connector:
@@ -25,14 +25,14 @@ class Connector:
     disconnect() methods (with calls to the superclass).
     """
 
-    def __init__(self, robot_id: str, config: InorbitConnectorModel) -> None:
+    def __init__(self, robot_id: str, config: InorbitConnectorConfig) -> None:
         """Initialize a new InOrbit connector.
 
         This class handles bidirectional communication with InOrbit.
 
         Args:
             robot_id (str): The ID of the InOrbit robot
-            config (InorbitConnectorModel): The configuration for the connector
+            config (InorbitConnectorConfig): The connector configuration
         """
 
         # Common information
@@ -146,7 +146,11 @@ class Connector:
         self._disconnect()
 
     def __run(self) -> None:
-        """The main run thread method for the connector."""
+        """The main run thread method for the connector.
+
+        This method will be called on a new thread and will run the execution loop of
+        the connector until the stop event is set.
+        """
 
         while not self.__stop_event.is_set():
             self._execution_loop()

@@ -1,0 +1,15 @@
+my-example-robot:
+  # The timezone of the robot location as a pytz timezone (https://pythonhosted.org/pytz/#helpers)
+  location_tz: America/Los_Angeles
+  # Connector log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  log_level: INFO
+  # The type of connector
+  connector_type: example_bot
+  # Update rate of the connector's main execution loop in Hz
+  connector_update_freq: 5.0
+
+  # This is where you define custom fields specific to your robot's connector
+  connector_config:
+    example_bot_api_version: v1
+    example_bot_hw_rev: v3
+    example_bot_custom_value: test123
