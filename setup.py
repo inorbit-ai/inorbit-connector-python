@@ -13,7 +13,7 @@ GITHUB_ORG_URL = "https://github.com/inorbit-ai"
 GITHUB_REPO_URL = f"{GITHUB_ORG_URL}/inorbit-connector-python"
 TEAMCITY_PROJECT_URL = (
     "https://inorbit.teamcity.com/project/"
-    "Engineering_Development_DeveloperPortal_Connectors_InorbitConnectorPython"
+    "Engineering_Development_DeveloperPortal_InorbitConnectorPython"
 )
 
 with open("README.md") as file:
@@ -38,6 +38,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     description="A Python library for connectors in the InOrbit RobOps ecosystem.",
+    download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/{VERSION}.zip",
     install_requires=install_requirements,
     keywords=["inorbit", "robops", "robotics"],
     license="MIT",
