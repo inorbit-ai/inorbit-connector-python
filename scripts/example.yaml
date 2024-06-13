@@ -7,6 +7,8 @@ my-example-robot:
   connector_type: example_bot
   # Update rate of the connector's main execution loop in Hz
   connector_update_freq: 5.0
+  # The ID of the InOrbit account that owns the robots
+  account_id: my_inorbit_account
 
   # This is where you define custom fields specific to your robot's connector
   connector_config:
