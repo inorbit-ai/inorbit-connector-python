@@ -50,7 +50,7 @@ class InorbitConnectorConfig(BaseModel):
     cameras: List[CameraConfig] = []
     connector_type: str
     connector_config: BaseModel
-    update_freq: float = 1.0
+    update_freq: float = 5.0
     location_tz: str = DEFAULT_TIMEZONE
     log_level: LogLevels = LogLevels.INFO
     user_scripts_dir: Path | None = None

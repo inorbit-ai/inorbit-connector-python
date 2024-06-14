@@ -181,10 +181,10 @@ class TestConnector:
         connector._robot_session = Mock()
 
         connector.start()
-        sleep(connector.config.update_freq)
+        sleep(1.0 / connector.config.update_freq)
         connector.stop()
         connector._execution_loop.assert_called()
 
         connector._execution_loop.reset_mock()
-        sleep(connector.config.update_freq * 2)
+        sleep((1.0 / connector.config.update_freq) * 2)
         connector._execution_loop.assert_not_called()

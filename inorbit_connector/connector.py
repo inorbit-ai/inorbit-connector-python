@@ -154,4 +154,4 @@ class Connector:
 
         while not self.__stop_event.is_set():
             self._execution_loop()
-            sleep(self.config.update_freq)
+            sleep(1.0 / self.config.update_freq)
