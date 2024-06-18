@@ -51,10 +51,11 @@ class Connector:
         robot_session_config = RobotSessionModel(
             api_key=config.api_key,
             endpoint=config.api_url,
+            account_id=config.account_id,
             robot_id=robot_id,
             robot_name=robot_id,
         )
-        self._robot_session = RobotSession(**robot_session_config.dict())
+        self._robot_session = RobotSession(**robot_session_config.model_dump())
 
     def _connect(self) -> None:
         """Connect to any external services.

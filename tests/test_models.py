@@ -72,6 +72,12 @@ class TestInorbitConnectorConfig:
         with pytest.raises(ValidationError, match="Whitespaces are not allowed"):
             InorbitConnectorConfig(**init_input)
 
+    def test_invalid_account_id(self, base_model):
+        init_input = base_model.copy()
+        init_input["account_id"] = "account id with spaces"
+        with pytest.raises(ValidationError, match="Whitespaces are not allowed"):
+            InorbitConnectorConfig(**init_input)
+
     def test_invalid_connector_config(self, base_model):
         init_input = {
             "connector_type": "valid_connector",

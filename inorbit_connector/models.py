@@ -54,9 +54,10 @@ class InorbitConnectorConfig(BaseModel):
     location_tz: str = DEFAULT_TIMEZONE
     log_level: LogLevels = LogLevels.INFO
     user_scripts_dir: Path | None = None
+    account_id: str | None = None
 
     # noinspection PyMethodParameters
-    @field_validator("api_key")
+    @field_validator("api_key", "account_id")
     def check_whitespace(cls, value: str) -> str:
         """Check if the api_key contains whitespace.
 
