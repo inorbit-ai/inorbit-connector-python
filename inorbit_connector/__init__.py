@@ -4,4 +4,4 @@
 # Copyright 2024 InOrbit, Inc.
 
 __author__ = "InOrbit, Inc."
-__version__ = "0.1.0"
+__version__ = "0.2.0"
