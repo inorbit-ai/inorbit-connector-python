@@ -23,7 +23,7 @@ your fleet of robots in InOrbit, unlocking interoperability.
 
 There are two ways for installing the connector Python package.
 
-1. From PyPi: `pip install inorbit-connector-python`
+1. From PyPi: `pip install inorbit-connector`
 
 2. From source: clone the repository and install the dependencies:
 
