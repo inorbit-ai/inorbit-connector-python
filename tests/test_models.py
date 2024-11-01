@@ -85,13 +85,16 @@ class TestInorbitConnectorConfig:
         }
 
         error = (
-            "1 validation error for InorbitConnectorConfig\nconnector_config\n  "
-            "Input should be a valid dictionary or instance of BaseModel "
-            "[type=model_type, input_value=InvalidDummyConfig(), "
-            "input_type=InvalidDummyConfig]\n    For further information visit "
-            "https://errors.pydantic.dev/2.7/v/model_type"
+            re.escape(
+                "1 validation error for InorbitConnectorConfig\nconnector_config\n  "
+                "Input should be a valid dictionary or instance of BaseModel "
+                "[type=model_type, input_value=InvalidDummyConfig(), "
+                "input_type=InvalidDummyConfig]\n    For further information visit "
+                "https://errors.pydantic.dev/"
+            )
+            + r"\d+\.\d+/v/model_type"  # match: "https://errors...dev/x.x/v/model_type"
         )
-        with pytest.raises(ValidationError, match=re.escape(error)):
+        with pytest.raises(ValidationError, match=error):
             InorbitConnectorConfig(**init_input)
 
     def test_invalid_location_tz(self, base_model):
@@ -115,12 +118,15 @@ class TestInorbitConnectorConfig:
         init_input["log_level"] = "BAD"
 
         error = (
-            "1 validation error for InorbitConnectorConfig\nlog_level\n  Input "
-            "should be 'DEBUG', 'INFO', 'WARNING', 'ERROR' or 'CRITICAL' [type=enum, "
-            "input_value='BAD', input_type=str]\n    For further information visit "
-            "https://errors.pydantic.dev/2.7/v/enum"
+            re.escape(
+                "1 validation error for InorbitConnectorConfig\nlog_level\n  Input "
+                "should be 'DEBUG', 'INFO', 'WARNING', 'ERROR' or 'CRITICAL' [type="
+                "enum, input_value='BAD', input_type=str]\n    For further "
+                "information visit https://errors.pydantic.dev/"
+            )
+            + r"\d+\.\d+/v/enum"  # match: "https://errors...dev/x.x/v/enum"
         )
-        with pytest.raises(ValidationError, match=re.escape(error)):
+        with pytest.raises(ValidationError, match=error):
             InorbitConnectorConfig(**init_input)
 
     def test_invalid_user_scripts_dir(self, base_model):
