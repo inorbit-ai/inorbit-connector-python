@@ -131,10 +131,10 @@ class Connector:
         """Publish a pose to InOrbit. If the frame_id is different from the last
         published, it calls self.publish_map() to update the map.
         """
-        self._robot_session.publish_pose(x, y, yaw, frame_id, *args, **kwargs)
         if frame_id != self._last_published_frame_id:
             self._logger.info(f"Updating map {frame_id} with new pose.")
             self.publish_map(frame_id, is_update=True)
+        self._robot_session.publish_pose(x, y, yaw, frame_id, *args, **kwargs)
 
     def start(self) -> None:
         """Start the execution loop of this connector.
