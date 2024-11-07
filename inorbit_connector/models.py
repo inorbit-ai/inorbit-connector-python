@@ -34,6 +34,7 @@ class MapConfig(BaseModel):
     origin_y: float
     resolution: float
 
+    # noinspection PyMethodParameters
     @field_validator("file")
     def validate_png_file(cls, file: FilePath) -> FilePath:
         """Validate that the file is a PNG file.
