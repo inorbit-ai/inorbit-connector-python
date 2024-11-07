@@ -66,6 +66,21 @@ class TestInorbitConnectorConfig:
         assert len(model.cameras) == 1
         assert str(model.cameras[0].video_url) == "https://test.com/"
 
+    def test_with_valid_input_and_maps(self, base_model):
+        model = InorbitConnectorConfig(
+            **base_model,
+            maps={
+                "frameA": {
+                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                    "map_id": "valid_map_id",
+                    "origin_x": 0.0,
+                    "origin_y": 0.0,
+                    "resolution": 0.1,
+                }
+            },
+        )
+        assert len(model.maps.keys()) == 1
+
     def test_invalid_api_key(self, base_model):
         init_input = base_model.copy()
         init_input["api_key"] = "key with spaces"
@@ -84,15 +99,11 @@ class TestInorbitConnectorConfig:
             "connector_config": InvalidDummyConfig(),
         }
 
-        error = (
-            re.escape(
-                "1 validation error for InorbitConnectorConfig\nconnector_config\n  "
-                "Input should be a valid dictionary or instance of BaseModel "
-                "[type=model_type, input_value=InvalidDummyConfig(), "
-                "input_type=InvalidDummyConfig]\n    For further information visit "
-                "https://errors.pydantic.dev/"
-            )
-            + r"\d+\.\d+/v/model_type"  # match: "https://errors...dev/x.x/v/model_type"
+        error = re.escape(
+            "1 validation error for InorbitConnectorConfig\nconnector_config\n  "
+            "Input should be a valid dictionary or instance of BaseModel "
+            "[type=model_type, input_value=InvalidDummyConfig(), "
+            "input_type=InvalidDummyConfig]\n    For further information visit "
         )
         with pytest.raises(ValidationError, match=error):
             InorbitConnectorConfig(**init_input)
@@ -117,14 +128,10 @@ class TestInorbitConnectorConfig:
         init_input = base_model.copy()
         init_input["log_level"] = "BAD"
 
-        error = (
-            re.escape(
-                "1 validation error for InorbitConnectorConfig\nlog_level\n  Input "
-                "should be 'DEBUG', 'INFO', 'WARNING', 'ERROR' or 'CRITICAL' [type="
-                "enum, input_value='BAD', input_type=str]\n    For further "
-                "information visit https://errors.pydantic.dev/"
-            )
-            + r"\d+\.\d+/v/enum"  # match: "https://errors...dev/x.x/v/enum"
+        error = re.escape(
+            "1 validation error for InorbitConnectorConfig\nlog_level\n  Input "
+            "should be 'DEBUG', 'INFO', 'WARNING', 'ERROR' or 'CRITICAL' [type="
+            "enum, input_value='BAD', input_type=str]"
         )
         with pytest.raises(ValidationError, match=error):
             InorbitConnectorConfig(**init_input)
@@ -132,7 +139,39 @@ class TestInorbitConnectorConfig:
     def test_invalid_user_scripts_dir(self, base_model):
         init_input = base_model.copy()
         init_input["user_scripts_dir"] = "/does/not/exist"
-        with pytest.raises(ValidationError, match="Must be a valid directory"):
+
+        error = (
+            "1 validation error for InorbitConnectorConfig\nuser_scripts_dir\n  "
+            "Path does not point to a directory [type=path_not_directory, input_value="
+            "'/does/not/exist', input_type=str]"
+        )
+        with pytest.raises(ValidationError, match=re.escape(error)):
+            InorbitConnectorConfig(**init_input)
+
+    def test_invalid_maps(self, base_model):
+        init_input = base_model.copy()
+        init_input["maps"] = {
+            "frameA": {
+                "file": f"{os.path.dirname(__file__)}/dir/invalid_map.png",
+                "map_id": "valid_map_id",
+                "origin_x": 0.0,
+                "origin_y": 0.0,
+                "resolution": 0.1,
+            }
+        }
+        with pytest.raises(ValidationError, match="Path does not point to a file"):
+            InorbitConnectorConfig(**init_input)
+        init_input = base_model.copy()
+        init_input["maps"] = {
+            "frameA": {
+                "file": f"{os.path.dirname(__file__)}/dir/not_a_map.txt",
+                "map_id": "valid_map_id",
+                "origin_x": 0.0,
+                "origin_y": 0.0,
+                "resolution": 0.1,
+            }
+        }
+        with pytest.raises(ValidationError, match="The map file must be a PNG file"):
             InorbitConnectorConfig(**init_input)
 
     @mock.patch.dict(os.environ, {"INORBIT_API_KEY": "env_valid_key"})

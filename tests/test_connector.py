@@ -4,6 +4,7 @@
 # Copyright 2024 InOrbit, Inc.
 
 # Standard
+import os
 import logging
 from time import sleep
 from unittest.mock import Mock, patch, MagicMock
@@ -188,3 +189,51 @@ class TestConnector:
         connector._execution_loop.reset_mock()
         sleep((1.0 / connector.config.update_freq) * 2)
         connector._execution_loop.assert_not_called()
+
+    def test_publish_map(self, base_model):
+        # Test with no maps
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        with patch.object(connector._robot_session, "publish_map") as mock_publish:
+            connector.publish_map("map")
+            mock_publish.assert_not_called()
+
+        # Test with a map
+        base_model["maps"] = {
+            "frameA": {
+                "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                "map_id": "valid_map_id",
+                "origin_x": 0.0,
+                "origin_y": 0.0,
+                "resolution": 0.1,
+            }
+        }
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        with patch.object(connector._robot_session, "publish_map") as mock_publish:
+            connector.publish_map("frameA")
+            mock_publish.assert_called_once()
+
+    def test_publish_pose_updates_maps(self, base_model):
+        base_model["maps"] = {
+            "frameA": {
+                "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                "map_id": "valid_map_id",
+                "origin_x": 0.0,
+                "origin_y": 0.0,
+                "resolution": 0.1,
+            },
+            "frameB": {
+                "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                "map_id": "valid_map_id",
+                "origin_x": 0.0,
+                "origin_y": 0.0,
+                "resolution": 0.1,
+            },
+        }
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        with patch.object(connector._robot_session, "publish_map") as mock_publish_map:
+            connector.publish_pose(0, 0, 0, "frameA")
+            assert mock_publish_map.call_count == 1  # Called on first map publish
+            connector.publish_pose(0, 0, 0, "frameA")
+            assert mock_publish_map.call_count == 1  # Not called again
+            connector.publish_pose(0, 0, 0, "frameB")
+            assert mock_publish_map.call_count == 2  # Called again

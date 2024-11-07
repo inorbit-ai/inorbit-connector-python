@@ -5,17 +5,52 @@
 
 # Standard
 import os
-from pathlib import Path
 from typing import List
 
 # Third-party
 import pytz
 from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
-from pydantic import BaseModel, field_validator, HttpUrl
+from pydantic import BaseModel, field_validator, HttpUrl, FilePath, DirectoryPath
 
 # InOrbit
 from inorbit_connector.utils import LogLevels, DEFAULT_TIMEZONE
+
+
+class MapConfig(BaseModel):
+    """Class representing a map configuration.
+
+    Attributes:
+        file (FilePath): The path to the PNG map file
+        map_id (str): The map id
+        origin_x (float): The x origin of the map
+        origin_y (float): The y origin of the map
+        resolution (float): The resolution
+    """
+
+    file: FilePath
+    map_id: str
+    origin_x: float
+    origin_y: float
+    resolution: float
+
+    # noinspection PyMethodParameters
+    @field_validator("file")
+    def validate_png_file(cls, file: FilePath) -> FilePath:
+        """Validate that the file is a PNG file.
+
+        Args:
+            file (FilePath): The path to the file to be validated
+
+        Raises:
+            ValueError: If the file is not a PNG file
+
+        Returns:
+            FilePath: The given file path if it is a PNG file
+        """
+        if not file.suffix.lower() == ".png":
+            raise ValueError("The map file must be a PNG file")
+        return file
 
 
 class InorbitConnectorConfig(BaseModel):
@@ -42,7 +77,11 @@ class InorbitConnectorConfig(BaseModel):
         update_freq (float, optional): Update frequency or 1 Hz by default
         location_tz (str, optional): The timezone of the location or "UTC" by default
         log_level (LogLevels, optional): The log level or LogLevels.INFO by default
-        user_scripts_dir (Path | None, optional): The location of custom user scripts
+        user_scripts_dir (DirectoryPath | None, optional): The location of custom user
+            scripts
+        account_id (str | None, optional): InOrbit account id, required for publishing
+            footprints
+        maps (dict[str, MapConfig], optional): frame_id to map configuration mapping
     """
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
@@ -53,8 +92,9 @@ class InorbitConnectorConfig(BaseModel):
     update_freq: float = 5.0
     location_tz: str = DEFAULT_TIMEZONE
     log_level: LogLevels = LogLevels.INFO
-    user_scripts_dir: Path | None = None
+    user_scripts_dir: DirectoryPath | None = None
     account_id: str | None = None
+    maps: dict[str, MapConfig] = {}
 
     # noinspection PyMethodParameters
     @field_validator("api_key", "account_id")
@@ -115,23 +155,3 @@ class InorbitConnectorConfig(BaseModel):
         if update_freq <= 0:
             raise ValueError("Must be positive and non-zero")
         return update_freq
-
-    # noinspection PyMethodParameters
-    @field_validator("user_scripts_dir")
-    def is_directory(cls, user_scripts_dir: Path | None) -> Path | None:
-        """Check if an argument is a valid path.
-
-        This is used for the user_scripts_dir value.
-
-        Args:
-            user_scripts_dir (Path | None): The path to check or None
-
-        Raises:
-            ValueError: If the path is not valid
-
-        Returns:
-            (Path | None): The valid path or None if optional
-        """
-        if user_scripts_dir and not user_scripts_dir.is_dir():
-            raise ValueError("Must be a valid directory")
-        return user_scripts_dir
