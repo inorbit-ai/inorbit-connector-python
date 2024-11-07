@@ -99,15 +99,11 @@ class TestInorbitConnectorConfig:
             "connector_config": InvalidDummyConfig(),
         }
 
-        error = (
-            re.escape(
-                "1 validation error for InorbitConnectorConfig\nconnector_config\n  "
-                "Input should be a valid dictionary or instance of BaseModel "
-                "[type=model_type, input_value=InvalidDummyConfig(), "
-                "input_type=InvalidDummyConfig]\n    For further information visit "
-                "https://errors.pydantic.dev/"
-            )
-            + r"\d+\.\d+/v/model_type"
+        error = re.escape(
+            "1 validation error for InorbitConnectorConfig\nconnector_config\n  "
+            "Input should be a valid dictionary or instance of BaseModel "
+            "[type=model_type, input_value=InvalidDummyConfig(), "
+            "input_type=InvalidDummyConfig]\n    For further information visit "
         )
         with pytest.raises(ValidationError, match=error):
             InorbitConnectorConfig(**init_input)

@@ -102,6 +102,27 @@ class Connector:
         # Overwrite this in subclass to something useful
         self._logger.warning("Execution loop is empty.")
 
+    def publish_map(self, frame_id: str, is_update: bool = False) -> None:
+        """Publish a map to InOrbit. If `frame_id` is not found in the maps
+        configuration, this method will do nothing.
+        """
+        if map_config := self.config.maps.get(frame_id):
+            self._robot_session.publish_map(
+                file=map_config.file,
+                map_id=map_config.map_id,
+                frame_id=frame_id,
+                x=map_config.origin_x,
+                y=map_config.origin_y,
+                resolution=map_config.resolution,
+                ts=None,
+                is_update=is_update,
+            )
+        else:
+            self._logger.error(
+                f"Map {frame_id} not found in the current configuration."
+                " Map message will not be sent."
+            )
+
     def start(self) -> None:
         """Start the execution loop of this connector.
 
