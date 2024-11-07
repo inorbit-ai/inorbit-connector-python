@@ -38,6 +38,7 @@ class Connector:
         # Common information
         self.robot_id = robot_id
         self.config = config
+        self._last_published_frame_id = None
 
         # Threading for the main run methods
         self.__stop_event = threading.Event()
@@ -117,11 +118,23 @@ class Connector:
                 ts=None,
                 is_update=is_update,
             )
+            self._last_published_frame_id = frame_id
         else:
             self._logger.error(
                 f"Map {frame_id} not found in the current configuration."
                 " Map message will not be sent."
             )
+
+    def publish_pose(
+        self, x: float, y: float, yaw: float, frame_id: str, *args, **kwargs
+    ) -> None:
+        """Publish a pose to InOrbit. If the frame_id is different from the last
+        published, it calls self.publish_map() to update the map.
+        """
+        self._robot_session.publish_pose(x, y, yaw, frame_id, *args, **kwargs)
+        if frame_id != self._last_published_frame_id:
+            self._logger.info(f"Updating map {frame_id} with new pose.")
+            self.publish_map(frame_id, is_update=True)
 
     def start(self) -> None:
         """Start the execution loop of this connector.
