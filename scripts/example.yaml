@@ -9,6 +9,14 @@ my-example-robot:
   connector_update_freq: 5.0
   # The ID of the InOrbit account that owns the robots
   account_id: my_inorbit_account
+  # Map configuration (optional)
+  maps:
+    frameIdA:
+      file: /path/to/mapA.png
+      map_id: mapA
+      origin_x: 0.0
+      origin_y: 0.0
+      resolution: 0.05
 
   # This is where you define custom fields specific to your robot's connector
   connector_config:
