@@ -7,16 +7,21 @@ my-example-robot:
   connector_type: example_bot
   # Update rate of the connector's main execution loop in Hz
   connector_update_freq: 5.0
-  # The ID of the InOrbit account that owns the robots
+  # The ID of the InOrbit account that owns the robots (optional, required for use of footprints)
   account_id: my_inorbit_account
   # Map configuration (optional)
   maps:
     frameIdA:
-      file: /path/to/mapA.png
+      file: ./example_map.png
       map_id: mapA
       origin_x: 0.0
       origin_y: 0.0
       resolution: 0.05
+  # User scripts directory (optional)
+  user_scripts_dir: ./
+  # Extra environment variables, useful for running user scripts (optional)
+  env_vars:
+    MY_ENV_VAR: my_value
 
   # This is where you define custom fields specific to your robot's connector
   connector_config:

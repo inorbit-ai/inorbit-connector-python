@@ -4,6 +4,7 @@
 # Copyright 2024 InOrbit, Inc.
 
 # Standard
+import os
 import logging
 import threading
 from time import sleep
@@ -47,6 +48,11 @@ class Connector:
         # Logging information
         self._logger = logging.getLogger(__name__)
         self._logger.setLevel(config.log_level.value)
+
+        # Set up environment variables
+        for env_var_name, env_var_value in config.env_vars.items():
+            self._logger.info(f"Setting environment variable '{env_var_name}'")
+            os.environ[env_var_name] = env_var_value
 
         # Create the robot session in InOrbit
         robot_session_config = RobotSessionModel(

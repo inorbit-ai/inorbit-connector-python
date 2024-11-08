@@ -82,6 +82,9 @@ class InorbitConnectorConfig(BaseModel):
         account_id (str | None, optional): InOrbit account id, required for publishing
             footprints
         maps (dict[str, MapConfig], optional): frame_id to map configuration mapping
+        environment (dict[str, str], optional): Environment variables to be set in the
+            connector or user scripts. The key is the environment variable name and the
+            value is the value to set.
     """
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
@@ -95,6 +98,7 @@ class InorbitConnectorConfig(BaseModel):
     user_scripts_dir: DirectoryPath | None = None
     account_id: str | None = None
     maps: dict[str, MapConfig] = {}
+    env_vars: dict[str, str] = {}
 
     # noinspection PyMethodParameters
     @field_validator("api_key", "account_id")
