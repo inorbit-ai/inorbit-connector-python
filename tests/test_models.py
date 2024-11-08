@@ -81,6 +81,13 @@ class TestInorbitConnectorConfig:
         )
         assert len(model.maps.keys()) == 1
 
+    def test_with_valid_input_and_env_vars(self, base_model):
+        model = InorbitConnectorConfig(
+            **base_model,
+            env_vars={"ENV_VAR": "env_value"},
+        )
+        assert model.env_vars == {"ENV_VAR": "env_value"}
+
     def test_invalid_api_key(self, base_model):
         init_input = base_model.copy()
         init_input["api_key"] = "key with spaces"

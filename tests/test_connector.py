@@ -237,3 +237,9 @@ class TestConnector:
             assert mock_publish_map.call_count == 1  # Not called again
             connector.publish_pose(0, 0, 0, "frameB")
             assert mock_publish_map.call_count == 2  # Called again
+
+    def test_uses_env_vars(self, base_model):
+        base_model["env_vars"] = {"ENV_VAR": "env_value"}
+        Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        assert "ENV_VAR" in os.environ
+        assert os.environ["ENV_VAR"] == "env_value"
