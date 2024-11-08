@@ -4,6 +4,7 @@
 # Copyright 2024 InOrbit, Inc.
 
 # Standard
+import os
 import logging
 import threading
 from time import sleep
@@ -25,7 +26,7 @@ class Connector:
     disconnect() methods (with calls to the superclass).
     """
 
-    def __init__(self, robot_id: str, config: InorbitConnectorConfig) -> None:
+    def __init__(self, robot_id: str, config: InorbitConnectorConfig, **kwargs) -> None:
         """Initialize a new InOrbit connector.
 
         This class handles bidirectional communication with InOrbit.
@@ -33,6 +34,16 @@ class Connector:
         Args:
             robot_id (str): The ID of the InOrbit robot
             config (InorbitConnectorConfig): The connector configuration
+
+        Keyword Args:
+            register_user_scripts (bool): Register user scripts automatically.
+                Default is False
+            default_user_scripts_dir (str): The default user scripts directory path to
+                use if not explicitly set in the config.
+                Default is "~/.inorbit_connectors/connector-{robot_id}/local/"
+            create_user_scripts_dir (bool): The path to the user scripts directory.
+                Relevant only if register_user_scripts is True.
+                Default is False
         """
 
         # Common information
@@ -57,6 +68,41 @@ class Connector:
             robot_name=robot_id,
         )
         self._robot_session = RobotSession(**robot_session_config.model_dump())
+
+        # If enabled, register user scripts
+        if kwargs.get("register_user_scripts", False):
+            # Get user_scripts path
+            path = config.user_scripts_dir
+            if path is None:
+                path = kwargs.get(
+                    "default_user_scripts_dir",
+                    f"~/.inorbit_connectors/connector-{robot_id}/local/",
+                )
+            user_scripts_path = os.path.expanduser(path)
+            create_dir = kwargs.get("create_user_scripts_dir", False)
+            self._register_user_scripts(user_scripts_path, create_dir)
+
+    def _register_user_scripts(self, dir: str, create: bool) -> None:
+        """Register user scripts folder.
+
+        Args:
+            dir (str): The path to the user scripts directory.
+            create (bool): Create the directory if it doesn't exist.
+        """
+        if not os.path.exists(dir):
+            if create:
+                self._logger.info(f"Creating user_scripts directory: {dir}")
+                os.makedirs(dir, exist_ok=True)
+            else:
+                self._logger.warning(f"User_scripts directory not found: {dir}")
+                return
+        if os.path.exists(dir):
+            self._logger.info(f"Registering user_scripts path: {dir}")
+            # NOTE: this only supports bash execution (exec_name_regex is set to
+            # files with '.sh' extension).
+            # More script types can be supported, but right now is only limited to
+            # bash scripts
+            self._robot_session.register_commands_path(dir, exec_name_regex=r".*\.sh")
 
     def _connect(self) -> None:
         """Connect to any external services.

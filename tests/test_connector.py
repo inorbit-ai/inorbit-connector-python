@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch, MagicMock
 # Third-party
 import pytest
 from inorbit_edge.models import CameraConfig
+from inorbit_edge.robot import RobotSession
 from pydantic import BaseModel
 
 # InOrbit
@@ -39,6 +40,7 @@ class TestConnector:
         return Connector("TestRobot", InorbitConnectorConfig(**base_model))
 
     def test_init(self, base_model):
+
         config = InorbitConnectorConfig(**base_model)
         robot_id = "TestRobot"
 
@@ -237,3 +239,47 @@ class TestConnector:
             assert mock_publish_map.call_count == 1  # Not called again
             connector.publish_pose(0, 0, 0, "frameB")
             assert mock_publish_map.call_count == 2  # Called again
+
+    def test_registers_user_scripts(self, base_model, tmp_path):
+        with patch(
+            f"{RobotSession.__module__}.{RobotSession.__name__}"
+            ".register_commands_path",
+            autospec=True,
+        ) as mock_path_session:
+            # Test it doesn't register callbacks if no user scripts are specified
+            Connector("TestRobot", InorbitConnectorConfig(**base_model))
+            mock_path_session.assert_not_called()
+            mock_path_session.reset_mock()
+
+            # Test it attepts to registers callbacks if user scripts are specified, but
+            # fails if the directory does not exist
+            Connector(
+                "TestRobot",
+                InorbitConnectorConfig(**base_model),
+                register_user_scripts=True,
+                default_user_scripts_dir=tmp_path / "./not_a_dir",
+            )
+            mock_path_session.assert_not_called()
+            mock_path_session.reset_mock()
+
+            # Test it attepts to registers callbacks if user scripts are specified and
+            # the directory exists
+            Connector(
+                "TestRobot",
+                InorbitConnectorConfig(**base_model),
+                register_user_scripts=True,
+                default_user_scripts_dir=tmp_path,
+            )
+            mock_path_session.assert_called_once()
+            mock_path_session.reset_mock()
+
+            # Test it creates the scripts folder if specified
+            Connector(
+                "TestRobot",
+                InorbitConnectorConfig(**base_model),
+                register_user_scripts=True,
+                default_user_scripts_dir=tmp_path / "a_dir",
+                create_user_scripts_dir=True,
+            )
+            mock_path_session.assert_called_once()
+            mock_path_session.reset_mock()
