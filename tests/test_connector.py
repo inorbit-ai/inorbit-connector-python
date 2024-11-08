@@ -56,6 +56,16 @@ class TestConnector:
         assert connector._robot_session.endpoint == str(config.api_url)
         assert connector._robot_session.use_ssl is True
         assert connector._robot_session.use_websockets is False
+        assert connector._robot_session.robot_key is None
+
+    def test_init_with_robot_key(self, base_model):
+        config = InorbitConnectorConfig(
+            **base_model, inorbit_robot_key="valid_robot_key"
+        )
+        robot_id = "TestRobot"
+
+        connector = Connector(robot_id, config)
+        assert connector._robot_session.robot_key == "valid_robot_key"
 
     def test_connect_calls_robot_session_connect(self, base_connector):
         base_connector._robot_session = Mock()

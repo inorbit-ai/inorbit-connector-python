@@ -55,6 +55,7 @@ class Connector:
             account_id=config.account_id,
             robot_id=robot_id,
             robot_name=robot_id,
+            robot_key=config.inorbit_robot_key,
         )
         self._robot_session = RobotSession(**robot_session_config.model_dump())
 
