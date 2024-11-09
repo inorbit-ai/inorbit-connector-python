@@ -152,5 +152,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# Covers JetBrains IDEs
-.idea/**
+# Covers various IDEs
+.idea/
+.vscode/
