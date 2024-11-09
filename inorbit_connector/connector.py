@@ -81,6 +81,9 @@ class Connector:
             user_scripts_path = os.path.expanduser(path)
             create_dir = kwargs.get("create_user_scripts_dir", False)
             self._register_user_scripts(user_scripts_path, create_dir)
+        # If enabled, register the provided custom commands handler
+        if kwargs.get("register_custom_command_handler", True):
+            self._register_custom_command_handler(self._inorbit_command_handler)
 
     def _register_user_scripts(self, dir: str, create: bool) -> None:
         """Register user scripts folder.
@@ -103,6 +106,31 @@ class Connector:
             # More script types can be supported, but right now is only limited to
             # bash scripts
             self._robot_session.register_commands_path(dir, exec_name_regex=r".*\.sh")
+
+    def _register_custom_command_handler(self, handler: callable) -> None:
+        """Register a custom command handler.
+
+        Args:
+            handler (Callable): The custom command handler.
+        """
+        self._robot_session.register_custom_command_handler(handler)
+
+    def _inorbit_command_handler(self, command_name: str, args: list, options: dict):
+        """Callback method for command messages. This method is called when a command
+        is received from InOrbit.
+        Will automatically be registered if `register_custom_command_handler`
+        constructor keyword argument is set.
+
+        Args:
+            command_name (str): The name of the command
+            args (list): The list of arguments
+            options (dict): The dictionary of options.
+                It usually contains `result_function()` which must be called with "0"
+                to indicate success or any other value to indicate failure. See
+                https://github.com/inorbit-ai/edge-sdk-python for usage information.
+        """
+        # Overwrite this in subclass to handle custom commands
+        self._logger.warning(f"Custom command {command_name} not implemented.")
 
     def _connect(self) -> None:
         """Connect to any external services.
