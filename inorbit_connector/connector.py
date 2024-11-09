@@ -113,7 +113,7 @@ class Connector:
         Args:
             handler (Callable): The custom command handler.
         """
-        self._robot_session.register_custom_command_handler(handler)
+        self._robot_session.register_command_callback(handler)
 
     def _inorbit_command_handler(self, command_name: str, args: list, options: dict):
         """Callback method for command messages. This method is called when a command
