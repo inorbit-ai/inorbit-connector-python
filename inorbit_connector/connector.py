@@ -59,6 +59,11 @@ class Connector:
         self._logger = logging.getLogger(__name__)
         self._logger.setLevel(config.log_level.value)
 
+        # Set up environment variables
+        for env_var_name, env_var_value in config.env_vars.items():
+            self._logger.info(f"Setting environment variable '{env_var_name}'")
+            os.environ[env_var_name] = env_var_value
+
         # Create the robot session in InOrbit
         robot_session_config = RobotSessionModel(
             api_key=config.api_key,
@@ -66,6 +71,7 @@ class Connector:
             account_id=config.account_id,
             robot_id=robot_id,
             robot_name=robot_id,
+            robot_key=config.inorbit_robot_key,
         )
         self._robot_session = RobotSession(**robot_session_config.model_dump())
 

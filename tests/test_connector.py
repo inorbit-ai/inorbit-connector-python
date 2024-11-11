@@ -58,6 +58,16 @@ class TestConnector:
         assert connector._robot_session.endpoint == str(config.api_url)
         assert connector._robot_session.use_ssl is True
         assert connector._robot_session.use_websockets is False
+        assert connector._robot_session.robot_key is None
+
+    def test_init_with_robot_key(self, base_model):
+        config = InorbitConnectorConfig(
+            **base_model, inorbit_robot_key="valid_robot_key"
+        )
+        robot_id = "TestRobot"
+
+        connector = Connector(robot_id, config)
+        assert connector._robot_session.robot_key == "valid_robot_key"
 
     def test_connect_calls_robot_session_connect(self, base_connector):
         base_connector._robot_session = Mock()
@@ -302,3 +312,9 @@ class TestConnector:
                 register_custom_command_handler=False,
             )
             mock_register_callback.assert_not_called()
+
+    def test_uses_env_vars(self, base_model):
+        base_model["env_vars"] = {"ENV_VAR": "env_value"}
+        Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        assert "ENV_VAR" in os.environ
+        assert os.environ["ENV_VAR"] == "env_value"
