@@ -115,6 +115,7 @@ class Connector:
         """
         self._robot_session.register_command_callback(handler)
 
+    # noinspection PyUnusedLocal
     def _inorbit_command_handler(self, command_name: str, args: list, options: dict):
         """Callback method for command messages. This method is called when a command
         is received from InOrbit.
