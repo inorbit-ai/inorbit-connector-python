@@ -84,6 +84,9 @@ class InorbitConnectorConfig(BaseModel):
         inorbit_robot_key (str | None, optional): Robot key for InOrbit Connect robots.
             See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
         maps (dict[str, MapConfig], optional): frame_id to map configuration mapping
+        environment (dict[str, str], optional): Environment variables to be set in the
+            connector or user scripts. The key is the environment variable name and the
+            value is the value to set.
     """
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
@@ -98,6 +101,7 @@ class InorbitConnectorConfig(BaseModel):
     account_id: str | None = None
     inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
+    env_vars: dict[str, str] = {}
 
     # noinspection PyMethodParameters
     @field_validator("api_key", "account_id")
