@@ -81,6 +81,8 @@ class InorbitConnectorConfig(BaseModel):
             scripts
         account_id (str | None, optional): InOrbit account id, required for publishing
             footprints
+        inorbit_robot_key (str | None, optional): Robot key for InOrbit Connect robots.
+            See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
         maps (dict[str, MapConfig], optional): frame_id to map configuration mapping
     """
 
@@ -94,6 +96,7 @@ class InorbitConnectorConfig(BaseModel):
     log_level: LogLevels = LogLevels.INFO
     user_scripts_dir: DirectoryPath | None = None
     account_id: str | None = None
+    inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
 
     # noinspection PyMethodParameters
