@@ -85,27 +85,27 @@ class Connector:
         if kwargs.get("register_custom_command_handler", True):
             self._register_custom_command_handler(self._inorbit_command_handler)
 
-    def _register_user_scripts(self, dir: str, create: bool) -> None:
+    def _register_user_scripts(self, path: str, create: bool) -> None:
         """Register user scripts folder.
 
         Args:
-            dir (str): The path to the user scripts directory.
+            path (str): The path to the user scripts directory.
             create (bool): Create the directory if it doesn't exist.
         """
-        if not os.path.exists(dir):
+        if not os.path.exists(path):
             if create:
-                self._logger.info(f"Creating user_scripts directory: {dir}")
-                os.makedirs(dir, exist_ok=True)
+                self._logger.info(f"Creating user_scripts directory: {path}")
+                os.makedirs(path, exist_ok=True)
             else:
-                self._logger.warning(f"User_scripts directory not found: {dir}")
+                self._logger.warning(f"User_scripts directory not found: {path}")
                 return
-        if os.path.exists(dir):
-            self._logger.info(f"Registering user_scripts path: {dir}")
+        if os.path.exists(path):
+            self._logger.info(f"Registering user_scripts path: {path}")
             # NOTE: this only supports bash execution (exec_name_regex is set to
             # files with '.sh' extension).
             # More script types can be supported, but right now is only limited to
             # bash scripts
-            self._robot_session.register_commands_path(dir, exec_name_regex=r".*\.sh")
+            self._robot_session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
     def _register_custom_command_handler(self, handler: callable) -> None:
         """Register a custom command handler.
