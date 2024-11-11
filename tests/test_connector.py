@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch, MagicMock
 # Third-party
 import pytest
 from inorbit_edge.models import CameraConfig
+from inorbit_edge.robot import RobotSession
 from pydantic import BaseModel
 
 # InOrbit
@@ -39,6 +40,7 @@ class TestConnector:
         return Connector("TestRobot", InorbitConnectorConfig(**base_model))
 
     def test_init(self, base_model):
+
         config = InorbitConnectorConfig(**base_model)
         robot_id = "TestRobot"
 
@@ -247,6 +249,69 @@ class TestConnector:
             assert mock_publish_map.call_count == 1  # Not called again
             connector.publish_pose(0, 0, 0, "frameB")
             assert mock_publish_map.call_count == 2  # Called again
+
+    def test_register_user_scripts(self, base_model, tmp_path):
+        with patch(
+            f"{RobotSession.__module__}.{RobotSession.__name__}"
+            ".register_commands_path",
+            autospec=True,
+        ) as mock_register_path:
+            # Test it doesn't register callbacks if no user scripts are specified
+            Connector("TestRobot", InorbitConnectorConfig(**base_model))
+            mock_register_path.assert_not_called()
+            mock_register_path.reset_mock()
+
+            # Test it attepts to registers callbacks if user scripts are specified, but
+            # fails if the directory does not exist
+            Connector(
+                "TestRobot",
+                InorbitConnectorConfig(**base_model),
+                register_user_scripts=True,
+                default_user_scripts_dir=tmp_path / "./not_a_dir",
+            )
+            mock_register_path.assert_not_called()
+            mock_register_path.reset_mock()
+
+            # Test it attepts to registers callbacks if user scripts are specified and
+            # the directory exists
+            Connector(
+                "TestRobot",
+                InorbitConnectorConfig(**base_model),
+                register_user_scripts=True,
+                default_user_scripts_dir=tmp_path,
+            )
+            mock_register_path.assert_called_once()
+            mock_register_path.reset_mock()
+
+            # Test it creates the scripts folder if specified
+            Connector(
+                "TestRobot",
+                InorbitConnectorConfig(**base_model),
+                register_user_scripts=True,
+                default_user_scripts_dir=tmp_path / "a_dir",
+                create_user_scripts_dir=True,
+            )
+            mock_register_path.assert_called_once()
+            mock_register_path.reset_mock()
+
+    def test_register_command_callback(self, base_model):
+        with patch(
+            f"{Connector.__module__}.{Connector.__name__}"
+            "._register_custom_command_handler",
+            autospec=True,
+        ) as mock_register_callback:
+            # Test it registers by default
+            Connector("TestRobot", InorbitConnectorConfig(**base_model))
+            mock_register_callback.assert_called_once()
+            mock_register_callback.reset_mock()
+
+            # Test it doesn't register if explicitly disabled
+            Connector(
+                "TestRobot",
+                InorbitConnectorConfig(**base_model),
+                register_custom_command_handler=False,
+            )
+            mock_register_callback.assert_not_called()
 
     def test_uses_env_vars(self, base_model):
         base_model["env_vars"] = {"ENV_VAR": "env_value"}
