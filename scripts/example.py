@@ -7,7 +7,6 @@
 import logging
 import os
 import random
-from time import sleep
 
 # Third-party
 from pydantic import field_validator, BaseModel
@@ -160,9 +159,7 @@ def main():
     connector.start()
 
     try:
-        while True:
-            # Yield execution to another thread
-            sleep(0)
+        connector.join()
     except KeyboardInterrupt:
         logger.info("...exiting")
         connector.stop()
