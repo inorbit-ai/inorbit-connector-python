@@ -11,7 +11,7 @@ my-example-robot:
   account_id: my_inorbit_account
   # Robot key for InOrbit Connect robots (optional, delete if unused)
   # See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
-  inorbit_robot_key: my_inorbit_robot_key
+  inorbit_robot_key:
   # Map configuration (optional)
   maps:
     frameIdA:

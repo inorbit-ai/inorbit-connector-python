@@ -246,6 +246,14 @@ class Connector:
             self.__thread = threading.Thread(target=self.__run)
             self.__thread.start()
 
+    def join(self) -> None:
+        """Join the execution loop of this connector.
+
+        This method should be called to join the execution loop of this connector and
+        will block until it ends.
+        """
+        self.__thread.join()
+
     def stop(self) -> None:
         """Stop the execution loop of this connector.
 
