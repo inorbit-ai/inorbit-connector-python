@@ -119,7 +119,25 @@ class Connector:
         Args:
             handler (Callable): The custom command handler.
         """
-        self._robot_session.register_command_callback(handler)
+
+        def handler_wrapper(command_name: str, args: list, options: dict):
+            try:
+                handler(command_name, args, options)
+            except Exception as e:
+                self._logger.error(f"Error handling command {command_name}: {e}")
+                self._logger.error(
+                    f"Failed to execute command '{command_name}' with args {args}. "
+                    f"Exception:\n{e}"
+                )
+                options["result_function"](
+                    "1",
+                    execution_status_details=(
+                        "An error occured executing custom command"
+                    ),
+                    stderr=str(e),
+                )
+
+        self._robot_session.register_command_callback(handler_wrapper)
 
     # noinspection PyUnusedLocal
     def _inorbit_command_handler(self, command_name: str, args: list, options: dict):
