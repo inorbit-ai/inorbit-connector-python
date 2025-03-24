@@ -22,9 +22,6 @@ with open("README.md") as file:
 with open("requirements.txt", "r") as file:
     install_requirements = file.read().splitlines()
 
-with open("requirements-dev.txt", "r") as file:
-    dev_requirements = file.read().splitlines()
-
 setup(
     author="InOrbit, Inc.",
     author_email="support@inorbit.ai",
@@ -44,10 +41,7 @@ setup(
     description="A Python library for connectors in the InOrbit RobOps ecosystem.",
     download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/{VERSION}.zip",
     install_requires=install_requirements,
-    extras_require={
-        "dev": dev_requirements + install_requirements,
-        "test": dev_requirements + install_requirements,
-    },
+    extras_require={},
     keywords=["inorbit", "robops", "robotics"],
     license="MIT",
     long_description=long_description,
