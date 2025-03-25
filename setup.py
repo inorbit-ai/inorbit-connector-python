@@ -37,7 +37,6 @@ setup(
     description="A Python library for connectors in the InOrbit RobOps ecosystem.",
     download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/{VERSION}.zip",
     install_requires=install_requirements,
-    extras_require={},
     keywords=["inorbit", "robops", "robotics"],
     license="MIT",
     long_description=long_description,
