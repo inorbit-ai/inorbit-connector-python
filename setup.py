@@ -11,10 +11,6 @@ VERSION = "0.4.0"
 
 GITHUB_ORG_URL = "https://github.com/inorbit-ai"
 GITHUB_REPO_URL = f"{GITHUB_ORG_URL}/inorbit-connector-python"
-TEAMCITY_PROJECT_URL = (
-    "https://inorbit.teamcity.com/project/"
-    "Engineering_Development_DeveloperPortal_InorbitConnectorPython"
-)
 
 with open("README.md") as file:
     long_description = file.read()
@@ -51,7 +47,6 @@ setup(
     packages=find_packages(),
     platforms=["Linux", "Windows", "macOS"],
     project_urls={
-        "CI/CD": TEAMCITY_PROJECT_URL,
         "Tracker": f"{GITHUB_REPO_URL}/issues",
         "Contributing": f"{GITHUB_REPO_URL}/blob/v{VERSION}/CONTRIBUTING.md",
         "Code of Conduct": f"{GITHUB_REPO_URL}/blob/v{VERSION}/CODE_OF_CONDUCT.md",
