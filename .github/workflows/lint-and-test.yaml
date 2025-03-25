@@ -11,7 +11,7 @@ on:
 jobs:
   lint-and-test:
     name: Lint and Test 🔍
-    runs-on: ubuntu-latest
+    runs-on: [ubuntu-latest, macos-latest, windows-latest]
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12']
