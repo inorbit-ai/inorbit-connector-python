@@ -13,7 +13,7 @@ To run the example:
 2) Install the `inorbit_connector` library in a virtual environment:
     ```shell
     virtualenv .venv
-    source .venv/bin/activeate
+    source .venv/bin/activate
     pip install .
     ```
 3) Source your environment file:
