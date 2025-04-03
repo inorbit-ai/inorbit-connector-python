@@ -129,6 +129,15 @@ class ExampleBotConnector(Connector):
         hdd = random.uniform(0.3, 0.7)
         self._robot_session.publish_system_stats(cpu, ram, hdd)
 
+        # Publish pose...
+        x = random.uniform(-1.0, 1.0)
+        y = random.uniform(-1.0, 1.0)
+        yaw = random.uniform(-3.14, 3.14)
+        # Note that if the frame_id is present in the maps definition,
+        # the map image will be automatically uploaded to InOrbit.
+        frame_id = "frameIdA"
+        self.publish_pose(x, y, yaw, frame_id)
+
 
 def main():
     # Setup the logger
