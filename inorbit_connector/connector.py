@@ -6,8 +6,8 @@
 # Standard
 import os
 import logging
+import asyncio
 import threading
-from time import sleep
 
 # Third Party
 from inorbit_edge.models import RobotSessionModel
@@ -52,8 +52,12 @@ class Connector:
         self._last_published_frame_id = None
 
         # Threading for the main run methods
-        self.__stop_event = threading.Event()
+        # The connector runs in an asycio loop within a spawned thread
+        self.__stop_event = asyncio.Event()
         self.__thread = threading.Thread(target=self.__run)
+
+        self.loop = asyncio.get_event_loop() or asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)  # TODO
 
         # Logging information
         self._logger = logging.getLogger(__name__)
@@ -87,6 +91,7 @@ class Connector:
             user_scripts_path = os.path.expanduser(path)
             create_dir = kwargs.get("create_user_scripts_dir", False)
             self._register_user_scripts(user_scripts_path, create_dir)
+
         # If enabled, register the provided custom commands handler
         if kwargs.get("register_custom_command_handler", True):
             self._register_custom_command_handler(self._inorbit_command_handler)
@@ -189,7 +194,7 @@ class Connector:
         self._robot_session.disconnect()
 
     # noinspection PyMethodMayBeStatic
-    def _execution_loop(self) -> None:
+    async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
         This method should be overridden by subclasses to provide the execution loop for
@@ -203,8 +208,8 @@ class Connector:
         self._logger.warning("Execution loop is empty.")
 
     def publish_map(self, frame_id: str, is_update: bool = False) -> None:
-        """Publish a map to InOrbit. If `frame_id` is not found in the maps
-        configuration, this method will do nothing.
+        """Publish the map metadata to InOrbit. If `frame_id` is not found in the maps
+        configuration, this method will not publish anything.
         """
         if map_config := self.config.maps.get(frame_id):
             self._robot_session.publish_map(
@@ -238,9 +243,16 @@ class Connector:
     def start(self) -> None:
         """Start the execution loop of this connector.
 
-        This method should be called to start the execution loop of this connector. It
-        will block until the execution loop is started but run the loop on a new thread
-        and will also call connect() to connect to any external services.
+        This method should be called to start the execution of this connector. It
+        creates an event loop in a new thread and runs the connector in it.
+
+        After calling start(), use join() to block until the connector is stopped.
+        Use stop() to stop the connector.
+
+        It:
+        - calls self._connect() to connect to any external services.
+        - sets up camera feeds defined in the configuration.
+        - runs the execution loop in a new thread.
         """
 
         # Prevent starting already running thread
@@ -260,8 +272,15 @@ class Connector:
                 clean = {k: v for k, v in dump.items() if v is not None}
                 self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
 
-            # Create new thread if an old thread finished
-            self.__thread = threading.Thread(target=self.__run)
+            # Create the event loop to run on a new thread
+            def run_event_loop():
+                try:
+                    self.loop.run_until_complete(self.__run())
+                finally:
+                    self.loop.close()
+
+            # Create and start the thread
+            self.__thread = threading.Thread(target=run_event_loop)
             self.__thread.start()
 
     def join(self) -> None:
@@ -287,13 +306,17 @@ class Connector:
         # Cleanup external connections
         self._disconnect()
 
-    def __run(self) -> None:
-        """The main run thread method for the connector.
+    async def __run(self) -> None:
+        """The main coroutine of the connector.
 
-        This method will be called on a new thread and will run the execution loop of
-        the connector until the stop event is set.
+        This coroutine will run the execution loop of the connector until the stop event
+        is set.
+        It uses self.config.update_freq to set a maximum frequency for the execution
+        loop, but it will never run faster than the actual execution of the loop body.
         """
 
         while not self.__stop_event.is_set():
-            self._execution_loop()
-            sleep(1.0 / self.config.update_freq)
+            await asyncio.gather(
+                self._execution_loop(),
+                asyncio.sleep(1.0 / self.config.update_freq),
+            )
