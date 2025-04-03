@@ -104,7 +104,7 @@ class ExampleBotConnector(Connector):
 
         This method should always call super.
         """
-        super()._connect()
+        super()._disconnect()
         # Do some magic here...
         self._logger.info(f"Disconnected to robot services at API {self.api_version}")
 
