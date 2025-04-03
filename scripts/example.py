@@ -4,6 +4,7 @@
 # Copyright 2024 InOrbit, Inc.
 
 # Standard
+import asyncio
 import logging
 import os
 import random
@@ -71,6 +72,18 @@ class ExampleBotConnectorConfig(InorbitConnectorConfig):
         return connector_type
 
 
+async def get_robot_linear_speed() -> float:
+    """Simulate a request to the robot's linear speed API."""
+    await asyncio.sleep(random.uniform(0.1, 0.3))
+    return random.uniform(0.1, 0.9)
+
+
+async def get_robot_angular_speed() -> float:
+    """Simulate a request to the robot's angular speed API."""
+    await asyncio.sleep(random.uniform(0.1, 0.3))
+    return random.uniform(0.1, 0.9)
+
+
 class ExampleBotConnector(Connector):
     """The example bot connector.
 
@@ -108,12 +121,11 @@ class ExampleBotConnector(Connector):
         # Do some magic here...
         self._logger.info(f"Disconnected to robot services at API {self.api_version}")
 
-    def _execution_loop(self) -> None:
+    async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
         This is where the meat of your connector is implemented. It is good practice to
-        handle things like action requests in a threaded manner so that the connector
-        does not block the execution loop.
+        handle things like API requests concurrently to speed up the execution loop.
         """
         # Do some magic here...
 
@@ -128,6 +140,20 @@ class ExampleBotConnector(Connector):
         ram = random.uniform(0.2, 0.8)
         hdd = random.uniform(0.3, 0.7)
         self._robot_session.publish_system_stats(cpu, ram, hdd)
+
+        # A common pattern is to poll REST endpoints for fresh robot data.
+        # asyncio-compatible libraries are great for this
+        linear_speed, angular_speed = await asyncio.gather(
+            get_robot_linear_speed(),
+            get_robot_angular_speed(),
+        )
+        odometry = {
+            "linear_speed": linear_speed,
+            "angular_speed": angular_speed,
+        }
+        self._robot_session.publish_odometry(**odometry)
+
+        self._logger.info("Robot data updated and published")
 
 
 def main():
