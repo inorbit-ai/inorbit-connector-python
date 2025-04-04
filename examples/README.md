@@ -54,12 +54,13 @@ This directory contains a more comprehensive example of a connector. In addition
 + TO-DO: A custom commands handler
 + TO-DO: An integration with the [`inorbit_edge_executor`](https://pypi.org/project/inorbit-edge-executor/) for mission execution.
 
-It is run in the same way as the `simple-connector` example:
+It is run in the same way as the `simple-connector` example, with the robot selection being done through the command line:
 
 ```shell
 cd examples/
 source example.env
-python robot-connector/connector.py
+python robot-connector/main.py --help
+python robot-connector/main.py --config example.yaml --robot_id my-example-robot
 ```
 
 To kill the connector, press `ctrl-c` in the terminal.
