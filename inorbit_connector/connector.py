@@ -10,6 +10,7 @@ import asyncio
 import threading
 import traceback
 from typing import Coroutine
+from abc import ABC, abstractmethod
 
 # Third Party
 from inorbit_edge.models import RobotSessionModel
@@ -20,12 +21,14 @@ from inorbit_edge.video import OpenCVCamera
 from inorbit_connector.models import InorbitConnectorConfig
 
 
-class Connector:
+class Connector(ABC):
     """Generic InOrbit connector.
 
-    This is the base class of an InOrbit connector. Subclasses should be implemented
-    to override the execution_loop() method and optionally connect() and
-    disconnect() methods (with calls to the superclass).
+    This is the base class of an InOrbit connector. Subclasses should implement all
+    abstract methods.
+
+    A lot of initialization logic is customizable through the configuration object. See
+    self.__init__() for more details.
     """
 
     def __init__(self, robot_id: str, config: InorbitConnectorConfig, **kwargs) -> None:
@@ -147,7 +150,7 @@ class Connector:
 
         self._robot_session.register_command_callback(handler_wrapper)
 
-    # noinspection PyUnusedLocal
+    @abstractmethod
     async def _inorbit_command_handler(
         self, command_name: str, args: list, options: dict
     ):
@@ -167,38 +170,46 @@ class Connector:
         # Overwrite this in subclass to handle custom commands
         self._logger.warning(f"Custom command {command_name} not implemented.")
 
+    @abstractmethod
     async def _connect(self) -> None:
         """Connect to any external services.
 
-        The base method handles connecting to InOrbit based on the provided
-        configuration. Subclasses should override this method to connect to any
-        external services ensuring to call the super method as well.
-
         This method should not be called directly. Instead, call the start() method to
         start the connector. This ensures that the connector is only started once.
+        """
+        pass
+
+    async def __connect(self) -> None:
+        """Initialte the connection to InOrbit based on the provided configfiguration.
+        Connects to any external services.
 
         Raises:
             Exception: If the robot session cannot connect.
         """
+        # Call the user-implemented connection logic
+        await self._connect()
 
         # Connect to InOrbit
         self._robot_session.connect()
 
+    @abstractmethod
     async def _disconnect(self) -> None:
         """Disconnect from any external services.
-
-        The base method handles disconnecting from InOrbit based on the provided
-        configuration. Subclasses should override this method to disconnect from any
-        external services ensuring to call the super method as well.
 
         This method should not be called directly. Instead, call the stop() method to
         stop the connector. This ensures that the connector is only stopped once.
         """
+        pass
+
+    async def __disconnect(self) -> None:
+        """Disconnect external services and disconnect from InOrbit."""
 
         # Disconnect from InOrbit
         self._robot_session.disconnect()
 
-    # noinspection PyMethodMayBeStatic
+        # Call the user-implemented disconnection logic
+        await self._disconnect()
+
     async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
@@ -265,7 +276,7 @@ class Connector:
             self.__stop_event.clear()
 
             # Connect to external services and create the InOrbit session
-            self.loop.run_until_complete(self._connect())
+            self.loop.run_until_complete(self.__connect())
 
             # Set up camera feeds
             for idx, camera_config in enumerate(self.config.cameras):
@@ -313,7 +324,7 @@ class Connector:
 
         # Cleanup external connections
         new_loop = asyncio.new_event_loop()
-        new_loop.run_until_complete(self._disconnect())
+        new_loop.run_until_complete(self.__disconnect())
         new_loop.close()
 
     async def __run(self) -> None:

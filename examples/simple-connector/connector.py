@@ -106,20 +106,14 @@ class ExampleBotConnector(Connector):
         self.custom_value = config.connector_config.example_bot_custom_value
 
     async def _connect(self) -> None:
-        """Connect to the robot services.
+        """Connect to the robot services."""
 
-        This method should always call super.
-        """
-        await super()._connect()
         # Do some magic here...
         self._logger.info(f"Connected to robot services at API {self.api_version}")
 
     async def _disconnect(self) -> None:
-        """Disconnect from the robot services.
+        """Disconnect from the robot services."""
 
-        This method should always call super.
-        """
-        await super()._disconnect()
         # Do some magic here...
         self._logger.info(f"Disconnected to robot services at API {self.api_version}")
 
@@ -156,6 +150,17 @@ class ExampleBotConnector(Connector):
         self._robot_session.publish_odometry(**odometry)
 
         self._logger.info("Robot data updated and published")
+
+    async def _inorbit_command_handler(
+        self, command_name: str, args: list, options: dict
+    ) -> None:
+        """Handle InOrbit commands."""
+        self._logger.info(f"Received command: {command_name}")
+        self._logger.info(f"Args: {args}")
+        self._logger.info(f"Options: {options}")
+        self._logger.info("Executing command...")
+        asyncio.sleep(1)
+        self._logger.info(f"Command {command_name} executed")
 
 
 def main():
