@@ -8,6 +8,8 @@ import os
 import logging
 import asyncio
 import threading
+import traceback
+from typing import Coroutine
 
 # Third Party
 from inorbit_edge.models import RobotSessionModel
@@ -118,16 +120,17 @@ class Connector:
             # bash scripts
             self._robot_session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
-    def _register_custom_command_handler(self, handler: callable) -> None:
-        """Register a custom command handler.
+    def _register_custom_command_handler(self, async_handler: Coroutine) -> None:
+        """Register an async custom command handler.
 
         Args:
-            handler (Callable): The custom command handler.
+            async_handler (Coroutine): The custom commands handler.
         """
 
         def handler_wrapper(command_name: str, args: list, options: dict):
             try:
-                handler(command_name, args, options)
+                # Handle the commands in the event loop
+                self.loop.run_until_complete(async_handler(command_name, args, options))
             except Exception as e:
                 self._logger.error(f"Error handling command {command_name}: {e}")
                 self._logger.error(
@@ -145,7 +148,9 @@ class Connector:
         self._robot_session.register_command_callback(handler_wrapper)
 
     # noinspection PyUnusedLocal
-    def _inorbit_command_handler(self, command_name: str, args: list, options: dict):
+    async def _inorbit_command_handler(
+        self, command_name: str, args: list, options: dict
+    ):
         """Callback method for command messages. This method is called when a command
         is received from InOrbit.
         Will automatically be registered if `register_custom_command_handler`
@@ -162,7 +167,7 @@ class Connector:
         # Overwrite this in subclass to handle custom commands
         self._logger.warning(f"Custom command {command_name} not implemented.")
 
-    def _connect(self) -> None:
+    async def _connect(self) -> None:
         """Connect to any external services.
 
         The base method handles connecting to InOrbit based on the provided
@@ -179,7 +184,7 @@ class Connector:
         # Connect to InOrbit
         self._robot_session.connect()
 
-    def _disconnect(self) -> None:
+    async def _disconnect(self) -> None:
         """Disconnect from any external services.
 
         The base method handles disconnecting from InOrbit based on the provided
@@ -260,7 +265,7 @@ class Connector:
             self.__stop_event.clear()
 
             # Connect to external services and create the InOrbit session
-            self._connect()
+            self.loop.run_until_complete(self._connect())
 
             # Set up camera feeds
             for idx, camera_config in enumerate(self.config.cameras):
@@ -276,6 +281,9 @@ class Connector:
             def run_event_loop():
                 try:
                     self.loop.run_until_complete(self.__run())
+                except Exception as e:
+                    self._logger.error(f"Error in execution loop: {e}")
+                    self._logger.error(f"Traceback: {traceback.format_exc()}")
                 finally:
                     self.loop.close()
 
@@ -304,7 +312,9 @@ class Connector:
         self.__thread.join()
 
         # Cleanup external connections
-        self._disconnect()
+        new_loop = asyncio.new_event_loop()
+        new_loop.run_until_complete(self._disconnect())
+        new_loop.close()
 
     async def __run(self) -> None:
         """The main coroutine of the connector.

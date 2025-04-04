@@ -105,21 +105,21 @@ class ExampleBotConnector(Connector):
         self.hw_rev = config.connector_config.example_bot_hw_rev
         self.custom_value = config.connector_config.example_bot_custom_value
 
-    def _connect(self) -> None:
+    async def _connect(self) -> None:
         """Connect to the robot services.
 
         This method should always call super.
         """
-        super()._connect()
+        await super()._connect()
         # Do some magic here...
         self._logger.info(f"Connected to robot services at API {self.api_version}")
 
-    def _disconnect(self) -> None:
+    async def _disconnect(self) -> None:
         """Disconnect from the robot services.
 
         This method should always call super.
         """
-        super()._connect()
+        await super()._disconnect()
         # Do some magic here...
         self._logger.info(f"Disconnected to robot services at API {self.api_version}")
 
