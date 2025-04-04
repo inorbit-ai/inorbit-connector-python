@@ -17,7 +17,9 @@ from inorbit_connector.connector import Connector
 from inorbit_connector.models import InorbitConnectorConfig
 from inorbit_connector.utils import read_yaml
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "example.yaml")
+CONFIG_FILE = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "../example.yaml"
+)
 ROBOT_ID = "my-example-robot"
 CONNECTOR_TYPE = "example_bot"
 
