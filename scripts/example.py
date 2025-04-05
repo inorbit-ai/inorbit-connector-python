@@ -104,7 +104,7 @@ class ExampleBotConnector(Connector):
 
         This method should always call super.
         """
-        super()._connect()
+        super()._disconnect()
         # Do some magic here...
         self._logger.info(f"Disconnected to robot services at API {self.api_version}")
 
@@ -128,6 +128,15 @@ class ExampleBotConnector(Connector):
         ram = random.uniform(0.2, 0.8)
         hdd = random.uniform(0.3, 0.7)
         self._robot_session.publish_system_stats(cpu, ram, hdd)
+
+        # Publish pose...
+        x = random.uniform(-1.0, 1.0)
+        y = random.uniform(-1.0, 1.0)
+        yaw = random.uniform(-3.14, 3.14)
+        # Note that if the frame_id is present in the maps definition,
+        # the map image will be automatically uploaded to InOrbit.
+        frame_id = "frameIdA"
+        self.publish_pose(x, y, yaw, frame_id)
 
 
 def main():
