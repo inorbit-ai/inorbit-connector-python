@@ -7,10 +7,11 @@
 import os
 import logging
 from time import sleep
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 
 # Third-party
 import pytest
+from pydantic import AnyHttpUrl
 from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import RobotSession
 from pydantic import BaseModel
@@ -24,16 +25,66 @@ class DummyConfig(BaseModel):
     pass
 
 
+class TestConnectorIsAbstract:
+    def test_connector_is_abstract(self):
+        assert Connector.__abstractmethods__ == {
+            "_connect",
+            "_disconnect",
+            "_execution_loop",
+            "_inorbit_command_handler",
+        }
+
+    def test_cannot_be_instantiated(self):
+        with pytest.raises(TypeError):
+            Connector("TestRobot", MagicMock())
+
+    def test_cannot_be_subclassed_without_overriding_abstract_methods(self):
+        class SubConnector(Connector):
+            pass
+
+        with pytest.raises(TypeError):
+            SubConnector("TestRobot", MagicMock())
+
+    def test_can_be_subclassed_with_all_abstract_methods_implemented(self):
+        class SubConnector(Connector):
+            def _connect(self):
+                pass
+
+            def _disconnect(self):
+                pass
+
+            def _execution_loop(self):
+                pass
+
+            def _inorbit_command_handler(self, command_name, args, options):
+                pass
+
+        connector = SubConnector(
+            "TestRobot",
+            InorbitConnectorConfig(
+                api_key="valid_key",
+                api_url="https://valid.com/",
+                connector_type="valid_connector",
+                connector_config=DummyConfig(),
+            ),
+        )
+        assert isinstance(connector, Connector)
+
+
 class TestConnector:
 
     @pytest.fixture
     def base_model(self):
         return {
             "api_key": "valid_key",
-            "api_url": "https://valid.com/",
+            "api_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
         }
+
+    @pytest.fixture(autouse=True)
+    def make_connector_not_abstract(self):
+        Connector.__abstractmethods__ = set()
 
     @pytest.fixture
     def base_connector(self, base_model):
@@ -69,69 +120,123 @@ class TestConnector:
         connector = Connector(robot_id, config)
         assert connector._robot_session.robot_key == "valid_robot_key"
 
-    def test_connect_calls_robot_session_connect(self, base_connector):
+    @pytest.mark.asyncio
+    async def test_connect_calls_robot_session_connect(self, base_connector):
         base_connector._robot_session = Mock()
-        base_connector._connect()
+        base_connector._connect = AsyncMock()
+        await base_connector._Connector__connect()
 
+        assert base_connector._connect.called
         assert base_connector._robot_session.connect.called
 
-    def test_connect_raises_error_when_failed_to_connect(self, base_connector):
+    @pytest.mark.asyncio
+    async def test_connect_raises_error_when_failed_to_connect(self, base_connector):
         base_connector._robot_session = Mock()
         base_connector._robot_session.connect.side_effect = Exception(
             "Failed to connect"
         )
 
         with pytest.raises(Exception) as e:
-            base_connector._connect()
+            await base_connector._Connector__connect()
         assert str(e.value) == "Failed to connect"
 
-    def test_disconnect(self, base_connector):
+    @pytest.mark.asyncio
+    async def test_disconnect(self, base_connector):
         base_connector._robot_session = Mock()
-        base_connector._disconnect()
+        base_connector._disconnect = AsyncMock()
+        await base_connector._Connector__disconnect()
 
+        assert base_connector._disconnect.called
         assert base_connector._robot_session.disconnect.called
-
-    def test_execution_loop(self, base_connector):
-        with patch("logging.Logger.warning", new=MagicMock()) as mock_warning:
-            mock_warning.assert_not_called()
-            base_connector._execution_loop()
-            mock_warning.assert_called_once_with("Execution loop is empty.")
 
     def test_start(self, base_model):
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
         with patch("threading.Thread") as mock_thread:
-            connector._connect = MagicMock()
+            connector._Connector__run_connector = MagicMock()
             connector.start()
-            connector._connect.assert_called_once()
-            mock_thread.assert_called()
+            assert not connector._Connector__stop_event.is_set()
+            mock_thread.assert_called_with(target=connector._Connector__run_connector)
             mock_thread().start.assert_called_once()
 
-    def test_start_with_cameras(self, base_model):
+    def test_run_connector(self, base_connector):
+        run_connector = base_connector._Connector__run_connector
+
+        with (
+            patch("asyncio.new_event_loop") as mock_loop,
+            patch("asyncio.set_event_loop") as mock_set_loop,
+        ):
+
+            # Setup mocks
+            mock_event_loop = MagicMock()
+            mock_loop.return_value = mock_event_loop
+            base_connector._Connector__connect = AsyncMock()
+            base_connector._Connector__run_loop = AsyncMock()
+            base_connector._Connector__disconnect = AsyncMock()
+            base_connector._robot_session = MagicMock()
+
+            # Call the method
+            run_connector()
+
+            # Verify the event loop was created and set
+            mock_loop.assert_called_once()
+            mock_set_loop.assert_called_once_with(mock_event_loop)
+
+            # Verify connect was called
+            base_connector._Connector__connect.assert_called_once()
+
+            # Verify run_loop was called
+            base_connector._Connector__run_loop.assert_called_once()
+
+            # Verify disconnect was called in the finally block
+            base_connector._Connector__disconnect.assert_called_once()
+
+            # Verify the loop was closed
+            mock_event_loop.close.assert_called_once()
+
+    def test_run_with_cameras(self, base_model):
         base_model["cameras"] = [CameraConfig(video_url="https://test.com/")]
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
-        with patch("threading.Thread") as mock_thread:
-            connector._connect = MagicMock()
-            connector._robot_session = MagicMock()
-            connector.start()
-            connector._connect.assert_called_once()
-            mock_thread.assert_called()
-            mock_thread().start.assert_called_once()
+        run_connector = connector._Connector__run_connector
 
-            connector._connect.assert_called_once()
+        with (
+            patch("asyncio.new_event_loop") as mock_loop,
+            patch("asyncio.set_event_loop"),
+        ):
+
+            # Setup mocks
+            mock_event_loop = MagicMock()
+            mock_loop.return_value = mock_event_loop
+            connector._Connector__connect = AsyncMock()
+            connector._Connector__run_loop = AsyncMock()
+            connector._Connector__disconnect = AsyncMock()
+            connector._robot_session.register_camera = MagicMock()
+
+            # Call the method
+            run_connector()
 
             assert connector._robot_session.register_camera.call_count == len(
                 connector.config.cameras
             )
 
-            mock_thread.assert_called()
-            mock_thread().start.assert_called_once()
-
-    def test_start_with_cameras_none_params_ignored(self, base_model):
+    def test_run_with_cameras_none_params_ignored(self, base_model):
         base_model["cameras"] = [CameraConfig(video_url="https://test.com/")]
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
-        with patch("threading.Thread") as mock_thread:
-            connector._connect = MagicMock()
-            connector.start()
+        run_connector = connector._Connector__run_connector
+
+        with (
+            patch("asyncio.new_event_loop") as mock_loop,
+            patch("asyncio.set_event_loop"),
+        ):
+
+            # Setup mocks
+            mock_event_loop = MagicMock()
+            mock_loop.return_value = mock_event_loop
+            connector._Connector__connect = AsyncMock()
+            connector._Connector__run_loop = AsyncMock()
+            connector._Connector__disconnect = AsyncMock()
+
+            # Call the method
+            run_connector()
 
             assert len(connector._robot_session.camera_streamers.keys()) == len(
                 connector.config.cameras
@@ -143,21 +248,27 @@ class TestConnector:
             assert streamer.camera.scaling == 0.3
             assert streamer.camera.quality == 35
 
-            connector._connect.assert_called_once()
-            mock_thread.assert_called()
-            mock_thread().start.assert_called_once()
-            connector._connect.assert_called_once()
-            mock_thread.assert_called()
-            mock_thread().start.assert_called_once()
-
-    def test_start_with_cameras_custom_params(self, base_model):
+    def test_run_with_cameras_custom_params(self, base_model):
         base_model["cameras"] = [
             CameraConfig(video_url="https://test.com/", rate=5, scaling=0.2, quality=30)
         ]
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
-        with patch("threading.Thread") as mock_thread:
-            connector._connect = MagicMock()
-            connector.start()
+        run_connector = connector._Connector__run_connector
+
+        with (
+            patch("asyncio.new_event_loop") as mock_loop,
+            patch("asyncio.set_event_loop"),
+        ):
+
+            # Setup mocks
+            mock_event_loop = MagicMock()
+            mock_loop.return_value = mock_event_loop
+            connector._Connector__connect = AsyncMock()
+            connector._Connector__run_loop = AsyncMock()
+            connector._Connector__disconnect = AsyncMock()
+
+            # Call the method
+            run_connector()
 
             assert len(connector._robot_session.camera_streamers.keys()) == len(
                 connector.config.cameras
@@ -169,29 +280,18 @@ class TestConnector:
             assert streamer.camera.quality == 30
             assert streamer.camera.video_url == str(base_model["cameras"][0].video_url)
 
-            connector._connect.assert_called_once()
-            mock_thread.assert_called()
-            mock_thread().start.assert_called_once()
-            connector._connect.assert_called_once()
-            mock_thread.assert_called()
-            mock_thread().start.assert_called_once()
-
     def test_stop(self, base_connector):
-        with (
-            patch.object(base_connector, "_disconnect") as mock_disconnect,
-            patch("threading.Event.set") as mock_thread_set,
-            patch("threading.Thread.join") as mock_thread_join,
-        ):
-            base_connector.stop()
+        base_connector._Connector__thread = MagicMock()
+        assert not base_connector._Connector__stop_event.is_set()
+        base_connector.stop()
+        assert base_connector._Connector__stop_event.is_set()
+        assert base_connector._Connector__thread.join.called
 
-            assert mock_disconnect.called
-            assert mock_thread_set.called
-            assert mock_thread_join.called
-
-    def test_run(self, base_model):
+    def test_run_loop(self, base_model):
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
-        connector._execution_loop = MagicMock()
+        connector._execution_loop = AsyncMock()
         connector._robot_session = Mock()
+        assert not connector._Connector__stop_event.is_set()
 
         connector.start()
         sleep(1.0 / connector.config.update_freq)

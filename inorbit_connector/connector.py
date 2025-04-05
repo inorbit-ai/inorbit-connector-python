@@ -8,7 +8,6 @@ import os
 import logging
 import asyncio
 import threading
-import time
 import traceback
 from typing import Coroutine
 from abc import ABC, abstractmethod
@@ -296,7 +295,6 @@ class Connector(ABC):
 
         # Stop the execution loop
         self.__stop_event.set()
-        time.sleep(1)
         self.__thread.join()
 
     def __run_connector(self):
