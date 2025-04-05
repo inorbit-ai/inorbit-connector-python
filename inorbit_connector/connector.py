@@ -177,7 +177,7 @@ class Connector(ABC):
         pass
 
     async def __connect(self) -> None:
-        """Initialte the connection to InOrbit based on the provided configfiguration.
+        """Initialte the connection to InOrbit based on the provided configuration.
         Connects to any external services.
 
         Raises:
