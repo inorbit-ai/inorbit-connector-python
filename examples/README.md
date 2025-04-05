@@ -4,11 +4,7 @@ This directory contains examples of connectors that can be used as a starting po
 
 ## `simple-connector/` 
 
-The contents of this directory demonstrate the basic usage of the `inorbit-connector` library. It can be run with the following command:
-
-```bash
-python simple-connector/simple_connector.py
-```
+The contents of this directory demonstrate the basic usage of the `inorbit-connector` library. 
 
 It includes example configurations and classes for a basic connector. The example will read in custom
 configuration values from `example.yaml`, create a connection to InOrbit based on the environment variables in
@@ -48,7 +44,7 @@ To kill the connector, press `ctrl-c` in the terminal.
 This directory contains a more comprehensive example of a connector. In addition to the contents of the `simple-connector` demo, it includes:
 
 + An entry point script with custom argument parsing
-+ A mock robot API class, which simulates a robot sending data to the connector
++ A mock robot API class, which simulates a robot's polling API for fetching real-time data
 + A connector class that publishes the robot data to InOrbit
 + Connector configuration classes with custom fields for the robot
 + TO-DO: A custom commands handler
