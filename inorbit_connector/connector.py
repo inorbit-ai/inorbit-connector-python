@@ -8,6 +8,7 @@ import os
 import logging
 import asyncio
 import threading
+import time
 import traceback
 from typing import Coroutine
 from abc import ABC, abstractmethod
@@ -57,12 +58,9 @@ class Connector(ABC):
         self._last_published_frame_id = None
 
         # Threading for the main run methods
-        # The connector runs in an asycio loop within a spawned thread
+        # The connector runs an asycio loop within a spawned thread
         self.__stop_event = asyncio.Event()
-        self.__thread = threading.Thread(target=self.__run)
-
-        self.loop = asyncio.get_event_loop() or asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)  # TODO
+        self.__thread = threading.Thread(target=self.__run_loop)
 
         # Logging information
         self._logger = logging.getLogger(__name__)
@@ -210,6 +208,7 @@ class Connector(ABC):
         # Call the user-implemented disconnection logic
         await self._disconnect()
 
+    @abstractmethod
     async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
@@ -219,9 +218,7 @@ class Connector(ABC):
         start or stop the connector. This ensures that the connector is only started or
         stopped once.
         """
-
-        # Overwrite this in subclass to something useful
-        self._logger.warning("Execution loop is empty.")
+        pass
 
     def publish_map(self, frame_id: str, is_update: bool = False) -> None:
         """Publish the map metadata to InOrbit. If `frame_id` is not found in the maps
@@ -257,7 +254,7 @@ class Connector(ABC):
         self._robot_session.publish_pose(x, y, yaw, frame_id, *args, **kwargs)
 
     def start(self) -> None:
-        """Start the execution loop of this connector.
+        """Start the connector in a new thread.
 
         This method should be called to start the execution of this connector. It
         creates an event loop in a new thread and runs the connector in it.
@@ -269,37 +266,16 @@ class Connector(ABC):
         - calls self._connect() to connect to any external services.
         - sets up camera feeds defined in the configuration.
         - runs the execution loop in a new thread.
+        - calls self._disconnect() to disconnect from any external services once the
+          connector is stopped.
         """
 
-        # Prevent starting already running thread
+        # Prevent starting an already running thread
         if not self.__thread.is_alive():
             self.__stop_event.clear()
 
-            # Connect to external services and create the InOrbit session
-            self.loop.run_until_complete(self.__connect())
-
-            # Set up camera feeds
-            for idx, camera_config in enumerate(self.config.cameras):
-                self._logger.info(
-                    f"Registering camera {idx}: {str(camera_config.video_url)}"
-                )
-                # If values are None, use default instead
-                dump = camera_config.model_dump()
-                clean = {k: v for k, v in dump.items() if v is not None}
-                self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
-
-            # Create the event loop to run on a new thread
-            def run_event_loop():
-                try:
-                    self.loop.run_until_complete(self.__run())
-                except Exception as e:
-                    self._logger.error(f"Error in execution loop: {e}")
-                    self._logger.error(f"Traceback: {traceback.format_exc()}")
-                finally:
-                    self.loop.close()
-
             # Create and start the thread
-            self.__thread = threading.Thread(target=run_event_loop)
+            self.__thread = threading.Thread(target=self.__run_connector)
             self.__thread.start()
 
     def join(self) -> None:
@@ -320,14 +296,43 @@ class Connector(ABC):
 
         # Stop the execution loop
         self.__stop_event.set()
+        time.sleep(1)
         self.__thread.join()
 
-        # Cleanup external connections
-        new_loop = asyncio.new_event_loop()
-        new_loop.run_until_complete(self.__disconnect())
-        new_loop.close()
+    def __run_connector(self):
+        """The target function of the connector's thread.
 
-    async def __run(self) -> None:
+        It connects to InOrbit via the edge-sdk, start the execution loop and
+        disconnects all services when the connector is signaled stop via self.stop().
+        """
+
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        # Connect to external services and create the InOrbit session
+        loop.run_until_complete(self.__connect())
+
+        # Set up camera feeds
+        for idx, camera_config in enumerate(self.config.cameras):
+            self._logger.info(
+                f"Registering camera {idx}: {str(camera_config.video_url)}"
+            )
+            # If values are None, use default instead
+            dump = camera_config.model_dump()
+            clean = {k: v for k, v in dump.items() if v is not None}
+            self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
+
+        try:
+            loop.run_until_complete(self.__run_loop())
+        except Exception as e:
+            self._logger.error(f"Error in execution loop: {e}")
+            self._logger.error(f"Traceback: {traceback.format_exc()}")
+        finally:
+            loop.run_until_complete(self.__disconnect())
+            loop.close()
+
+    async def __run_loop(self) -> None:
         """The main coroutine of the connector.
 
         This coroutine will run the execution loop of the connector until the stop event
