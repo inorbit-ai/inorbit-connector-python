@@ -1,5 +1,6 @@
 import argparse
 import logging
+import signal
 import sys
 
 from inorbit_connector.utils import read_yaml
@@ -56,13 +57,15 @@ def start():
 
     config = ExampleBotConnectorConfig(**yaml)
     connector = ExampleBotConnector(robot_id, config)
+    LOGGER.info("Starting connector...")
+    connector.start()
 
-    try:
-        connector.start()
-        connector.join()
-    except KeyboardInterrupt:
-        LOGGER.info("Received SIGINT, stopping connector")
-        connector.stop()
+    # Register a signal handler for graceful shutdown
+    # When a keyboard interrupt is received (Ctrl+C), the connector will be stopped
+    signal.signal(signal.SIGINT, lambda sig, frame: connector.stop())
+
+    # Wait for the connector to finish
+    connector.join()
 
 
 if __name__ == "__main__":

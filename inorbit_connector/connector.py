@@ -294,8 +294,12 @@ class Connector(ABC):
         """
 
         # Stop the execution loop
+        self._logger.info("Stopping connector")
         self.__stop_event.set()
-        self.__thread.join()
+        self.__thread.join(timeout=5)
+        if self.__thread.is_alive():
+            self._logger.error("Thread did not stop in time, forcefully killing")
+            self.__thread.kill()
 
     def __run_connector(self):
         """The target function of the connector's thread.

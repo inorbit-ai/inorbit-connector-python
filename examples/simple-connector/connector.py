@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import random
+import signal
 
 # Third-party
 from pydantic import field_validator, BaseModel
@@ -191,11 +192,12 @@ def main():
     connector = ExampleBotConnector(ROBOT_ID, config)
     connector.start()
 
-    try:
-        connector.join()
-    except KeyboardInterrupt:
-        logger.info("...exiting")
-        connector.stop()
+    # Register a signal handler for graceful shutdown
+    # When a keyboard interrupt is received (Ctrl+C), the connector will be stopped
+    signal.signal(signal.SIGINT, lambda sig, frame: connector.stop())
+
+    # Wait for the connector to finish
+    connector.join()
 
 
 if __name__ == "__main__":
