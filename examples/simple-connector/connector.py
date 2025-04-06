@@ -9,6 +9,7 @@ import logging
 import os
 import random
 import signal
+from typing import override
 
 # Third-party
 from pydantic import field_validator, BaseModel
@@ -106,18 +107,21 @@ class ExampleBotConnector(Connector):
         self.hw_rev = config.connector_config.example_bot_hw_rev
         self.custom_value = config.connector_config.example_bot_custom_value
 
+    @override
     async def _connect(self) -> None:
         """Connect to the robot services."""
 
         # Do some magic here...
         self._logger.info(f"Connected to robot services at API {self.api_version}")
 
+    @override
     async def _disconnect(self) -> None:
         """Disconnect from the robot services."""
 
         # Do some magic here...
         self._logger.info(f"Disconnected to robot services at API {self.api_version}")
 
+    @override
     async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
@@ -161,6 +165,7 @@ class ExampleBotConnector(Connector):
 
         self._logger.info("Robot data updated and published")
 
+    @override
     async def _inorbit_command_handler(
         self, command_name: str, args: list, options: dict
     ) -> None:

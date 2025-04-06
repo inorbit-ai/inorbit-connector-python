@@ -60,11 +60,10 @@ class Robot:
     def __init__(
         self,
         api_wrapper: ExampleBotAPIWrapper,
-        stop_event: asyncio.Event,
         default_update_freq: float,
     ):
         self._api_wrapper = api_wrapper
-        self._stop_event = stop_event
+        self._stop_event = asyncio.Event()
         self._telemetry_data: dict = {}
         self._system_stats: dict = {}
         self._robot_status: dict = {}
