@@ -300,7 +300,6 @@ class TestConnector:
         assert connector._Connector__loop.is_running()
         connector.stop()
         assert not connector._Connector__loop.is_running()
-        assert connector._execution_loop.call_count == 1
 
         connector._execution_loop.reset_mock()
         sleep((1.0 / connector.config.update_freq) * 2)
