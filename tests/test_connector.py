@@ -297,12 +297,28 @@ class TestConnector:
 
         connector.start()
         sleep(1.0 / connector.config.update_freq)
+        assert connector._Connector__loop.is_running()
         connector.stop()
-        connector._execution_loop.assert_called()
+        assert not connector._Connector__loop.is_running()
+        assert connector._execution_loop.call_count == 1
 
         connector._execution_loop.reset_mock()
         sleep((1.0 / connector.config.update_freq) * 2)
         connector._execution_loop.assert_not_called()
+
+    def test_run_loop_catches_exceptions(self, base_model):
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        connector._execution_loop = AsyncMock(side_effect=Exception("Test exception"))
+        connector._robot_session = Mock()
+        connector._logger = MagicMock()
+
+        connector.start()
+        sleep(1.0 / connector.config.update_freq)
+        assert connector._Connector__loop.is_running()
+        connector.stop()
+        assert not connector._Connector__loop.is_running()
+        connector._execution_loop.assert_called()
+        connector._logger.error.assert_called()
 
     def test_publish_map(self, base_model):
         # Test with no maps

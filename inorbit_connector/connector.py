@@ -371,10 +371,19 @@ class Connector(ABC):
         is set.
         It uses self.config.update_freq to set a maximum frequency for the execution
         loop, but it will never run faster than the actual execution of the loop body.
-        """
 
+        Exceptions raised by self._execution_loop() are caught and logged to prevent
+        the connector from crashing. It is recommended to handle exceptions within the
+        loop and publish the errors.
+        """
         while not self.__stop_event.is_set():
-            await asyncio.gather(
-                self._execution_loop(),
-                asyncio.sleep(1.0 / self.config.update_freq),
-            )
+            try:
+                await asyncio.gather(
+                    self._execution_loop(),
+                    asyncio.sleep(1.0 / self.config.update_freq),
+                )
+            except Exception as e:
+                self._logger.error(f"Error in execution loop: {e}")
+                self._logger.error(f"Traceback: {traceback.format_exc()}")
+                # Continue execution after a brief pause to avoid tight error loops
+                await asyncio.sleep(1.0)
