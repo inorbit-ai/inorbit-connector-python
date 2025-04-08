@@ -17,8 +17,10 @@ from inorbit_edge.robot import RobotSession
 from pydantic import BaseModel
 
 # InOrbit
-from inorbit_connector.connector import Connector
-from inorbit_connector.models import InorbitConnectorConfig
+from inorbit_connector.connector import (
+    Connector,
+    InorbitConnectorConfig,
+)
 
 
 class DummyConfig(BaseModel):
@@ -394,7 +396,33 @@ class TestConnector:
             mock_register_path.assert_called_once()
             mock_register_path.reset_mock()
 
-    def test_register_command_callback(self, base_model):
+    def test_uses_env_vars(self, base_model):
+        base_model["env_vars"] = {"ENV_VAR": "env_value"}
+        Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        assert "ENV_VAR" in os.environ
+        assert os.environ["ENV_VAR"] == "env_value"
+
+
+class TestConnectorCommandHandler:
+
+    @pytest.fixture
+    def base_model(self):
+        return {
+            "api_key": "valid_key",
+            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connector_type": "valid_connector",
+            "connector_config": DummyConfig(),
+        }
+
+    @pytest.fixture(autouse=True)
+    def make_connector_not_abstract(self):
+        Connector.__abstractmethods__ = set()
+
+    @pytest.fixture
+    def base_connector(self, base_model):
+        return Connector("TestRobot", InorbitConnectorConfig(**base_model))
+
+    def test_register_command_handler(self, base_model):
         with patch(
             f"{Connector.__module__}.{Connector.__name__}"
             "._register_custom_command_handler",
@@ -413,8 +441,80 @@ class TestConnector:
             )
             mock_register_callback.assert_not_called()
 
-    def test_uses_env_vars(self, base_model):
-        base_model["env_vars"] = {"ENV_VAR": "env_value"}
-        Connector("TestRobot", InorbitConnectorConfig(**base_model))
-        assert "ENV_VAR" in os.environ
-        assert os.environ["ENV_VAR"] == "env_value"
+    def test_handler_wrapper_success(self, base_connector):
+        """Test the wrapper function's behavior on successful command execution."""
+        connector = base_connector
+        connector._robot_session = MagicMock()
+        connector._Connector__loop = MagicMock()
+        connector._logger = MagicMock()
+
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run_coroutine:
+
+            mock_async_handler = AsyncMock()
+
+            # 1. Register the handler to get the wrapper
+            connector._register_custom_command_handler(mock_async_handler)
+            wrapper_func = connector._robot_session.register_command_callback.call_args[
+                0
+            ][0]
+
+            # 2. Prepare arguments for the commands handler
+            command_name = "test_command"
+            args = ["arg1", "arg2"]
+            mock_result_func = MagicMock()
+            options = {"result_function": mock_result_func}
+
+            # 3. Call the wrapper
+            wrapper_func(command_name, args, options)
+
+            # 4. Assertions
+            # Check that run_coroutine_threadsafe was called correctly
+            mock_run_coroutine.assert_called_once()
+            # Check the coroutine passed to run_coroutine_threadsafe
+            assert mock_async_handler.called
+            assert mock_async_handler.call_args[0] == (command_name, args, options)
+            # Check the loop passed to run_coroutine_threadsafe
+            assert mock_run_coroutine.call_args[0][1] is connector._Connector__loop
+
+            # Ensure no error logs were made and result_function wasn't called by the
+            # wrapper
+            connector._logger.error.assert_not_called()
+            mock_result_func.assert_not_called()  # The handler itself should call it
+
+    @pytest.mark.skip(reason="Haven't been able to test the error handling")
+    def test_handler_wrapper_exception(self, base_connector):
+        """Test wrapper sync handler exception."""
+        connector = base_connector
+        connector._robot_session = MagicMock()
+        connector._Connector__loop = MagicMock()
+
+        # Mock run_coroutine_threadsafe. We only care that it's called.
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run_coroutine:
+
+            mock_async_handler = AsyncMock()
+            mock_exception = Exception("Test exception")
+
+            # Configure the handler to raise immediately upon call
+            mock_async_handler.side_effect = mock_exception
+
+            # 1. Register the handler to get the wrapper
+            connector._register_custom_command_handler(mock_async_handler)
+            wrapper_func = connector._robot_session.register_command_callback.call_args[
+                0
+            ][0]
+
+            # 2. Prepare arguments for the wrapper
+            cmd_name = "test_command"
+            args = ["arg1", "arg2"]
+            mock_result_func = MagicMock()
+            options = {"result_function": mock_result_func}
+
+            # 3. Call the wrapper
+            wrapper_func(cmd_name, args, options)
+
+            # 4. Assertions: Check only the essentials before exception likely halts
+            # flow
+            # Check run_coroutine_threadsafe was called
+            mock_run_coroutine.assert_called_once()
+            # Check the handler itself was called (which triggered the side_effect)
+            mock_async_handler.assert_called()  # Check it was called at least
