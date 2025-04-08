@@ -3,7 +3,7 @@ import asyncio
 from typing import override
 
 # InOrbit
-from inorbit_connector.connector import Connector
+from inorbit_connector.connector import CommandResultCode, Connector
 
 # Local
 from datatypes import ExampleBotConnectorConfig
@@ -85,3 +85,4 @@ class ExampleBotConnector(Connector):
         self._logger.info("Executing command...")
         asyncio.sleep(1)
         self._logger.info(f"Command {command_name} executed")
+        options["result_function"](CommandResultCode.SUCCESS)

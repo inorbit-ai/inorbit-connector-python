@@ -15,7 +15,7 @@ from typing import override
 from pydantic import field_validator, BaseModel
 
 # InOrbit
-from inorbit_connector.connector import Connector
+from inorbit_connector.connector import CommandResultCode, Connector
 from inorbit_connector.models import InorbitConnectorConfig
 from inorbit_connector.utils import read_yaml
 
@@ -125,8 +125,9 @@ class ExampleBotConnector(Connector):
     async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
-        This is where the meat of your connector is implemented. It is good practice to
-        handle things like API requests concurrently to speed up the execution loop.
+        This is where the main logic of your connector is implemented. It is good
+        practice to handle things like API requests concurrently to speed up the
+        execution loop.
         """
         # Do some magic here...
 
@@ -176,6 +177,7 @@ class ExampleBotConnector(Connector):
         self._logger.info("Executing command...")
         asyncio.sleep(1)
         self._logger.info(f"Command {command_name} executed")
+        options["result_function"](CommandResultCode.SUCCESS)
 
 
 def main():

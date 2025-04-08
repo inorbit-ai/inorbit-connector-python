@@ -4,6 +4,7 @@
 # Copyright 2024 InOrbit, Inc.
 
 # Standard
+from enum import Enum
 import os
 import logging
 import asyncio
@@ -19,6 +20,21 @@ from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
 from inorbit_connector.models import InorbitConnectorConfig
+
+
+class CommandResultCode(Enum):
+    """The result code of a command execution."""
+
+    SUCCESS = "0"
+    FAILURE = "1"
+
+    def __str__(self) -> str:
+        """Return the string value of the enum.
+
+        Returns:
+            str: The value of the enum as a string.
+        """
+        return self.value
 
 
 class Connector(ABC):
@@ -121,7 +137,7 @@ class Connector(ABC):
             self._robot_session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
     def _register_custom_command_handler(self, async_handler: Coroutine) -> None:
-        """Register an async custom command handler.
+        """Register an async custom command handler wrapped in error handling logic.
 
         Args:
             async_handler (Coroutine): The custom commands handler.
@@ -138,7 +154,7 @@ class Connector(ABC):
                     f"Exception:\n{e}"
                 )
                 options["result_function"](
-                    "1",
+                    CommandResultCode.FAILURE,
                     execution_status_details=(
                         "An error occured executing custom command"
                     ),
@@ -154,18 +170,35 @@ class Connector(ABC):
         """Callback method for command messages. This method is called when a command
         is received from InOrbit.
         Will automatically be registered if `register_custom_command_handler`
-        constructor keyword argument is set.
+        constructor keyword argument is set, which is the default behavior.
+
+        The result function will always be included in the options dictionary and must
+        be called in order to report the result of a command. It has the following
+        signature:
+
+        options['result_function'](
+            result_code: CommandResultCode,
+            execution_status_details: str | None = None,
+            stdout: str | None = None,
+            stderr: str | None = None,
+        ) -> None
+
+        e.g.:
+        if success:
+            return options['result_function'](CommandResultCode.SUCCESS)
+        else:
+            return options['result_function'](
+                CommandResultCode.FAILURE,
+                stderr="Example error"
+            )
 
         Args:
             command_name (str): The name of the command
             args (list): The list of arguments
             options (dict): The dictionary of options.
-                It usually contains `result_function()` which must be called with "0"
-                to indicate success or any other value to indicate failure. See
-                https://github.com/inorbit-ai/edge-sdk-python for usage information.
+                It contains the `result_function` explained above.
         """
-        # Overwrite this in subclass to handle custom commands
-        self._logger.warning(f"Custom command {command_name} not implemented.")
+        pass
 
     @abstractmethod
     async def _connect(self) -> None:
@@ -177,8 +210,8 @@ class Connector(ABC):
         pass
 
     async def __connect(self) -> None:
-        """Initialte the connection to InOrbit based on the provided configuration.
-        Connects to any external services.
+        """Initialize the connection to InOrbit based on the provided configuration,
+        and connect to external services calling self._connect().
 
         Raises:
             Exception: If the robot session cannot connect.
