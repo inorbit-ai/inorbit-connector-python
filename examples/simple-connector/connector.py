@@ -4,19 +4,24 @@
 # Copyright 2024 InOrbit, Inc.
 
 # Standard
+import asyncio
 import logging
 import os
 import random
+import signal
+from typing import override
 
 # Third-party
 from pydantic import field_validator, BaseModel
 
 # InOrbit
-from inorbit_connector.connector import Connector
+from inorbit_connector.connector import CommandResultCode, Connector
 from inorbit_connector.models import InorbitConnectorConfig
 from inorbit_connector.utils import read_yaml
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "example.yaml")
+CONFIG_FILE = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "../example.yaml"
+)
 ROBOT_ID = "my-example-robot"
 CONNECTOR_TYPE = "example_bot"
 
@@ -50,7 +55,7 @@ class ExampleBotConnectorConfig(InorbitConnectorConfig):
 
     # noinspection PyMethodParameters
     @field_validator("connector_type")
-    def check_whitespace(cls, connector_type: str) -> str:
+    def check_connector_type(cls, connector_type: str) -> str:
         """Validate the connector type.
 
         This should always be equal to the pre-defined constant.
@@ -69,6 +74,18 @@ class ExampleBotConnectorConfig(InorbitConnectorConfig):
                 f"Expected connector type '{CONNECTOR_TYPE}' not '{connector_type}'"
             )
         return connector_type
+
+
+async def get_robot_linear_speed() -> float:
+    """Simulate a request to the robot's linear speed API."""
+    await asyncio.sleep(random.uniform(0.1, 0.3))
+    return random.uniform(0.1, 0.9)
+
+
+async def get_robot_angular_speed() -> float:
+    """Simulate a request to the robot's angular speed API."""
+    await asyncio.sleep(random.uniform(0.1, 0.3))
+    return random.uniform(0.1, 0.9)
 
 
 class ExampleBotConnector(Connector):
@@ -90,30 +107,27 @@ class ExampleBotConnector(Connector):
         self.hw_rev = config.connector_config.example_bot_hw_rev
         self.custom_value = config.connector_config.example_bot_custom_value
 
-    def _connect(self) -> None:
-        """Connect to the robot services.
+    @override
+    async def _connect(self) -> None:
+        """Connect to the robot services."""
 
-        This method should always call super.
-        """
-        super()._connect()
         # Do some magic here...
         self._logger.info(f"Connected to robot services at API {self.api_version}")
 
-    def _disconnect(self) -> None:
-        """Disconnect from the robot services.
+    @override
+    async def _disconnect(self) -> None:
+        """Disconnect from the robot services."""
 
-        This method should always call super.
-        """
-        super()._disconnect()
         # Do some magic here...
         self._logger.info(f"Disconnected to robot services at API {self.api_version}")
 
-    def _execution_loop(self) -> None:
+    @override
+    async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
-        This is where the meat of your connector is implemented. It is good practice to
-        handle things like action requests in a threaded manner so that the connector
-        does not block the execution loop.
+        This is where the main logic of your connector is implemented. It is good
+        practice to handle things like API requests concurrently to speed up the
+        execution loop.
         """
         # Do some magic here...
 
@@ -137,6 +151,33 @@ class ExampleBotConnector(Connector):
         # the map image will be automatically uploaded to InOrbit.
         frame_id = "frameIdA"
         self.publish_pose(x, y, yaw, frame_id)
+
+        # A common pattern is to poll REST endpoints for fresh robot data.
+        # asyncio-compatible libraries are great for this
+        linear_speed, angular_speed = await asyncio.gather(
+            get_robot_linear_speed(),
+            get_robot_angular_speed(),
+        )
+        odometry = {
+            "linear_speed": linear_speed,
+            "angular_speed": angular_speed,
+        }
+        self._robot_session.publish_odometry(**odometry)
+
+        self._logger.info("Robot data updated and published")
+
+    @override
+    async def _inorbit_command_handler(
+        self, command_name: str, args: list, options: dict
+    ) -> None:
+        """Handle InOrbit commands."""
+        self._logger.info(f"Received command: {command_name}")
+        self._logger.info(f"Args: {args}")
+        self._logger.info(f"Options: {options}")
+        self._logger.info("Executing command...")
+        await asyncio.sleep(1)
+        self._logger.info(f"Command {command_name} executed")
+        options["result_function"](CommandResultCode.SUCCESS)
 
 
 def main():
@@ -167,11 +208,12 @@ def main():
     connector = ExampleBotConnector(ROBOT_ID, config)
     connector.start()
 
-    try:
-        connector.join()
-    except KeyboardInterrupt:
-        logger.info("...exiting")
-        connector.stop()
+    # Register a signal handler for graceful shutdown
+    # When a keyboard interrupt is received (Ctrl+C), the connector will be stopped
+    signal.signal(signal.SIGINT, lambda sig, frame: connector.stop())
+
+    # Wait for the connector to finish
+    connector.join()
 
 
 if __name__ == "__main__":

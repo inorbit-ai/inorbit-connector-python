@@ -4,10 +4,14 @@
 # Copyright 2024 InOrbit, Inc.
 
 # Standard
+from enum import Enum
 import os
 import logging
+import asyncio
 import threading
-from time import sleep
+import traceback
+from typing import Coroutine
+from abc import ABC, abstractmethod
 
 # Third Party
 from inorbit_edge.models import RobotSessionModel
@@ -18,12 +22,21 @@ from inorbit_edge.video import OpenCVCamera
 from inorbit_connector.models import InorbitConnectorConfig
 
 
-class Connector:
+class CommandResultCode(str, Enum):
+    """The result code of a command execution."""
+
+    SUCCESS = "0"
+    FAILURE = "1"
+
+
+class Connector(ABC):
     """Generic InOrbit connector.
 
-    This is the base class of an InOrbit connector. Subclasses should be implemented
-    to override the execution_loop() method and optionally connect() and
-    disconnect() methods (with calls to the superclass).
+    This is the base class of an InOrbit connector. Subclasses should implement all
+    abstract methods.
+
+    A lot of initialization logic is customizable through the configuration object. See
+    self.__init__() for more details.
     """
 
     def __init__(self, robot_id: str, config: InorbitConnectorConfig, **kwargs) -> None:
@@ -52,8 +65,12 @@ class Connector:
         self._last_published_frame_id = None
 
         # Threading for the main run methods
-        self.__stop_event = threading.Event()
-        self.__thread = threading.Thread(target=self.__run)
+        # The connector runs an asycio loop within a spawned thread
+        # self.__loop is initialized within __run_connector(), and only referenced
+        # outside of it by the commands handler
+        self.__stop_event = asyncio.Event()
+        self.__thread = threading.Thread(target=self.__run_loop)
+        self.__loop: asyncio.AbstractEventLoop | None = None
 
         # Logging information
         self._logger = logging.getLogger(__name__)
@@ -87,6 +104,7 @@ class Connector:
             user_scripts_path = os.path.expanduser(path)
             create_dir = kwargs.get("create_user_scripts_dir", False)
             self._register_user_scripts(user_scripts_path, create_dir)
+
         # If enabled, register the provided custom commands handler
         if kwargs.get("register_custom_command_handler", True):
             self._register_custom_command_handler(self._inorbit_command_handler)
@@ -113,16 +131,19 @@ class Connector:
             # bash scripts
             self._robot_session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
-    def _register_custom_command_handler(self, handler: callable) -> None:
-        """Register a custom command handler.
+    def _register_custom_command_handler(self, async_handler: Coroutine) -> None:
+        """Register an async custom command handler wrapped in error handling logic.
 
         Args:
-            handler (Callable): The custom command handler.
+            async_handler (Coroutine): The custom commands handler.
         """
 
         def handler_wrapper(command_name: str, args: list, options: dict):
             try:
-                handler(command_name, args, options)
+                # Handle the commands in the existing event loop
+                asyncio.run_coroutine_threadsafe(
+                    async_handler(command_name, args, options), self.__loop
+                )
             except Exception as e:
                 self._logger.error(f"Error handling command {command_name}: {e}")
                 self._logger.error(
@@ -130,7 +151,7 @@ class Connector:
                     f"Exception:\n{e}"
                 )
                 options["result_function"](
-                    "1",
+                    CommandResultCode.FAILURE,
                     execution_status_details=(
                         "An error occured executing custom command"
                     ),
@@ -139,57 +160,85 @@ class Connector:
 
         self._robot_session.register_command_callback(handler_wrapper)
 
-    # noinspection PyUnusedLocal
-    def _inorbit_command_handler(self, command_name: str, args: list, options: dict):
+    @abstractmethod
+    async def _inorbit_command_handler(
+        self, command_name: str, args: list, options: dict
+    ):
         """Callback method for command messages. This method is called when a command
         is received from InOrbit.
         Will automatically be registered if `register_custom_command_handler`
-        constructor keyword argument is set.
+        constructor keyword argument is set, which is the default behavior.
+
+        The result function will always be included in the options dictionary and must
+        be called in order to report the result of a command. It has the following
+        signature:
+
+        options['result_function'](
+            result_code: CommandResultCode,
+            execution_status_details: str | None = None,
+            stdout: str | None = None,
+            stderr: str | None = None,
+        ) -> None
+
+        e.g.:
+        if success:
+            return options['result_function'](CommandResultCode.SUCCESS)
+        else:
+            return options['result_function'](
+                CommandResultCode.FAILURE,
+                stderr="Example error"
+            )
 
         Args:
             command_name (str): The name of the command
             args (list): The list of arguments
             options (dict): The dictionary of options.
-                It usually contains `result_function()` which must be called with "0"
-                to indicate success or any other value to indicate failure. See
-                https://github.com/inorbit-ai/edge-sdk-python for usage information.
+                It contains the `result_function` explained above.
         """
-        # Overwrite this in subclass to handle custom commands
-        self._logger.warning(f"Custom command {command_name} not implemented.")
+        pass
 
-    def _connect(self) -> None:
+    @abstractmethod
+    async def _connect(self) -> None:
         """Connect to any external services.
-
-        The base method handles connecting to InOrbit based on the provided
-        configuration. Subclasses should override this method to connect to any
-        external services ensuring to call the super method as well.
 
         This method should not be called directly. Instead, call the start() method to
         start the connector. This ensures that the connector is only started once.
+        """
+        pass
+
+    async def __connect(self) -> None:
+        """Initialize the connection to InOrbit based on the provided configuration,
+        and connect to external services calling self._connect().
 
         Raises:
             Exception: If the robot session cannot connect.
         """
+        # Call the user-implemented connection logic
+        await self._connect()
 
         # Connect to InOrbit
         self._robot_session.connect()
 
-    def _disconnect(self) -> None:
+    @abstractmethod
+    async def _disconnect(self) -> None:
         """Disconnect from any external services.
-
-        The base method handles disconnecting from InOrbit based on the provided
-        configuration. Subclasses should override this method to disconnect from any
-        external services ensuring to call the super method as well.
 
         This method should not be called directly. Instead, call the stop() method to
         stop the connector. This ensures that the connector is only stopped once.
         """
+        pass
+
+    async def __disconnect(self) -> None:
+        """Disconnect external services and disconnect from InOrbit."""
 
         # Disconnect from InOrbit
         self._robot_session.disconnect()
 
-    # noinspection PyMethodMayBeStatic
-    def _execution_loop(self) -> None:
+        # Call the user-implemented disconnection logic
+        await self._disconnect()
+
+    @abstractmethod
+    async def _execution_loop(self) -> None:
         """The main execution loop for the connector.
 
         This method should be overridden by subclasses to provide the execution loop for
@@ -198,13 +247,11 @@ class Connector:
         start or stop the connector. This ensures that the connector is only started or
         stopped once.
         """
-
-        # Overwrite this in subclass to something useful
-        self._logger.warning("Execution loop is empty.")
+        pass
 
     def publish_map(self, frame_id: str, is_update: bool = False) -> None:
-        """Publish a map to InOrbit. If `frame_id` is not found in the maps
-        configuration, this method will do nothing.
+        """Publish the map metadata to InOrbit. If `frame_id` is not found in the maps
+        configuration, this method will not publish anything.
         """
         if map_config := self.config.maps.get(frame_id):
             self._robot_session.publish_map(
@@ -236,32 +283,28 @@ class Connector:
         self._robot_session.publish_pose(x, y, yaw, frame_id, *args, **kwargs)
 
     def start(self) -> None:
-        """Start the execution loop of this connector.
+        """Start the connector in a new thread.
 
-        This method should be called to start the execution loop of this connector. It
-        will block until the execution loop is started but run the loop on a new thread
-        and will also call connect() to connect to any external services.
+        This method should be called to start the execution of this connector. It
+        creates an event loop in a new thread and runs the connector in it.
+
+        After calling start(), use join() to block until the connector is stopped.
+        Use stop() to stop the connector.
+
+        It:
+        - calls self._connect() to connect to any external services.
+        - sets up camera feeds defined in the configuration.
+        - runs the execution loop in a new thread.
+        - calls self._disconnect() to disconnect from any external services once the
+          connector is stopped.
         """
 
-        # Prevent starting already running thread
+        # Prevent starting an already running thread
         if not self.__thread.is_alive():
             self.__stop_event.clear()
 
-            # Connect to external services and create the InOrbit session
-            self._connect()
-
-            # Set up camera feeds
-            for idx, camera_config in enumerate(self.config.cameras):
-                self._logger.info(
-                    f"Registering camera {idx}: {str(camera_config.video_url)}"
-                )
-                # If values are None, use default instead
-                dump = camera_config.model_dump()
-                clean = {k: v for k, v in dump.items() if v is not None}
-                self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
-
-            # Create new thread if an old thread finished
-            self.__thread = threading.Thread(target=self.__run)
+            # Create and start the thread
+            self.__thread = threading.Thread(target=self.__run_connector)
             self.__thread.start()
 
     def join(self) -> None:
@@ -281,19 +324,66 @@ class Connector:
         """
 
         # Stop the execution loop
+        self._logger.info("Stopping connector")
         self.__stop_event.set()
-        self.__thread.join()
+        self.__thread.join(timeout=5)
+        if self.__thread.is_alive():
+            self._logger.error("Thread did not stop in time, forcefully killing")
+            self.__thread.kill()
 
-        # Cleanup external connections
-        self._disconnect()
+    def __run_connector(self):
+        """The target function of the connector's thread.
 
-    def __run(self) -> None:
-        """The main run thread method for the connector.
-
-        This method will be called on a new thread and will run the execution loop of
-        the connector until the stop event is set.
+        It connects to InOrbit via the edge-sdk, start the execution loop and
+        disconnects all services when the connector is signaled stop via self.stop().
         """
 
+        # Create a new event loop for this thread
+        self.__loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.__loop)
+
+        # Connect to external services and create the InOrbit session
+        self.__loop.run_until_complete(self.__connect())
+
+        # Set up camera feeds
+        for idx, camera_config in enumerate(self.config.cameras):
+            self._logger.info(
+                f"Registering camera {idx}: {str(camera_config.video_url)}"
+            )
+            # If values are None, use default instead
+            dump = camera_config.model_dump()
+            clean = {k: v for k, v in dump.items() if v is not None}
+            self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
+
+        try:
+            self.__loop.run_until_complete(self.__run_loop())
+        except Exception as e:
+            self._logger.error(f"Error in execution loop: {e}")
+            self._logger.error(f"Traceback: {traceback.format_exc()}")
+        finally:
+            self.__loop.run_until_complete(self.__disconnect())
+            self.__loop.close()
+
+    async def __run_loop(self) -> None:
+        """The main coroutine of the connector.
+
+        This coroutine will run the execution loop of the connector until the stop event
+        is set.
+        It uses self.config.update_freq to set a maximum frequency for the execution
+        loop, but it will never run faster than the actual execution of the loop body.
+
+        Exceptions raised by self._execution_loop() are caught and logged to prevent
+        the connector from crashing. It is recommended to handle exceptions within the
+        loop and publish the errors.
+        """
         while not self.__stop_event.is_set():
-            self._execution_loop()
-            sleep(1.0 / self.config.update_freq)
+            try:
+                await asyncio.gather(
+                    self._execution_loop(),
+                    asyncio.sleep(1.0 / self.config.update_freq),
+                )
+            except Exception as e:
+                self._logger.error(f"Error in execution loop: {e}")
+                self._logger.error(f"Traceback: {traceback.format_exc()}")
+                # Continue execution after a brief pause to avoid tight error loops
+                await asyncio.sleep(1.0)
