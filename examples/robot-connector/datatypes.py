@@ -35,7 +35,7 @@ class ExampleBotConnectorConfig(InorbitConnectorConfig):
 
     # noinspection PyMethodParameters
     @field_validator("connector_type")
-    def check_whitespace(cls, connector_type: str) -> str:
+    def check_connector_type(cls, connector_type: str) -> str:
         """Validate the connector type.
 
         This should always be equal to the pre-defined constant.
