@@ -22,7 +22,7 @@ from inorbit_edge.video import OpenCVCamera
 from inorbit_connector.models import InorbitConnectorConfig
 
 
-class CommandResultCode(Enum):
+class CommandResultCode(str, Enum):
     """The result code of a command execution."""
 
     SUCCESS = "0"
@@ -66,8 +66,11 @@ class Connector(ABC):
 
         # Threading for the main run methods
         # The connector runs an asycio loop within a spawned thread
+        # self.__loop is initialized within __run_connector(), and only referenced
+        # outside of it by the commands handler
         self.__stop_event = asyncio.Event()
         self.__thread = threading.Thread(target=self.__run_loop)
+        self.__loop: asyncio.AbstractEventLoop | None = None
 
         # Logging information
         self._logger = logging.getLogger(__name__)
@@ -137,8 +140,10 @@ class Connector(ABC):
 
         def handler_wrapper(command_name: str, args: list, options: dict):
             try:
-                # Handle the commands in the event loop
-                self.loop.run_until_complete(async_handler(command_name, args, options))
+                # Handle the commands in the existing event loop
+                asyncio.run_coroutine_threadsafe(
+                    async_handler(command_name, args, options), self.__loop
+                )
             except Exception as e:
                 self._logger.error(f"Error handling command {command_name}: {e}")
                 self._logger.error(
@@ -334,11 +339,11 @@ class Connector(ABC):
         """
 
         # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        self.__loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.__loop)
 
         # Connect to external services and create the InOrbit session
-        loop.run_until_complete(self.__connect())
+        self.__loop.run_until_complete(self.__connect())
 
         # Set up camera feeds
         for idx, camera_config in enumerate(self.config.cameras):
@@ -351,13 +356,13 @@ class Connector(ABC):
             self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
 
         try:
-            loop.run_until_complete(self.__run_loop())
+            self.__loop.run_until_complete(self.__run_loop())
         except Exception as e:
             self._logger.error(f"Error in execution loop: {e}")
             self._logger.error(f"Traceback: {traceback.format_exc()}")
         finally:
-            loop.run_until_complete(self.__disconnect())
-            loop.close()
+            self.__loop.run_until_complete(self.__disconnect())
+            self.__loop.close()
 
     async def __run_loop(self) -> None:
         """The main coroutine of the connector.

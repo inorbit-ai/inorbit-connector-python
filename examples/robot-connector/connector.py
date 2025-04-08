@@ -83,6 +83,6 @@ class ExampleBotConnector(Connector):
         self._logger.info(f"Args: {args}")
         self._logger.info(f"Options: {options}")
         self._logger.info("Executing command...")
-        asyncio.sleep(1)
+        await asyncio.sleep(1)
         self._logger.info(f"Command {command_name} executed")
         options["result_function"](CommandResultCode.SUCCESS)
