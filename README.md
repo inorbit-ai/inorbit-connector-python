@@ -1,4 +1,4 @@
-# `inorbit-connector-python`
+# `inorbit-connector`
 
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg) ![PyPI - Package Version](https://img.shields.io/pypi/v/inorbit-connector) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/inorbit-connector)
 
@@ -8,8 +8,8 @@ A Python framework for developing _connectors_ for the [InOrbit](https://inorbit
 
 ## Overview
 
-This repository contains a Python library that provides a base structure for developing [InOrbit](https://inorbit.ai/) robot connectors.
-Making use of InOrbit's [Edge SDK](https://developer.inorbit.ai/docs#edge-sdk), the library provides a starting point for the integration of a fleet of robots in InOrbit, unlocking interoperability.
+This repository contains a Python framework that provides a base structure for developing [InOrbit](https://inorbit.ai/) robot connectors.
+Making use of InOrbit's [Edge SDK](https://developer.inorbit.ai/docs#edge-sdk), `inorbit-connector` provides a starting point for the integration of a fleet of robots in InOrbit, unlocking interoperability.
 
 ## Requirements
 
@@ -18,7 +18,7 @@ Making use of InOrbit's [Edge SDK](https://developer.inorbit.ai/docs#edge-sdk), 
 
 ## Setup
 
-There are two ways of installing the connector Python package.
+There are two ways of installing the `inorbit-connector` Python package.
 
 1. From [PyPi](https://pypi.org/project/inorbit-connector/): `pip install inorbit-connector`
 

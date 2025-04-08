@@ -4,7 +4,7 @@ This directory contains examples of connectors that can be used as a starting po
 
 ## `simple-connector/` 
 
-The contents of this directory demonstrate the basic usage of the `inorbit-connector` library. 
+The contents of this directory demonstrate the basic usage of the `inorbit-connector` framework. 
 
 It includes example configurations and classes for a basic connector. The example will read in custom
 configuration values from `example.yaml`, create a connection to InOrbit based on the environment variables in
