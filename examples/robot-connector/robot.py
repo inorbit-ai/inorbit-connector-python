@@ -143,9 +143,9 @@ class Robot:
             and self._system_stats.get("hdd")
         ):
             return {
-                "cpu_load_percentage": random.uniform(0.1, 0.9),
-                "ram_usage_percentage": random.uniform(0.1, 0.9),
-                "hdd_usage_percentage": random.uniform(0.1, 0.9),
+                "cpu_load_percentage": self._system_stats["cpu"],
+                "ram_usage_percentage": self._system_stats["ram"],
+                "hdd_usage_percentage": self._system_stats["hdd"],
             }
         return None
 
