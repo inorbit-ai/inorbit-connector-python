@@ -28,14 +28,6 @@ class CommandResultCode(Enum):
     SUCCESS = "0"
     FAILURE = "1"
 
-    def __str__(self) -> str:
-        """Return the string value of the enum.
-
-        Returns:
-            str: The value of the enum as a string.
-        """
-        return self.value
-
 
 class Connector(ABC):
     """Generic InOrbit connector.
