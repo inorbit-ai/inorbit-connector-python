@@ -284,10 +284,21 @@ class TestConnector:
 
     def test_stop(self, base_connector):
         base_connector._Connector__thread = MagicMock()
+        base_connector._Connector__thread.is_alive.return_value = False
         assert not base_connector._Connector__stop_event.is_set()
         base_connector.stop()
         assert base_connector._Connector__stop_event.is_set()
         assert base_connector._Connector__thread.join.called
+
+    def test_stop_raises_exception_if_thread_does_not_stop_in_time(
+        self, base_connector
+    ):
+        base_connector._Connector__thread = MagicMock()
+        assert not base_connector._Connector__stop_event.is_set()
+        with pytest.raises(Exception, match="Thread did not stop in time"):
+            base_connector.stop()
+            assert base_connector._Connector__stop_event.is_set()
+            assert base_connector._Connector__thread.join.called
 
     def test_run_loop(self, base_model):
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
