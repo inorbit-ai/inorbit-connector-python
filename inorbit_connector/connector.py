@@ -328,8 +328,7 @@ class Connector(ABC):
         self.__stop_event.set()
         self.__thread.join(timeout=5)
         if self.__thread.is_alive():
-            self._logger.error("Thread did not stop in time, forcefully killing")
-            self.__thread.kill()
+            raise Exception("Thread did not stop in time")
 
     def __run_connector(self):
         """The target function of the connector's thread.
