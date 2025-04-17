@@ -140,22 +140,21 @@ class Connector(ABC):
 
         def handler_wrapper(command_name: str, args: list, options: dict):
             try:
-                # Handle the commands in the existing event loop
+                # Handle the commands in the existing event loop and wait for the result
                 asyncio.run_coroutine_threadsafe(
                     async_handler(command_name, args, options), self.__loop
-                )
+                ).result()
             except Exception as e:
-                self._logger.error(f"Error handling command {command_name}: {e}")
                 self._logger.error(
                     f"Failed to execute command '{command_name}' with args {args}. "
-                    f"Exception:\n{e}"
+                    f"Exception:\n{str(e) or e.__class__.__name__}"
                 )
                 options["result_function"](
                     CommandResultCode.FAILURE,
                     execution_status_details=(
                         "An error occured executing custom command"
                     ),
-                    stderr=str(e),
+                    stderr=str(e) or e.__class__.__name__,
                 )
 
         self._robot_session.register_command_callback(handler_wrapper)
