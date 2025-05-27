@@ -1,8 +1,11 @@
 my-example-robot:
   # The timezone of the robot location as a pytz timezone (https://pythonhosted.org/pytz/#helpers)
   location_tz: America/Los_Angeles
-  # Connector log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  # Connector log level (optional, can be set in the logging_config file) (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  # Comment out to use the log level set in the logging_config file
   log_level: INFO
+  # Logging configuration (optional)
+  logging_config: ./logging.example.conf
   # The type of connector
   connector_type: example_bot
   # Update rate of the connector's main execution loop in Hz

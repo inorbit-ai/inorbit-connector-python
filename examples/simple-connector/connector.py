@@ -107,6 +107,13 @@ class ExampleBotConnector(Connector):
         self.hw_rev = config.connector_config.example_bot_hw_rev
         self.custom_value = config.connector_config.example_bot_custom_value
 
+        # Testing the logger
+        self._logger.debug("This is a debug message 🐛")
+        self._logger.info("This is an info message ℹ️")
+        self._logger.warning("This is a warning message ⚠️")
+        self._logger.error("This is an error message ❌")
+        self._logger.critical("This is a critical message 💥")
+
     @override
     async def _connect(self) -> None:
         """Connect to the robot services."""

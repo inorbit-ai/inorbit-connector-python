@@ -19,6 +19,7 @@ from inorbit_edge.robot import RobotSession
 from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
+from inorbit_connector.logging.logger import setup_logger
 from inorbit_connector.models import InorbitConnectorConfig
 
 
@@ -73,8 +74,8 @@ class Connector(ABC):
         self.__loop: asyncio.AbstractEventLoop | None = None
 
         # Logging information
+        setup_logger(config.logging_config, config.log_level)
         self._logger = logging.getLogger(__name__)
-        self._logger.setLevel(config.log_level.value)
 
         # Set up environment variables
         for env_var_name, env_var_value in config.env_vars.items():

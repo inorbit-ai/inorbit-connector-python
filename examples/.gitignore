@@ -1,3 +1,6 @@
 # Ignore all .env files, but do not ignore example.env
 *.env
 !example.env
+
+# Ignore all log files
+*.log

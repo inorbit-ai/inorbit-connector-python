@@ -14,7 +14,8 @@ from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 from pydantic import BaseModel, field_validator, HttpUrl, FilePath, DirectoryPath
 
 # InOrbit
-from inorbit_connector.utils import LogLevels, DEFAULT_TIMEZONE
+from inorbit_connector.utils import DEFAULT_TIMEZONE, DEFAULT_LOGGING_CONFIG
+from inorbit_connector.logging.logger import LogLevels
 
 
 class MapConfig(BaseModel):
@@ -76,7 +77,10 @@ class InorbitConnectorConfig(BaseModel):
         connector_config (BaseModel): The configuration for the connector
         update_freq (float, optional): Update frequency or 1 Hz by default
         location_tz (str, optional): The timezone of the location or "UTC" by default
-        log_level (LogLevels, optional): The log level or LogLevels.INFO by default
+        logging_config (FilePath | None, optional): The path to the logger
+            configuration file.
+        log_level (LogLevels, optional): If set, it takes precedence globally over the
+            log level set in the logger configuration file.
         user_scripts_dir (DirectoryPath | None, optional): The location of custom user
             scripts
         account_id (str | None, optional): InOrbit account id, required for publishing
@@ -96,7 +100,8 @@ class InorbitConnectorConfig(BaseModel):
     connector_config: BaseModel
     update_freq: float = 5.0
     location_tz: str = DEFAULT_TIMEZONE
-    log_level: LogLevels = LogLevels.INFO
+    logging_config: FilePath | None = DEFAULT_LOGGING_CONFIG
+    log_level: LogLevels | None = None
     user_scripts_dir: DirectoryPath | None = None
     account_id: str | None = None
     inorbit_robot_key: str | None = None
