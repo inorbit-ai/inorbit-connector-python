@@ -102,7 +102,7 @@ class TestConnector:
         assert connector.config == config
 
         assert connector._logger.name == Connector.__module__
-        assert connector._logger.level == logging.INFO
+        assert logging.getLogger().level == logging.INFO
 
         assert connector._robot_session.robot_id == robot_id
         assert connector._robot_session.robot_name == robot_id

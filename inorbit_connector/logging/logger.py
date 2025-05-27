@@ -38,8 +38,8 @@ def setup_logger(log_config_file: str | None, log_level: LogLevels | None):
             disable_existing_loggers=False,
         )
 
-    # If a log level is provided, overwrite the log level of the handlers
+    # If a log level is provided, overwrite root logger level
     # This is useful when a log level is set in the YAML file for an specific robot.
     if log_level:
-        for handler in logging.getLogger().handlers:
-            handler.setLevel(log_level.value)
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level.value)

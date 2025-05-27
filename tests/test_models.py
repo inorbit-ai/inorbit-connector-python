@@ -18,7 +18,7 @@ from pydantic import ValidationError, BaseModel
 
 # InOrbit
 from inorbit_connector.models import InorbitConnectorConfig
-from inorbit_connector.utils import LogLevels
+from inorbit_connector.logging.logger import LogLevels
 
 
 class DummyConfig(BaseModel):
