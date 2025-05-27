@@ -1,6 +1,10 @@
 import logging
 import logging.config
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from inorbit_connector.models import LoggingConfig
 
 
 class LogLevels(str, Enum):
@@ -25,21 +29,21 @@ class LogLevels(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-def setup_logger(log_config_file: str | None, log_level: LogLevels | None):
+def setup_logger(config: "LoggingConfig"):
     """Configures the global logger.
 
     Args:
-        log_config_file (str | None): The path to the logging configuration file.
-        log_level (LogLevels | None): The log level to set.
+        config (LoggingConfig): The logging configuration.
     """
-    if log_config_file:
+    if config.config_file:
         logging.config.fileConfig(
-            log_config_file,
+            config.config_file,
             disable_existing_loggers=False,
+            defaults=config.defaults,
         )
 
     # If a log level is provided, overwrite root logger level
     # This is useful when a log level is set in the YAML file for an specific robot.
-    if log_level:
+    if config.log_level:
         root_logger = logging.getLogger()
-        root_logger.setLevel(log_level.value)
+        root_logger.setLevel(config.log_level.value)

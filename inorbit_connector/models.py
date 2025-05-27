@@ -54,6 +54,23 @@ class MapConfig(BaseModel):
         return file
 
 
+class LoggingConfig(BaseModel):
+    """Class representing a logging configuration.
+
+    Attributes:
+        config_file (FilePath | None, optional): The path to the logging configuration
+           file. If not set, the default configuration file will be used.
+        log_level (LogLevels | None, optional): The log level. Overwrites the log level
+            set in the logging configuration file.
+        defaults (dict[str, str], optional): The log defaults to pass down to the
+            logging configuration file.
+    """
+
+    config_file: FilePath | None = DEFAULT_LOGGING_CONFIG
+    log_level: LogLevels | None = None
+    defaults: dict[str, str] = {}
+
+
 class InorbitConnectorConfig(BaseModel):
     """Class representing an Inorbit connector model.
 
@@ -77,10 +94,7 @@ class InorbitConnectorConfig(BaseModel):
         connector_config (BaseModel): The configuration for the connector
         update_freq (float, optional): Update frequency or 1 Hz by default
         location_tz (str, optional): The timezone of the location or "UTC" by default
-        logging_config (FilePath | None, optional): The path to the logger
-            configuration file.
-        log_level (LogLevels, optional): If set, it takes precedence globally over the
-            log level set in the logger configuration file.
+        logging (LoggingConfig, optional): The logging configuration
         user_scripts_dir (DirectoryPath | None, optional): The location of custom user
             scripts
         account_id (str | None, optional): InOrbit account id, required for publishing
@@ -100,8 +114,7 @@ class InorbitConnectorConfig(BaseModel):
     connector_config: BaseModel
     update_freq: float = 5.0
     location_tz: str = DEFAULT_TIMEZONE
-    logging_config: FilePath | None = DEFAULT_LOGGING_CONFIG
-    log_level: LogLevels | None = None
+    logging: LoggingConfig = LoggingConfig()
     user_scripts_dir: DirectoryPath | None = None
     account_id: str | None = None
     inorbit_robot_key: str | None = None

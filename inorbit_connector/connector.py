@@ -74,7 +74,7 @@ class Connector(ABC):
         self.__loop: asyncio.AbstractEventLoop | None = None
 
         # Logging information
-        setup_logger(config.logging_config, config.log_level)
+        setup_logger(config.logging)
         self._logger = logging.getLogger(__name__)
 
         # Set up environment variables
