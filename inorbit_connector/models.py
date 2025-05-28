@@ -5,17 +5,29 @@
 
 # Standard
 import os
+import warnings
 from typing import List
 
 # Third-party
 import pytz
 from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
-from pydantic import BaseModel, field_validator, HttpUrl, FilePath, DirectoryPath
+from pydantic import (
+    BaseModel,
+    field_validator,
+    HttpUrl,
+    FilePath,
+    DirectoryPath,
+    Field,
+    model_validator,
+)
 
 # InOrbit
 from inorbit_connector.utils import DEFAULT_TIMEZONE, DEFAULT_LOGGING_CONFIG
 from inorbit_connector.logging.logger import LogLevels
+
+# Ensure deprecation warnings are shown
+warnings.filterwarnings("always", category=DeprecationWarning)
 
 
 class MapConfig(BaseModel):
@@ -68,7 +80,9 @@ class LoggingConfig(BaseModel):
 
     config_file: FilePath | None = DEFAULT_LOGGING_CONFIG
     log_level: LogLevels | None = None
-    defaults: dict[str, str] = {}
+    defaults: dict[str, str] = {
+        "log_file": "inorbit-connector.log",
+    }
 
 
 class InorbitConnectorConfig(BaseModel):
@@ -120,6 +134,26 @@ class InorbitConnectorConfig(BaseModel):
     inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
+    # Kept for backwards compatibility
+    log_level: LogLevels | None = Field(default=None, exclude=True)
+
+    @model_validator(mode="after")
+    def warn_log_level_deprecated(self) -> "InorbitConnectorConfig":
+        """Warn if log_level is set as it is deprecated.
+
+        Returns:
+            InorbitConnectorConfig: The model instance
+        """
+        if self.log_level is not None:
+            warnings.warn(
+                "The 'log_level' field is deprecated. "
+                "Please use 'logging.log_level' instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if self.logging.log_level is None:
+                self.logging.log_level = self.log_level
+        return self
 
     # noinspection PyMethodParameters
     @field_validator("api_key", "account_id")

@@ -16,7 +16,9 @@ class TestLoggingConfig:
         config = LoggingConfig()
         assert config.config_file is not None
         assert config.log_level is None
-        assert config.defaults == {}
+        assert config.defaults == {
+            "log_file": "inorbit-connector.log",
+        }
 
     def test_custom_values(self):
         config = LoggingConfig(
