@@ -21,6 +21,7 @@ from inorbit_connector.connector import (
     Connector,
     InorbitConnectorConfig,
 )
+from inorbit_connector.models import LoggingConfig
 
 
 class DummyConfig(BaseModel):
@@ -68,6 +69,7 @@ class TestConnectorIsAbstract:
                 api_url="https://valid.com/",
                 connector_type="valid_connector",
                 connector_config=DummyConfig(),
+                logging=LoggingConfig(defaults={"log_file": "/tmp/test.log"}),
             ),
         )
         assert isinstance(connector, Connector)
@@ -82,6 +84,7 @@ class TestConnector:
             "api_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
+            "logging": LoggingConfig(defaults={"log_file": "/tmp/test.log"}),
         }
 
     @pytest.fixture(autouse=True)
@@ -438,6 +441,7 @@ class TestConnectorCommandHandler:
             "api_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
+            "logging": LoggingConfig(defaults={"log_file": "/tmp/test.log"}),
         }
 
     @pytest.fixture(autouse=True)
