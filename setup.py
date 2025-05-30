@@ -62,6 +62,7 @@ setup(
     maintainer_email="russell@inorbit.ai",
     name="inorbit-connector",
     packages=find_packages(),
+    package_data={"inorbit_connector.logging": ["logging.default.conf"]},
     platforms=["Linux", "Windows", "macOS"],
     project_urls={
         "Tracker": f"{GITHUB_REPO_URL}/issues",
