@@ -21,7 +21,7 @@ To run the example:
 ```shell
 virtualenv .venv
 source .venv/bin/activate
-pip install .
+pip install .[colorlog]
  ```
 
 3) Source your environment file:
