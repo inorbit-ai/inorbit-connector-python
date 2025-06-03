@@ -17,8 +17,8 @@ from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 from pydantic import ValidationError, BaseModel
 
 # InOrbit
-from inorbit_connector.models import InorbitConnectorConfig
-from inorbit_connector.utils import LogLevels
+from inorbit_connector.models import InorbitConnectorConfig, LoggingConfig
+from inorbit_connector.logging.logger import LogLevels
 
 
 class DummyConfig(BaseModel):
@@ -40,7 +40,7 @@ class TestInorbitConnectorConfig:
             "connector_config": DummyConfig(),
             "update_freq": 2.0,
             "location_tz": "Asia/Kolkata",
-            "log_level": LogLevels.INFO,
+            "logging": LoggingConfig(defaults={"log_file": "./test.log"}),
         }
 
     def test_with_valid_input(self, base_model):
@@ -51,9 +51,13 @@ class TestInorbitConnectorConfig:
         assert isinstance(model.connector_config, DummyConfig)
         assert model.update_freq == base_model["update_freq"]
         assert model.location_tz == base_model["location_tz"]
-        assert model.log_level == base_model["log_level"]
         assert model.cameras == []
         assert model.user_scripts_dir is None
+        assert model.logging == base_model["logging"]
+        assert model.account_id is None
+        assert model.inorbit_robot_key is None
+        assert model.maps == {}
+        assert model.env_vars == {}
 
     def test_with_valid_input_and_user_scripts_dir(self, base_model):
         model = InorbitConnectorConfig(**base_model, user_scripts_dir=".")
@@ -87,6 +91,33 @@ class TestInorbitConnectorConfig:
             env_vars={"ENV_VAR": "env_value"},
         )
         assert model.env_vars == {"ENV_VAR": "env_value"}
+
+    def test_with_valid_input_and_logging_config(self, base_model):
+        logging_config = LoggingConfig(
+            log_level=LogLevels.INFO, defaults={"log_file": "./test.log"}
+        )
+        base_model = base_model.copy()
+        base_model.pop("logging", None)
+        model = InorbitConnectorConfig(
+            **base_model,
+            logging=logging_config,
+        )
+        assert model.logging.log_level == LogLevels.INFO
+        assert model.logging.defaults == {"log_file": "./test.log"}
+
+    def test_with_valid_input_and_account_id(self, base_model):
+        model = InorbitConnectorConfig(
+            **base_model,
+            account_id="valid_account_id",
+        )
+        assert model.account_id == "valid_account_id"
+
+    def test_with_valid_input_and_robot_key(self, base_model):
+        model = InorbitConnectorConfig(
+            **base_model,
+            inorbit_robot_key="valid_robot_key",
+        )
+        assert model.inorbit_robot_key == "valid_robot_key"
 
     def test_invalid_api_key(self, base_model):
         init_input = base_model.copy()
@@ -133,13 +164,8 @@ class TestInorbitConnectorConfig:
 
     def test_invalid_log_level(self, base_model):
         init_input = base_model.copy()
-        init_input["log_level"] = "BAD"
-
-        error = re.escape(
-            "1 validation error for InorbitConnectorConfig\nlog_level\n  Input "
-            "should be 'DEBUG', 'INFO', 'WARNING', 'ERROR' or 'CRITICAL' [type="
-            "enum, input_value='BAD', input_type=str]"
-        )
+        init_input["logging"] = {"log_level": "BAD"}
+        error = r"Input should be 'DEBUG', 'INFO', 'WARNING', 'ERROR' or 'CRITICAL'"
         with pytest.raises(ValidationError, match=error):
             InorbitConnectorConfig(**init_input)
 
@@ -208,7 +234,12 @@ class TestInorbitConnectorConfig:
         model = InorbitConnectorConfig(**init_input)
         assert str(model.api_url) == "https://valid.env/"
 
+    @mock.patch.dict(os.environ, {}, clear=True)
     def test_reads_api_url_from_environment_variable_default(self, base_model):
+        # Re-import after Mock
+        importlib.reload(sys.modules["inorbit_connector.models"])
+        from inorbit_connector.models import InorbitConnectorConfig
+
         init_input = {
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
@@ -216,7 +247,12 @@ class TestInorbitConnectorConfig:
         model = InorbitConnectorConfig(**init_input)
         assert str(model.api_url) == INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 
+    @mock.patch.dict(os.environ, {}, clear=True)
     def test_missing_api_key_environment_variable(self, base_model):
+        # Re-import after Mock
+        importlib.reload(sys.modules["inorbit_connector.models"])
+        from inorbit_connector.models import InorbitConnectorConfig
+
         init_input = {
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),

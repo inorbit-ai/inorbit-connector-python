@@ -3,36 +3,15 @@
 # License: MIT License
 # Copyright 2024 InOrbit, Inc.
 
-
-# Standard
-from enum import Enum
-
 # Third-party
 import yaml
+import os
 
+# Constants
 DEFAULT_TIMEZONE = "UTC"
-
-
-class LogLevels(str, Enum):
-    """An enumeration class representing different levels of log messages.
-
-    Log levels for logging.
-
-    See https://docs.python.org/3/library/logging.html#logging-levels
-
-    Attributes:
-        DEBUG: Represents the debug log level
-        INFO: Represents the info log level
-        WARNING: Represents the warning log level
-        ERROR: Represents the error log level
-        CRITICAL: Represents the critical log level
-    """
-
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
+DEFAULT_LOGGING_CONFIG = os.path.join(
+    os.path.dirname(__file__), "logging/logging.default.conf"
+)
 
 
 def read_yaml(fname: str, robot_id: str = None) -> dict:

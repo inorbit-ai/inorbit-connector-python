@@ -5,6 +5,10 @@
 
 """The setup script."""
 
+
+import glob
+import os
+
 from setuptools import find_packages, setup
 
 VERSION = "1.0.1"
@@ -17,6 +21,18 @@ with open("README.md") as file:
 
 with open("requirements.txt", "r") as file:
     install_requirements = file.read().splitlines()
+
+# Create extras_require dictionary
+requirements_files = glob.glob("requirements-*.txt")
+extras_require = {}
+for req_file in requirements_files:
+    # Extract the extra name from the filename (e.g., "requirements-dev.txt" -> "dev")
+    extra_name = os.path.splitext(req_file)[0].replace("requirements-", "")
+
+    # Read the requirements file
+    with open(req_file, "r") as file:
+        extras_require[extra_name] = file.read().splitlines()
+
 
 setup(
     author="InOrbit, Inc.",
@@ -37,6 +53,7 @@ setup(
     description="A Python library for connectors in the InOrbit RobOps ecosystem.",
     download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/{VERSION}.zip",
     install_requires=install_requirements,
+    extras_require=extras_require,
     keywords=["inorbit", "robops", "robotics"],
     license="MIT",
     long_description=long_description,
@@ -45,6 +62,7 @@ setup(
     maintainer_email="russell@inorbit.ai",
     name="inorbit-connector",
     packages=find_packages(),
+    package_data={"inorbit_connector.logging": ["logging.default.conf"]},
     platforms=["Linux", "Windows", "macOS"],
     project_urls={
         "Tracker": f"{GITHUB_REPO_URL}/issues",

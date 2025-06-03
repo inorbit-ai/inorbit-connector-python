@@ -12,7 +12,7 @@ import yaml
 
 # InOrbit
 from inorbit_connector import utils
-from inorbit_connector.utils import LogLevels
+from inorbit_connector.logging.logger import LogLevels
 
 
 class TestLogLevels:
