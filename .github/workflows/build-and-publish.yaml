@@ -107,18 +107,64 @@ jobs:
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create
-          "$GITHUB_REF_NAME"
-          --repo "$GITHUB_REPOSITORY"
-          --notes ""
+        run: |
+          # If triggered by a tag, use the tag name
+          # If triggered by a version bump commit, extract version from commit message
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            # For tag triggers, validate the tag format
+            if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Error: Tag '$GITHUB_REF_NAME' does not follow the expected format"
+              echo "Expected format: 'vX.Y.Z' (e.g., v1.0.0)"
+              exit 1
+            fi
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          else
+            # Validate commit message format
+            if ! echo "${{ github.event.head_commit.message }}" | grep -q "Bump version: [0-9]\+\.[0-9]\+\.[0-9]\+ → [0-9]\+\.[0-9]\+\.[0-9]\+"; then
+              echo "Error: Commit message does not follow the expected format"
+              echo "Got: ${{ github.event.head_commit.message }}"
+              echo "Expected format: 'Bump version: X.Y.Z → A.B.C'"
+              exit 1
+            fi
+            
+            # Extract the last version number from commit message (format: "Bump version: 1.0.1 → 1.1.0")
+            VERSION=$(echo "${{ github.event.head_commit.message }}" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | tail -n1)
+            if [ -z "$VERSION" ]; then
+              echo "Error: Could not extract version number from commit message: ${{ github.event.head_commit.message }}"
+              echo "Expected format: 'Bump version: X.Y.Z → A.B.C'"
+              exit 1
+            fi
+            RELEASE_TAG="v$VERSION"
+          fi
+
+          # Create or update the release
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Updating existing release $RELEASE_TAG"
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes ""
+          else
+            echo "Creating new release $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes ""
+          fi
+
+          # Save the release tag for the next step
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
       - name: Upload artifact signatures to GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        # Upload to GitHub Release using the `gh` CLI.
-        # `dist/` contains the built packages, and the
-        # sigstore-produced signatures and certificates.
-        run: >-
-          gh release upload
-          "$GITHUB_REF_NAME" dist/**
-          --repo "$GITHUB_REPOSITORY"
+        run: |
+          # Verify the release exists before uploading
+          if ! gh release view "${{ env.RELEASE_TAG }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Error: Release ${{ env.RELEASE_TAG }} does not exist"
+            exit 1
+          fi
+
+          # Upload to GitHub Release using the `gh` CLI.
+          # `dist/` contains the built packages, and the
+          # sigstore-produced signatures and certificates.
+          echo "Uploading artifacts to release ${{ env.RELEASE_TAG }}"
+          if ! gh release upload "${{ env.RELEASE_TAG }}" dist/** --repo "$GITHUB_REPOSITORY"; then
+            echo "Error: Failed to upload artifacts to release ${{ env.RELEASE_TAG }}"
+            exit 1
+          fi
+          echo "Successfully uploaded artifacts to release ${{ env.RELEASE_TAG }}"
