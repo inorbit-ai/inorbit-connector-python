@@ -11,7 +11,7 @@ import os
 
 from setuptools import find_packages, setup
 
-VERSION = "1.1.3"
+VERSION = "1.2.0"
 
 GITHUB_ORG_URL = "https://github.com/inorbit-ai"
 GITHUB_REPO_URL = f"{GITHUB_ORG_URL}/inorbit-connector-python"
