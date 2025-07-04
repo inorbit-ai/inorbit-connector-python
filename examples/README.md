@@ -2,7 +2,7 @@
 
 This directory contains examples of connectors that can be used as a starting point for developing your own connectors.
 
-## `simple-connector/` 
+## `simple-connector/`
 
 The contents of this directory demonstrate the basic usage of the `inorbit-connector` framework. 
 
@@ -22,7 +22,7 @@ To run the example:
 virtualenv .venv
 source .venv/bin/activate
 pip install .[colorlog]
- ```
+```
 
 3) Source your environment file:
 
@@ -36,7 +36,7 @@ source example.env
 ```shell
 python simple-connector/connector.py
 ```
-   
+
 To kill the connector, press `ctrl-c` in the terminal.
 
 ## `robot-connector/`

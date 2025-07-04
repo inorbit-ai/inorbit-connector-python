@@ -15,7 +15,7 @@ my-example-robot:
   # The type of connector
   connector_type: example_bot
   # Update rate of the connector's main execution loop in Hz
-  connector_update_freq: 5.0
+  update_freq: 1.0
   # The ID of the InOrbit account that owns the robots (optional, required for use of footprints)
   account_id: my_inorbit_account
   # Robot key for InOrbit Connect robots (optional, delete if unused)
