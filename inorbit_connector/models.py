@@ -6,7 +6,7 @@
 # Standard
 import os
 import warnings
-from typing import List
+from typing import List, Optional
 
 # Third-party
 import pytz
@@ -36,6 +36,7 @@ class MapConfig(BaseModel):
     Attributes:
         file (FilePath): The path to the PNG map file
         map_id (str): The map id
+        map_label (str, optional): The map label
         origin_x (float): The x origin of the map
         origin_y (float): The y origin of the map
         resolution (float): The resolution
@@ -43,6 +44,7 @@ class MapConfig(BaseModel):
 
     file: FilePath
     map_id: str
+    map_label: Optional[str] = None
     origin_x: float
     origin_y: float
     resolution: float
