@@ -257,6 +257,7 @@ class Connector(ABC):
             self._robot_session.publish_map(
                 file=map_config.file,
                 map_id=map_config.map_id,
+                map_label=map_config.map_label,
                 frame_id=frame_id,
                 x=map_config.origin_x,
                 y=map_config.origin_y,

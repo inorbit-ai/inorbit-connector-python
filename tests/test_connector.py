@@ -8,6 +8,7 @@ import os
 import logging
 from time import sleep
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
+from pathlib import Path
 
 # Third-party
 import pytest
@@ -342,6 +343,7 @@ class TestConnector:
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
                 "map_id": "valid_map_id",
+                "map_label": "This is a map!",
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
@@ -350,20 +352,32 @@ class TestConnector:
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
         with patch.object(connector._robot_session, "publish_map") as mock_publish:
             connector.publish_map("frameA")
-            mock_publish.assert_called_once()
+            mock_publish.assert_called_once_with(
+                file=Path(f"{os.path.dirname(__file__)}/dir/test_map.png"),
+                map_id="valid_map_id",
+                map_label="This is a map!",
+                frame_id="frameA",
+                x=0.0,
+                y=0.0,
+                resolution=0.1,
+                ts=None,
+                is_update=False,
+            )
 
     def test_publish_pose_updates_maps(self, base_model):
         base_model["maps"] = {
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
                 "map_id": "valid_map_id",
+                "map_label": "This is a map!",
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
             },
+            # The second map has no label. The edge-sdk will treat defaults.
             "frameB": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
-                "map_id": "valid_map_id",
+                "map_id": "valid_map_id_b",
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
@@ -372,11 +386,32 @@ class TestConnector:
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
         with patch.object(connector._robot_session, "publish_map") as mock_publish_map:
             connector.publish_pose(0, 0, 0, "frameA")
-            assert mock_publish_map.call_count == 1  # Called on first map publish
+            mock_publish_map.assert_called_once_with(
+                file=Path(f"{os.path.dirname(__file__)}/dir/test_map.png"),
+                map_id="valid_map_id",
+                map_label="This is a map!",
+                frame_id="frameA",
+                x=0.0,
+                y=0.0,
+                resolution=0.1,
+                ts=None,
+                is_update=True,
+            )
+            mock_publish_map.reset_mock()
             connector.publish_pose(0, 0, 0, "frameA")
-            assert mock_publish_map.call_count == 1  # Not called again
+            mock_publish_map.assert_not_called()
             connector.publish_pose(0, 0, 0, "frameB")
-            assert mock_publish_map.call_count == 2  # Called again
+            mock_publish_map.assert_called_once_with(
+                file=Path(f"{os.path.dirname(__file__)}/dir/test_map.png"),
+                map_id="valid_map_id_b",
+                map_label=None,
+                frame_id="frameB",
+                x=0.0,
+                y=0.0,
+                resolution=0.1,
+                ts=None,
+                is_update=True,
+            )
 
     def test_register_user_scripts(self, base_model, tmp_path):
         with patch(
