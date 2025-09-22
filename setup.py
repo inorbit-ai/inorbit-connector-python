@@ -48,6 +48,7 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     description="A Python library for connectors in the InOrbit RobOps ecosystem.",
@@ -80,7 +81,7 @@ setup(
         "Website": "https://www.inorbit.ai/",
         "Source": f"{GITHUB_REPO_URL}/tree/v{VERSION}",
     },
-    python_requires=">=3.10, <3.13",
+    python_requires=">=3.10, <3.14",
     url=GITHUB_REPO_URL,
     version=VERSION,
 )
