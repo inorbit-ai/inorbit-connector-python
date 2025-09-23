@@ -1,4 +1,4 @@
-inorbit-edge[video]>=1.23.0,<2.0
+inorbit-edge[video]>=1.23.1,<2.0
 pydantic>=2.11,<3.0
 pytz>=2025.1
 PyYAML>=6.0.2,<7.0
