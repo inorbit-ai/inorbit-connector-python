@@ -10,6 +10,7 @@ import logging
 import asyncio
 import threading
 import traceback
+import time
 from typing import Coroutine
 from abc import ABC, abstractmethod
 
@@ -73,9 +74,40 @@ class Connector(ABC):
         self.__thread = threading.Thread(target=self.__run_loop)
         self.__loop: asyncio.AbstractEventLoop | None = None
 
+        # Status heartbeat configuration
+        self.__status_heartbeat_enabled = (
+            os.getenv("INORBIT_STATUS_HEARTBEAT_ENABLED", "true").lower() == "true"
+        )
+        self.__status_heartbeat_interval = float(
+            os.getenv("INORBIT_STATUS_HEARTBEAT_INTERVAL_SECONDS", "30.0")
+        )
+        self.__last_status_heartbeat = time.time()
+
+        # EdgeSDK resilience configuration
+        self.__edgesdk_restart_on_timeout = (
+            os.getenv("INORBIT_RESTART_ON_EDGESDK_TIMEOUT", "true").lower() == "true"
+        )
+        default_restart_timeout = self.__status_heartbeat_interval * 2
+        self.__edgesdk_restart_timeout = float(
+            os.getenv(
+                "INORBIT_EDGESDK_RESTART_TIMEOUT_SECONDS", str(default_restart_timeout)
+            )
+        )
+        self.__last_successful_publish = time.time()
+
         # Logging information
         setup_logger(config.logging)
         self._logger = logging.getLogger(__name__)
+
+        # Validate configuration
+        if self.__edgesdk_restart_on_timeout and self.__status_heartbeat_enabled:
+            if self.__edgesdk_restart_timeout <= self.__status_heartbeat_interval:
+                self._logger.warning(
+                    f"EdgeSDK restart timeout ({self.__edgesdk_restart_timeout}s) "
+                    f"should be longer than status heartbeat interval "
+                    f"({self.__status_heartbeat_interval}s) to allow heartbeat "
+                    f"attempts."
+                )
 
         # Set up environment variables
         for env_var_name, env_var_value in config.env_vars.items():
@@ -218,6 +250,8 @@ class Connector(ABC):
 
         # Connect to InOrbit
         self._robot_session.connect()
+        self.__last_successful_publish = time.time()
+        self._logger.info("Connected to InOrbit successfully")
 
     @abstractmethod
     async def _disconnect(self) -> None:
@@ -236,6 +270,64 @@ class Connector(ABC):
 
         # Call the user-implemented disconnection logic
         await self._disconnect()
+
+    def _check_edgesdk_health(self) -> None:
+        """Check EdgeSDK health and restart connector if unhealthy.
+
+        Simple timeout-based restart strategy.
+        If EdgeSDK hasn't successfully published anything within the timeout period,
+        exit (assuming external supervisor will restart us).
+        """
+        if not self.__edgesdk_restart_on_timeout:
+            return  # Health monitoring disabled
+
+        current_time = time.time()
+        time_since_last_publish = current_time - self.__last_successful_publish
+
+        if time_since_last_publish > self.__edgesdk_restart_timeout:
+            self._logger.critical(
+                f"EdgeSDK appears unhealthy: no successful publishes for "
+                f"{time_since_last_publish:.1f}s "
+                f"(timeout: {self.__edgesdk_restart_timeout}s). "
+                f"Exiting for restart."
+            )
+            # Exit the process - external supervisor (Docker, systemd, etc.)
+            # should restart us
+            import sys
+
+            sys.exit(1)
+
+    def _send_status_heartbeat(self) -> None:
+        """Send periodic status heartbeat to ensure robot shows as online in InOrbit.
+
+        This complements the EdgeSDK's connect/disconnect status messages by providing
+        a regular heartbeat to maintain online status visibility.
+        """
+        if not self.__status_heartbeat_enabled:
+            return
+
+        current_time = time.time()
+        if (
+            current_time - self.__last_status_heartbeat
+            >= self.__status_heartbeat_interval
+        ):
+            try:
+                self._robot_session.send_robot_status(online=True)
+                self.__last_status_heartbeat = current_time
+                self._logger.debug("Status heartbeat sent successfully")
+                self._mark_successful_publish()
+            except Exception as e:
+                self._logger.debug(
+                    f"Status heartbeat failed: {e}, will retry next cycle"
+                )
+
+    def _mark_successful_publish(self) -> None:
+        """Mark that a successful publish occurred.
+
+        Subclasses should call this method when they successfully publish
+        data to InOrbit to help monitor EdgeSDK health.
+        """
+        self.__last_successful_publish = time.time()
 
     @abstractmethod
     async def _execution_loop(self) -> None:
@@ -382,6 +474,14 @@ class Connector(ABC):
                     self._execution_loop(),
                     asyncio.sleep(1.0 / self.config.update_freq),
                 )
+
+                # Send heartbeat first to try to maintain status,
+                # then check if restart needed
+                # this way, even if the execution loop is slower than the
+                # heartbeat interval, we can still maintain status
+                self._send_status_heartbeat()
+                self._check_edgesdk_health()
+
             except Exception as e:
                 self._logger.error(f"Error in execution loop: {e}")
                 self._logger.error(f"Traceback: {traceback.format_exc()}")

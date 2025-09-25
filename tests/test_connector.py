@@ -463,6 +463,236 @@ class TestConnector:
         assert "ENV_VAR" in os.environ
         assert os.environ["ENV_VAR"] == "env_value"
 
+    def test_resilience_config_defaults(self, base_model):
+        """Test that resilience configuration has correct defaults."""
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+
+        # Check default values
+        assert connector._Connector__status_heartbeat_enabled is True
+        assert connector._Connector__status_heartbeat_interval == 30.0
+        assert connector._Connector__edgesdk_restart_on_timeout is True
+        assert (
+            connector._Connector__edgesdk_restart_timeout == 60.0
+        )  # 2x heartbeat interval
+        assert connector._Connector__last_successful_publish is not None
+        assert connector._Connector__last_status_heartbeat is not None
+
+    def test_resilience_config_environment_variables(self, base_model):
+        """Test that resilience configuration can be set via environment variables."""
+        env_vars = {
+            "INORBIT_STATUS_HEARTBEAT_ENABLED": "false",
+            "INORBIT_STATUS_HEARTBEAT_INTERVAL_SECONDS": "45.0",
+            "INORBIT_RESTART_ON_EDGESDK_TIMEOUT": "false",
+            "INORBIT_EDGESDK_RESTART_TIMEOUT_SECONDS": "120.0",
+        }
+
+        with patch.dict(os.environ, env_vars):
+            connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+
+            assert connector._Connector__status_heartbeat_enabled is False
+            assert connector._Connector__status_heartbeat_interval == 45.0
+            assert connector._Connector__edgesdk_restart_on_timeout is False
+            assert connector._Connector__edgesdk_restart_timeout == 120.0
+
+    def test_resilience_config_validation_warning(self, base_model):
+        """Test that a warning is logged when restart timeout <= heartbeat interval."""
+        env_vars = {
+            "INORBIT_STATUS_HEARTBEAT_INTERVAL_SECONDS": "60.0",
+            "INORBIT_EDGESDK_RESTART_TIMEOUT_SECONDS": "30.0",  # Less than heartbeat
+        }
+
+        with patch.dict(os.environ, env_vars):
+            with patch("logging.getLogger") as mock_logger:
+                mock_logger_instance = MagicMock()
+                mock_logger.return_value = mock_logger_instance
+
+                Connector("TestRobot", InorbitConnectorConfig(**base_model))
+
+                # Should log a warning about the configuration
+                mock_logger_instance.warning.assert_called()
+                warning_call = mock_logger_instance.warning.call_args[0][0]
+                assert "should be longer than" in warning_call
+                assert "heartbeat interval" in warning_call
+
+    def test_send_status_heartbeat_enabled(self, base_connector):
+        """Test status heartbeat when enabled."""
+        base_connector._robot_session = MagicMock()
+        base_connector._robot_session.send_robot_status.return_value = (
+            None  # Success (no exception)
+        )
+
+        # Mock time to simulate heartbeat interval passing
+        with patch("time.time") as mock_time:
+            # Set initial time
+            mock_time.return_value = 1000.0
+            base_connector._Connector__last_status_heartbeat = 970.0  # 30 seconds ago
+
+            base_connector._send_status_heartbeat()
+
+            # Should call send_robot_status and update timestamp
+            base_connector._robot_session.send_robot_status.assert_called_once_with(
+                online=True
+            )
+            assert base_connector._Connector__last_status_heartbeat == 1000.0
+
+    def test_send_status_heartbeat_not_due(self, base_connector):
+        """Test status heartbeat when not due yet."""
+        base_connector._robot_session = MagicMock()
+
+        # Mock time to simulate heartbeat not due
+        with patch("time.time") as mock_time:
+            mock_time.return_value = 1000.0
+            base_connector._Connector__last_status_heartbeat = (
+                990.0  # Only 10 seconds ago
+            )
+
+            base_connector._send_status_heartbeat()
+
+            # Should not call send_robot_status
+            base_connector._robot_session.send_robot_status.assert_not_called()
+
+    def test_send_status_heartbeat_disabled(self, base_model):
+        """Test status heartbeat when disabled."""
+        env_vars = {"INORBIT_STATUS_HEARTBEAT_ENABLED": "false"}
+
+        with patch.dict(os.environ, env_vars):
+            connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+            connector._robot_session = MagicMock()
+
+            # Mock time to simulate heartbeat interval passing
+            with patch("time.time") as mock_time:
+                mock_time.return_value = 1000.0
+                connector._Connector__last_status_heartbeat = 970.0  # 30 seconds ago
+
+                connector._send_status_heartbeat()
+
+                # Should not call send_robot_status when disabled
+                connector._robot_session.send_robot_status.assert_not_called()
+
+    def test_send_status_heartbeat_failure(self, base_connector):
+        """Test status heartbeat when send_robot_status fails."""
+        base_connector._robot_session = MagicMock()
+        base_connector._robot_session.send_robot_status.side_effect = RuntimeError(
+            "Failed to publish"
+        )
+        base_connector._logger = MagicMock()
+
+        # Mock time to simulate heartbeat interval passing
+        with patch("time.time") as mock_time:
+            mock_time.return_value = 1000.0
+            base_connector._Connector__last_status_heartbeat = 970.0  # 30 seconds ago
+
+            base_connector._send_status_heartbeat()
+
+            # Should call send_robot_status but not update timestamp on failure
+            base_connector._robot_session.send_robot_status.assert_called_once_with(
+                online=True
+            )
+            assert (
+                base_connector._Connector__last_status_heartbeat == 970.0
+            )  # Unchanged
+            base_connector._logger.debug.assert_called()
+
+    def test_mark_successful_publish(self, base_connector):
+        """Test marking successful publish updates timestamp."""
+        with patch("time.time") as mock_time:
+            mock_time.return_value = 1500.0
+
+            base_connector._mark_successful_publish()
+
+            assert base_connector._Connector__last_successful_publish == 1500.0
+
+    def test_check_edgesdk_health_healthy(self, base_connector):
+        """Test health check when EdgeSDK is healthy."""
+        # Mock time to simulate recent successful publish
+        with patch("time.time") as mock_time:
+            mock_time.return_value = 1000.0
+            base_connector._Connector__last_successful_publish = 970.0  # 30 seconds ago
+
+            # Should not exit (no exception)
+            base_connector._check_edgesdk_health()
+
+    def test_check_edgesdk_health_unhealthy_exits(self, base_connector):
+        """Test health check exits when EdgeSDK is unhealthy."""
+        base_connector._logger = MagicMock()
+
+        # Mock time to simulate old successful publish (beyond timeout)
+        with patch("time.time") as mock_time, patch("sys.exit") as mock_exit:
+            mock_time.return_value = 1000.0
+            base_connector._Connector__last_successful_publish = (
+                930.0  # 70 seconds ago (> 60s timeout)
+            )
+
+            base_connector._check_edgesdk_health()
+
+            # Should log critical error and exit
+            base_connector._logger.critical.assert_called()
+            mock_exit.assert_called_once_with(1)
+
+            # Check log message content
+            critical_call = base_connector._logger.critical.call_args[0][0]
+            assert "EdgeSDK appears unhealthy" in critical_call
+            assert "70.0s" in critical_call
+            assert "timeout: 60.0s" in critical_call
+
+    def test_check_edgesdk_health_disabled(self, base_model):
+        """Test health check when disabled."""
+        env_vars = {"INORBIT_RESTART_ON_EDGESDK_TIMEOUT": "false"}
+
+        with patch.dict(os.environ, env_vars):
+            connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+            connector._logger = MagicMock()
+
+            # Mock time to simulate very old successful publish
+            with patch("time.time") as mock_time, patch("sys.exit") as mock_exit:
+                mock_time.return_value = 1000.0
+                connector._Connector__last_successful_publish = 800.0  # 200 seconds ago
+
+                connector._check_edgesdk_health()
+
+                # Should not log or exit when disabled
+                connector._logger.critical.assert_not_called()
+                mock_exit.assert_not_called()
+
+    def test_connect_resets_successful_publish_timestamp(self, base_connector):
+        """Test that successful connection resets the successful publish timestamp."""
+        base_connector._robot_session = MagicMock()
+        base_connector._connect = AsyncMock()
+        base_connector._logger = MagicMock()
+
+        with patch("time.time") as mock_time:
+            mock_time.return_value = 2000.0
+
+            # Call the private __connect method
+            import asyncio
+
+            asyncio.run(base_connector._Connector__connect())
+
+            # Should reset timestamp and log success
+            assert base_connector._Connector__last_successful_publish == 2000.0
+            base_connector._logger.info.assert_called_with(
+                "Connected to InOrbit successfully"
+            )
+
+    def test_connect_failure_does_not_reset_timestamp(self, base_connector):
+        """Test that failed connection does not reset successful publish timestamp."""
+        base_connector._robot_session = MagicMock()
+        base_connector._robot_session.connect.side_effect = RuntimeError(
+            "Connection failed"
+        )
+        base_connector._connect = AsyncMock()
+
+        original_timestamp = 1500.0
+        base_connector._Connector__last_successful_publish = original_timestamp
+
+        with pytest.raises(RuntimeError):
+            import asyncio
+
+            asyncio.run(base_connector._Connector__connect())
+
+        # Should not reset timestamp on failure
+        assert base_connector._Connector__last_successful_publish == original_timestamp
+
 
 class TestConnectorCommandHandler:
 
