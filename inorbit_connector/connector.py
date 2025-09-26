@@ -106,6 +106,9 @@ class Connector(ABC):
             create_dir = kwargs.get("create_user_scripts_dir", False)
             self._register_user_scripts(user_scripts_path, create_dir)
 
+        # Set online status callback for EdgeSDK
+        self._robot_session.set_online_status_callback(self._is_robot_online)
+
         # If enabled, register the provided custom commands handler
         if kwargs.get("register_custom_command_handler", True):
             self._register_custom_command_handler(self._inorbit_command_handler)
@@ -159,6 +162,18 @@ class Connector(ABC):
                 )
 
         self._robot_session.register_command_callback(handler_wrapper)
+
+    def _is_robot_online(self) -> bool:
+        """Check if the robot is online.
+
+        Default implementation assumes robot is online if connector is running.
+        Override this method in specific connectors to provide robot-specific
+        health checks (e.g., API connectivity, robot state, etc.).
+
+        Returns:
+            bool: True if robot is online, False otherwise.
+        """
+        return True  # Base assumption: if connector is running, robot is online
 
     @abstractmethod
     async def _inorbit_command_handler(

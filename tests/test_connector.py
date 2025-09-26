@@ -579,3 +579,18 @@ class TestConnectorCommandHandler:
             mock_run_coroutine.assert_called_once()
             # Check the handler itself was called (which triggered the side_effect)
             mock_async_handler.assert_called()  # Check it was called at least
+
+    def test_sets_online_status_callback(self, base_model):
+        """Test that online status callback is set on EdgeSDK."""
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+
+        # Verify the callback was set
+        assert connector._robot_session._online_status_callback is not None
+
+        # Verify it calls the connector's _is_robot_online method
+        assert connector._robot_session._online_status_callback() is True
+
+    def test_is_robot_online_default_implementation(self, base_connector):
+        """Test that _is_robot_online returns True by default."""
+        connector = base_connector
+        assert connector._is_robot_online() is True
