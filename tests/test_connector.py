@@ -580,143 +580,17 @@ class TestConnectorCommandHandler:
             # Check the handler itself was called (which triggered the side_effect)
             mock_async_handler.assert_called()  # Check it was called at least
 
-    def test_register_builtin_command_handlers(self, base_model):
-        """Test that built-in command handlers are registered."""
-        with patch(
-            f"{Connector.__module__}.{Connector.__name__}"
-            "._register_builtin_command_handlers",
-            autospec=True,
-        ) as mock_register_builtin:
-            Connector("TestRobot", InorbitConnectorConfig(**base_model))
-            mock_register_builtin.assert_called_once()
+    def test_sets_online_status_callback(self, base_model):
+        """Test that online status callback is set on EdgeSDK."""
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
 
-    def test_get_state_handler_responds_online_by_default(self, base_connector):
-        """Test that get_state handler responds with online status by default."""
-        connector = base_connector
-        connector._robot_session = MagicMock()
-        connector._logger = MagicMock()
+        # Verify the callback was set
+        assert connector._robot_session._online_status_callback is not None
 
-        # Mock _is_robot_online to return True (default behavior)
-        with patch.object(connector, "_is_robot_online", return_value=True):
-            # Get the registered handler by calling _register_builtin_command_handlers
-            # and capturing the registered callback
-            registered_callbacks = []
-            original_register = connector._robot_session.register_command_callback
-
-            def capture_callback(callback):
-                registered_callbacks.append(callback)
-                return original_register(callback)
-
-            connector._robot_session.register_command_callback = capture_callback
-            connector._register_builtin_command_handlers()
-
-            # Find the get_state handler
-            get_state_handler = None
-            for callback in registered_callbacks:
-                # Test if this callback handles get_state
-                try:
-                    callback("get_state", [], {})
-                    get_state_handler = callback
-                    break
-                except Exception:
-                    continue
-
-            assert (
-                get_state_handler is not None
-            ), "get_state handler should be registered"
-
-            # Verify it called _send_robot_status with online=True
-            connector._robot_session._send_robot_status.assert_called_with(online=True)
-
-    def test_get_state_handler_responds_offline_when_robot_offline(
-        self, base_connector
-    ):
-        """Test that get_state handler responds with offline status when robot is offline."""
-        connector = base_connector
-        connector._robot_session = MagicMock()
-        connector._logger = MagicMock()
-
-        # Mock _is_robot_online to return False
-        with patch.object(connector, "_is_robot_online", return_value=False):
-            # Get the registered handler
-            registered_callbacks = []
-            original_register = connector._robot_session.register_command_callback
-
-            def capture_callback(callback):
-                registered_callbacks.append(callback)
-                return original_register(callback)
-
-            connector._robot_session.register_command_callback = capture_callback
-            connector._register_builtin_command_handlers()
-
-            # Find and call the get_state handler
-            for callback in registered_callbacks:
-                try:
-                    callback("get_state", [], {})
-                    break
-                except Exception:
-                    continue
-
-            # Verify it called _send_robot_status with online=False
-            connector._robot_session._send_robot_status.assert_called_with(online=False)
-
-    def test_get_state_handler_ignores_other_commands(self, base_connector):
-        """Test that get_state handler ignores commands other than get_state."""
-        connector = base_connector
-        connector._robot_session = MagicMock()
-        connector._logger = MagicMock()
-
-        # Get the registered handler
-        registered_callbacks = []
-        original_register = connector._robot_session.register_command_callback
-
-        def capture_callback(callback):
-            registered_callbacks.append(callback)
-            return original_register(callback)
-
-        connector._robot_session.register_command_callback = capture_callback
-        connector._register_builtin_command_handlers()
-
-        # Call with a different command
-        for callback in registered_callbacks:
-            callback("other_command", [], {})
-
-        # Verify _send_robot_status was not called
-        connector._robot_session._send_robot_status.assert_not_called()
+        # Verify it calls the connector's _is_robot_online method
+        assert connector._robot_session._online_status_callback() is True
 
     def test_is_robot_online_default_implementation(self, base_connector):
         """Test that _is_robot_online returns True by default."""
         connector = base_connector
         assert connector._is_robot_online() is True
-
-    def test_get_state_handler_handles_exceptions(self, base_connector):
-        """Test that get_state handler handles exceptions gracefully."""
-        connector = base_connector
-        connector._robot_session = MagicMock()
-        connector._logger = MagicMock()
-
-        # Mock _is_robot_online to raise an exception
-        with patch.object(connector, "_is_robot_online", side_effect=Exception("Test error")):
-            # Get the registered handler
-            registered_callbacks = []
-            original_register = connector._robot_session.register_command_callback
-
-            def capture_callback(callback):
-                registered_callbacks.append(callback)
-                return original_register(callback)
-
-            connector._robot_session.register_command_callback = capture_callback
-            connector._register_builtin_command_handlers()
-
-            # Call the get_state handler - should not raise exception
-            for callback in registered_callbacks:
-                try:
-                    callback("get_state", [], {})
-                    break
-                except:
-                    continue
-
-            # Verify error was logged
-            connector._logger.error.assert_called()
-            # Verify _send_robot_status was not called due to exception
-            connector._robot_session._send_robot_status.assert_not_called()

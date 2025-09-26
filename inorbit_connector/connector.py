@@ -106,8 +106,8 @@ class Connector(ABC):
             create_dir = kwargs.get("create_user_scripts_dir", False)
             self._register_user_scripts(user_scripts_path, create_dir)
 
-        # Register built-in command handlers (like get_state)
-        self._register_builtin_command_handlers()
+        # Set online status callback for EdgeSDK
+        self._robot_session.set_online_status_callback(self._is_robot_online)
 
         # If enabled, register the provided custom commands handler
         if kwargs.get("register_custom_command_handler", True):
@@ -162,23 +162,6 @@ class Connector(ABC):
                 )
 
         self._robot_session.register_command_callback(handler_wrapper)
-
-    def _register_builtin_command_handlers(self) -> None:
-        """Register built-in command handlers that all connectors need."""
-
-        def get_state_handler(command_name: str, args: list, options: dict):
-            """Handle get_state command from InOrbit."""
-            if command_name == "get_state":
-                try:
-                    is_online = self._is_robot_online()
-                    self._robot_session._send_robot_status(online=is_online)
-                    status_str = "online" if is_online else "offline"
-                    self._logger.debug(f"Responded to get_state: robot {status_str}")
-                except Exception as e:
-                    self._logger.error(f"Failed to handle get_state command: {e}")
-                    # Don't call result_function for get_state - it's not a user command
-
-        self._robot_session.register_command_callback(get_state_handler)
 
     def _is_robot_online(self) -> bool:
         """Check if the robot is online.
