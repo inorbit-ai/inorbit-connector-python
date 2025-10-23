@@ -11,13 +11,19 @@ import asyncio
 import threading
 import traceback
 from abc import ABC, abstractmethod
-from warnings import deprecated
+from typing import Coroutine
 
-# Python 3.10 compatibility
+# Python 3.12+ compatibility for override decorator
 try:
-    from typing import Coroutine, override
+    from typing import override
 except ImportError:
-    from typing_extensions import Coroutine, override
+    from typing_extensions import override
+
+# Python 3.13+ compatibility for deprecated decorator
+try:
+    from warnings import deprecated
+except ImportError:
+    from typing_extensions import deprecated
 
 # Third Party
 from inorbit_edge.models import RobotSessionModel
