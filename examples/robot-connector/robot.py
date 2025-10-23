@@ -28,6 +28,7 @@ class ExampleBotAPIWrapper:
                 "x": random.uniform(0.1, 0.9),
                 "y": random.uniform(0.1, 0.9),
                 "yaw": random.uniform(0.1, 0.9),
+                "frame_id": "frameIdA",
             },
         }
 
@@ -120,7 +121,12 @@ class Robot:
     def pose(self) -> dict | None:
         """Return the robot pose"""
         if pose := self._telemetry_data.get("pose"):
-            if pose.get("x") and pose.get("y") and pose.get("yaw"):
+            if (
+                pose.get("x")
+                and pose.get("y")
+                and pose.get("yaw")
+                and pose.get("frame_id")
+            ):
                 return pose
         return None
 

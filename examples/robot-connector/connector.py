@@ -64,13 +64,13 @@ class ExampleBotConnector(Connector):
         to InOrbit.
         """
         if pose := self._robot.pose:
-            self._robot_session.publish_pose(**pose)
+            self.publish_pose(**pose)
         if odometry := self._robot.odometry:
-            self._robot_session.publish_odometry(**odometry)
+            self.publish_odometry(**odometry)
         if key_values := self._robot.key_values:
-            self._robot_session.publish_key_values(**key_values)
+            self.publish_key_values(**key_values)
         if system_stats := self._robot.system_stats:
-            self._robot_session.publish_system_stats(**system_stats)
+            self.publish_system_stats(**system_stats)
 
         self._logger.info("Robot data published")
 
