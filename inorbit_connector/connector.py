@@ -12,6 +12,7 @@ import threading
 import traceback
 from abc import ABC, abstractmethod
 from warnings import deprecated
+
 # Python 3.10 compatibility
 try:
     from typing import Coroutine, override
@@ -38,8 +39,11 @@ class CommandResultCode(str, Enum):
 class FleetConnector(ABC):
     """Generic InOrbit fleet connector.
 
-    This is the base class of an InOrbit fleet connector. Subclasses should implement all
-    abstract methods.
+    This is the base class of an InOrbit fleet connector. Subclasses should implement
+    all abstract methods.
+
+    A lot of initialization logic is customizable through the configuration object.
+    See self.__init__() for more details.
     """
 
     def __init__(
@@ -55,7 +59,8 @@ class FleetConnector(ABC):
                 Default is False
             default_user_scripts_dir (str): The default user scripts directory path to
                 use if not explicitly set in the config.
-                Default is "~/.inorbit_connectors/connector-{self.__class__.__name__}/local/"
+                Default is
+                    "~/.inorbit_connectors/connector-{self.__class__.__name__}/local/"
             create_user_scripts_dir (bool): The path to the user scripts directory.
                 Relevant only if register_user_scripts is True.
                 Default is False
@@ -70,8 +75,8 @@ class FleetConnector(ABC):
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
 
-        # Private dictionary for fast internal access (use self._get_session(robot_id) for thread-safe access)
-        # This is kept for performance in tight loops, but should not be accessed directly
+        # Private dictionary for fast internal access (use self._get_session(robot_id)
+        # for thread-safe access) in tight loops. It should not be accessed directly
         # by subclasses to maintain thread-safety
         self.__robot_sessions: dict[str, RobotSession] = {}
 
@@ -104,9 +109,10 @@ class FleetConnector(ABC):
             os.environ[env_var_name] = env_var_value
 
         # Create RobotSessionFactory with common configuration
-        # HACK: Using RobotSessionModel preserves backwards compatibility with automatically loaded environment variables
-        # Robot-specific values (robot_id, robot_name) have to be ommited after initalization before passing the
-        # config to the factory.
+        # HACK: Using RobotSessionModel preserves backwards compatibility with
+        # automatically loaded environment variables Robot-specific values (robot_id,
+        # robot_name) have to be ommited after initalization before passing the config
+        # to the factory.
         robot_session_config = RobotSessionModel(
             api_key=config.api_key,
             endpoint=config.api_url,
@@ -129,7 +135,8 @@ class FleetConnector(ABC):
         """Register an async custom command handler wrapped in error handling logic.
 
         Args:
-            session (RobotSession): The robot session to register the command handler for.
+            session (RobotSession): The robot session to register the command handler
+            for.
             async_handler (Coroutine): The custom commands handler.
         """
 
@@ -142,7 +149,8 @@ class FleetConnector(ABC):
                 ).result()
             except Exception as e:
                 self._logger.error(
-                    f"Failed to execute command '{command_name}' for robot {session.robot_id} with args {args}. "
+                    f"Failed to execute command '{command_name}' for robot "
+                    f"{session.robot_id} with args {args}. "
                     f"Exception:\n{str(e) or e.__class__.__name__}"
                 )
                 options["result_function"](
@@ -183,9 +191,9 @@ class FleetConnector(ABC):
     def __initialize_session(self, robot_id: str) -> RobotSession:
         """Initialize a robot session."""
 
-        # TODO: allow customizing the robot names in the connector config, and/or allowing
-        # subclasses to set it dynamically (for example, to match the name the robot may have in
-        # its own system)
+        # TODO: allow customizing the robot names in the connector config, and/or
+        # allowing subclasses to set it dynamically (for example, to match the name the
+        # robot may have in its own system)
         session = self.__session_pool.get_session(robot_id, robot_name=robot_id)
 
         # If enabled, register user scripts
@@ -198,7 +206,9 @@ class FleetConnector(ABC):
             )
 
         # Set online status callback for EdgeSDK
-        session.set_online_status_callback(lambda: self._is_robot_online(robot_id))
+        session.set_online_status_callback(
+            lambda: self._is_fleet_robot_online(robot_id)
+        )
 
         # If enabled, register the provided custom commands handler
         if self.__register_custom_command_handler:
@@ -299,10 +309,11 @@ class FleetConnector(ABC):
     def _get_robot_session(self, robot_id: str) -> RobotSession:
         """Get a robot session for a specific robot ID.
 
-        Usually the connector API is enough to abstract from the edge-sdk, but in some cases accessing
-        the robot session directly may be necessary.
+        Usually the connector API is enough to abstract from the edge-sdk, but in some
+        cases accessing the robot session directly may be necessary.
 
-        This method provides thread-safe access to robot sessions through the session pool.
+        This method provides thread-safe access to robot sessions through the session
+        pool.
 
         Args:
             robot_id (str): The robot ID to get the session for
@@ -489,7 +500,8 @@ class FleetConnector(ABC):
     ) -> None:
         """Callback method for command messages for a specific robot.
 
-        This method is called when a command is received from InOrbit for a specific robot.
+        This method is called when a command is received from InOrbit for a specific
+        robot.
         Will automatically be registered if `register_custom_command_handler`
         constructor keyword argument is set, which is the default behavior.
 
@@ -535,8 +547,10 @@ class Connector(FleetConnector, ABC):
     This is the base class of an InOrbit connector. Subclasses should implement all
     abstract methods.
 
+    It is a subclass of FleetConnector, but managing a single robot.
+
     A lot of initialization logic is customizable through the configuration object. See
-    self.__init__() for more details.
+    FleetConnector.__init__() for more details.
     """
 
     def __init__(self, robot_id: str, config: InorbitConnectorConfig, **kwargs) -> None:
@@ -564,8 +578,8 @@ class Connector(FleetConnector, ABC):
     def _get_session(self) -> RobotSession:
         """Get the edge-sdk robot session for the current robot.
 
-        Usually the connector API is enough to abstract from the edge-sdk, but in some cases accessing
-        the robot session directly may be necessary.
+        Usually the connector API is enough to abstract from the edge-sdk, but in some
+        cases accessing the robot session directly may be necessary.
         """
         return super()._get_robot_session(self.robot_id)
 
