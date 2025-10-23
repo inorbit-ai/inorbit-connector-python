@@ -10,9 +10,13 @@ import logging
 import asyncio
 import threading
 import traceback
-from typing import Coroutine, Dict, override
 from abc import ABC, abstractmethod
 from warnings import deprecated
+# Python 3.10 compatibility
+try:
+    from typing import Coroutine, override
+except ImportError:
+    from typing_extensions import Coroutine, override
 
 # Third Party
 from inorbit_edge.models import RobotSessionModel
