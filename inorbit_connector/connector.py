@@ -66,11 +66,11 @@ class Connector(ABC):
         self._last_published_frame_id = None
 
         # Threading for the main run methods
-        # The connector runs an asycio loop within a spawned thread
+        # The connector runs an asyncio loop within a spawned thread
         # self.__loop is initialized within __run_connector(), and only referenced
         # outside of it by the commands handler
-        self.__stop_event = asyncio.Event()
-        self.__thread = threading.Thread(target=self.__run_loop)
+        self.__stop_event: asyncio.Event | None = None
+        self.__thread: threading.Thread | None = None
         self.__loop: asyncio.AbstractEventLoop | None = None
 
         # Logging information
@@ -298,6 +298,21 @@ class Connector(ABC):
             self.publish_map(frame_id, is_update=True)
         self._robot_session.publish_pose(x, y, yaw, frame_id, *args, **kwargs)
 
+    def register_cameras(self) -> None:
+        """Register camera feeds with the robot session.
+
+        This is a public accessor for registering cameras.
+        Used by Fleet to set up cameras after connection.
+        """
+        for idx, camera_config in enumerate(self.config.cameras):
+            self._logger.info(
+                f"Registering camera {idx}: {str(camera_config.video_url)}"
+            )
+            # If values are None, use default instead
+            dump = camera_config.model_dump()
+            clean = {k: v for k, v in dump.items() if v is not None}
+            self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
+
     def start(self) -> None:
         """Start the connector in a new thread.
 
@@ -316,9 +331,7 @@ class Connector(ABC):
         """
 
         # Prevent starting an already running thread
-        if not self.__thread.is_alive():
-            self.__stop_event.clear()
-
+        if self.__thread is None or not self.__thread.is_alive():
             # Create and start the thread
             self.__thread = threading.Thread(target=self.__run_connector)
             self.__thread.start()
@@ -341,10 +354,12 @@ class Connector(ABC):
 
         # Stop the execution loop
         self._logger.info("Stopping connector")
-        self.__stop_event.set()
-        self.__thread.join(timeout=5)
-        if self.__thread.is_alive():
-            raise Exception("Thread did not stop in time")
+        if self.__stop_event:
+            self.__stop_event.set()
+        if self.__thread:
+            self.__thread.join(timeout=5)
+            if self.__thread.is_alive():
+                raise Exception("Thread did not stop in time")
 
     def __run_connector(self):
         """The target function of the connector's thread.
@@ -357,18 +372,14 @@ class Connector(ABC):
         self.__loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.__loop)
 
+        # Create the stop event in the correct event loop context
+        self.__stop_event = asyncio.Event()
+
         # Connect to external services and create the InOrbit session
         self.__loop.run_until_complete(self.__connect())
 
         # Set up camera feeds
-        for idx, camera_config in enumerate(self.config.cameras):
-            self._logger.info(
-                f"Registering camera {idx}: {str(camera_config.video_url)}"
-            )
-            # If values are None, use default instead
-            dump = camera_config.model_dump()
-            clean = {k: v for k, v in dump.items() if v is not None}
-            self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
+        self.register_cameras()
 
         try:
             self.__loop.run_until_complete(self.__run_loop())
