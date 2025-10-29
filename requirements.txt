@@ -2,3 +2,6 @@ inorbit-edge[video]>=1.24.0,<2.0
 pydantic>=2.11,<3.0
 pytz>=2025.1
 PyYAML>=6.0.2,<7.0
+# NOTE: typing_extensions includes decorators and other utilities that are included in Python 3.12+
+# Look for conditional imports in the codebase for reference.
+typing_extensions>=4.5.0; python_version < "3.12"

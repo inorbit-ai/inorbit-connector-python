@@ -10,12 +10,24 @@ import logging
 import asyncio
 import threading
 import traceback
-from typing import Coroutine
 from abc import ABC, abstractmethod
+from typing import Coroutine
+
+# Python 3.12+ compatibility for override decorator
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
+
+# Python 3.13+ compatibility for deprecated decorator
+try:
+    from warnings import deprecated
+except ImportError:
+    from typing_extensions import deprecated
 
 # Third Party
 from inorbit_edge.models import RobotSessionModel
-from inorbit_edge.robot import RobotSession
+from inorbit_edge.robot import RobotSession, RobotSessionPool, RobotSessionFactory
 from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
@@ -30,23 +42,22 @@ class CommandResultCode(str, Enum):
     FAILURE = "1"
 
 
-class Connector(ABC):
-    """Generic InOrbit connector.
+class FleetConnector(ABC):
+    """Generic InOrbit fleet connector.
 
-    This is the base class of an InOrbit connector. Subclasses should implement all
-    abstract methods.
+    This is the base class of an InOrbit fleet connector. Subclasses should implement
+    all abstract methods.
 
-    A lot of initialization logic is customizable through the configuration object. See
-    self.__init__() for more details.
+    A lot of initialization logic is customizable through the configuration object.
+    See self.__init__() for more details.
     """
 
-    def __init__(self, robot_id: str, config: InorbitConnectorConfig, **kwargs) -> None:
-        """Initialize a new InOrbit connector.
-
-        This class handles bidirectional communication with InOrbit.
+    def __init__(
+        self, robot_ids: list[str], config: InorbitConnectorConfig, **kwargs
+    ) -> None:
+        """Initialize the base connector with common functionality.
 
         Args:
-            robot_id (str): The ID of the InOrbit robot
             config (InorbitConnectorConfig): The connector configuration
 
         Keyword Args:
@@ -54,16 +65,26 @@ class Connector(ABC):
                 Default is False
             default_user_scripts_dir (str): The default user scripts directory path to
                 use if not explicitly set in the config.
-                Default is "~/.inorbit_connectors/connector-{robot_id}/local/"
+                Default is
+                    "~/.inorbit_connectors/connector-{self.__class__.__name__}/local/"
             create_user_scripts_dir (bool): The path to the user scripts directory.
                 Relevant only if register_user_scripts is True.
                 Default is False
+            register_custom_command_handler (bool): Register custom command handler.
+                Default is True
         """
 
         # Common information
-        self.robot_id = robot_id
+        self.robot_ids = robot_ids
         self.config = config
-        self._last_published_frame_id = None
+
+        # Per robot state
+        self.__last_published_frame_ids: dict[str, str] = {}
+
+        # Private dictionary for fast internal access (use self._get_session(robot_id)
+        # for thread-safe access) in tight loops. It should not be accessed directly
+        # by subclasses to maintain thread-safety
+        self.__robot_sessions: dict[str, RobotSession] = {}
 
         # Threading for the main run methods
         # The connector runs an asycio loop within a spawned thread
@@ -72,6 +93,17 @@ class Connector(ABC):
         self.__stop_event = asyncio.Event()
         self.__thread = threading.Thread(target=self.__run_loop)
         self.__loop: asyncio.AbstractEventLoop | None = None
+
+        # Additional initalization arguments
+        self.__register_user_scripts = kwargs.get("register_user_scripts", False)
+        self.__default_user_scripts_dir = kwargs.get(
+            "default_user_scripts_dir",
+            f"~/.inorbit_connectors/connector-{self.__class__.__name__}/local/",
+        )
+        self.__create_user_scripts_dir = kwargs.get("create_user_scripts_dir", False)
+        self.__register_custom_command_handler = kwargs.get(
+            "register_custom_command_handler", True
+        )
 
         # Logging information
         setup_logger(config.logging)
@@ -82,41 +114,68 @@ class Connector(ABC):
             self._logger.info(f"Setting environment variable '{env_var_name}'")
             os.environ[env_var_name] = env_var_value
 
-        # Create the robot session in InOrbit
+        # Create RobotSessionFactory with common configuration
+        # HACK: Using RobotSessionModel preserves backwards compatibility with
+        # automatically loaded environment variables Robot-specific values (robot_id,
+        # robot_name) have to be ommited after initalization before passing the config
+        # to the factory.
         robot_session_config = RobotSessionModel(
             api_key=config.api_key,
             endpoint=config.api_url,
             account_id=config.account_id,
-            robot_id=robot_id,
-            robot_name=robot_id,
             robot_key=config.inorbit_robot_key,
+            robot_id="required_value",
+            robot_name="required_value",
         )
-        self._robot_session = RobotSession(**robot_session_config.model_dump())
+        factory_kwargs = robot_session_config.model_dump(
+            exclude={"robot_id", "robot_name"}
+        )
+        self.__session_factory = RobotSessionFactory(**factory_kwargs)
 
-        # If enabled, register user scripts
-        if kwargs.get("register_user_scripts", False):
-            # Get user_scripts path
-            path = config.user_scripts_dir
-            if path is None:
-                path = kwargs.get(
-                    "default_user_scripts_dir",
-                    f"~/.inorbit_connectors/connector-{robot_id}/local/",
+        # Create RobotSessionPool
+        self.__session_pool = RobotSessionPool(self.__session_factory)
+
+    def __register_custom_command_handler_for_session(
+        self, session: RobotSession, async_handler: Coroutine
+    ) -> None:
+        """Register an async custom command handler wrapped in error handling logic.
+
+        Args:
+            session (RobotSession): The robot session to register the command handler
+            for.
+            async_handler (Coroutine): The custom commands handler.
+        """
+
+        def handler_wrapper(command_name: str, args: list, options: dict):
+            try:
+                # Handle the commands in the existing event loop and wait for the result
+                asyncio.run_coroutine_threadsafe(
+                    async_handler(session.robot_id, command_name, args, options),
+                    self.__loop,
+                ).result()
+            except Exception as e:
+                self._logger.error(
+                    f"Failed to execute command '{command_name}' for robot "
+                    f"{session.robot_id} with args {args}. "
+                    f"Exception:\n{str(e) or e.__class__.__name__}"
                 )
-            user_scripts_path = os.path.expanduser(path)
-            create_dir = kwargs.get("create_user_scripts_dir", False)
-            self._register_user_scripts(user_scripts_path, create_dir)
+                options["result_function"](
+                    CommandResultCode.FAILURE,
+                    execution_status_details=(
+                        "An error occured executing custom command"
+                    ),
+                    stderr=str(e) or e.__class__.__name__,
+                )
 
-        # Set online status callback for EdgeSDK
-        self._robot_session.set_online_status_callback(self._is_robot_online)
+        session.register_command_callback(handler_wrapper)
 
-        # If enabled, register the provided custom commands handler
-        if kwargs.get("register_custom_command_handler", True):
-            self._register_custom_command_handler(self._inorbit_command_handler)
-
-    def _register_user_scripts(self, path: str, create: bool) -> None:
+    def __register_user_scripts_for_session(
+        self, session: RobotSession, path: str, create: bool = False
+    ) -> None:
         """Register user scripts folder.
 
         Args:
+            session (RobotSession): The robot session to register the user scripts for.
             path (str): The path to the user scripts directory.
             create (bool): Create the directory if it doesn't exist.
         """
@@ -133,93 +192,43 @@ class Connector(ABC):
             # files with '.sh' extension).
             # More script types can be supported, but right now is only limited to
             # bash scripts
-            self._robot_session.register_commands_path(path, exec_name_regex=r".*\.sh")
+            session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
-    def _register_custom_command_handler(self, async_handler: Coroutine) -> None:
-        """Register an async custom command handler wrapped in error handling logic.
+    def __initialize_session(self, robot_id: str) -> RobotSession:
+        """Initialize a robot session."""
 
-        Args:
-            async_handler (Coroutine): The custom commands handler.
-        """
+        # TODO: allow customizing the robot names in the connector config, and/or
+        # allowing subclasses to set it dynamically (for example, to match the name the
+        # robot may have in its own system)
+        session = self.__session_pool.get_session(robot_id, robot_name=robot_id)
 
-        def handler_wrapper(command_name: str, args: list, options: dict):
-            try:
-                # Handle the commands in the existing event loop and wait for the result
-                asyncio.run_coroutine_threadsafe(
-                    async_handler(command_name, args, options), self.__loop
-                ).result()
-            except Exception as e:
-                self._logger.error(
-                    f"Failed to execute command '{command_name}' with args {args}. "
-                    f"Exception:\n{str(e) or e.__class__.__name__}"
-                )
-                options["result_function"](
-                    CommandResultCode.FAILURE,
-                    execution_status_details=(
-                        "An error occured executing custom command"
-                    ),
-                    stderr=str(e) or e.__class__.__name__,
-                )
-
-        self._robot_session.register_command_callback(handler_wrapper)
-
-    def _is_robot_online(self) -> bool:
-        """Check if the robot is online.
-
-        Default implementation assumes robot is online if connector is running.
-        Override this method in specific connectors to provide robot-specific
-        health checks (e.g., API connectivity, robot state, etc.).
-
-        Returns:
-            bool: True if robot is online, False otherwise.
-        """
-        return True  # Base assumption: if connector is running, robot is online
-
-    @abstractmethod
-    async def _inorbit_command_handler(
-        self, command_name: str, args: list, options: dict
-    ):
-        """Callback method for command messages. This method is called when a command
-        is received from InOrbit.
-        Will automatically be registered if `register_custom_command_handler`
-        constructor keyword argument is set, which is the default behavior.
-
-        The result function will always be included in the options dictionary and must
-        be called in order to report the result of a command. It has the following
-        signature:
-
-        options['result_function'](
-            result_code: CommandResultCode,
-            execution_status_details: str | None = None,
-            stdout: str | None = None,
-            stderr: str | None = None,
-        ) -> None
-
-        e.g.:
-        if success:
-            return options['result_function'](CommandResultCode.SUCCESS)
-        else:
-            return options['result_function'](
-                CommandResultCode.FAILURE,
-                stderr="Example error"
+        # If enabled, register user scripts
+        if self.__register_user_scripts:
+            path = self.config.user_scripts_dir or os.path.expanduser(
+                self.__default_user_scripts_dir
+            )
+            self.__register_user_scripts_for_session(
+                session, path, self.__create_user_scripts_dir
             )
 
-        Args:
-            command_name (str): The name of the command
-            args (list): The list of arguments
-            options (dict): The dictionary of options.
-                It contains the `result_function` explained above.
-        """
-        pass
+        # Set online status callback for EdgeSDK
+        session.set_online_status_callback(
+            lambda: self._is_fleet_robot_online(robot_id)
+        )
 
-    @abstractmethod
-    async def _connect(self) -> None:
-        """Connect to any external services.
+        # If enabled, register the provided custom commands handler
+        if self.__register_custom_command_handler:
+            self.__register_custom_command_handler_for_session(
+                session, self._inorbit_robot_command_handler
+            )
 
-        This method should not be called directly. Instead, call the start() method to
-        start the connector. This ensures that the connector is only started once.
-        """
-        pass
+        return session
+
+    def __initialize_sessions(self) -> None:
+        """Initialize the robot sessions."""
+
+        for robot_id in self.robot_ids:
+            self.__robot_sessions[robot_id] = self.__initialize_session(robot_id)
 
     async def __connect(self) -> None:
         """Initialize the connection to InOrbit based on the provided configuration,
@@ -232,71 +241,96 @@ class Connector(ABC):
         await self._connect()
 
         # Connect to InOrbit
-        self._robot_session.connect()
-
-    @abstractmethod
-    async def _disconnect(self) -> None:
-        """Disconnect from any external services.
-
-        This method should not be called directly. Instead, call the stop() method to
-        stop the connector. This ensures that the connector is only stopped once.
-        """
-        pass
+        self.__initialize_sessions()
 
     async def __disconnect(self) -> None:
         """Disconnect external services and disconnect from InOrbit."""
 
         # Disconnect from InOrbit
-        self._robot_session.disconnect()
+        for session in self.__robot_sessions.values():
+            session.disconnect()
 
         # Call the user-implemented disconnection logic
         await self._disconnect()
 
-    @abstractmethod
-    async def _execution_loop(self) -> None:
-        """The main execution loop for the connector.
+    def __run_connector(self) -> None:
+        """The target function of the connector's thread.
 
-        This method should be overridden by subclasses to provide the execution loop for
-        the connector, will be called repeatedly until the connector is stopped, and
-        should not be called directly. Instead, call the start() or stop() methods to
-        start or stop the connector. This ensures that the connector is only started or
-        stopped once.
+        It connects to InOrbit via the edge-sdk, start the execution loop and
+        disconnects all services when the connector is signaled stop via self.stop().
         """
-        pass
 
-    def publish_map(self, frame_id: str, is_update: bool = False) -> None:
-        """Publish the map metadata to InOrbit. If `frame_id` is not found in the maps
-        configuration, this method will not publish anything.
-        """
-        if map_config := self.config.maps.get(frame_id):
-            self._robot_session.publish_map(
-                file=map_config.file,
-                map_id=map_config.map_id,
-                map_label=map_config.map_label,
-                frame_id=frame_id,
-                x=map_config.origin_x,
-                y=map_config.origin_y,
-                resolution=map_config.resolution,
-                ts=None,
-                is_update=is_update,
+        # Create a new event loop for this thread
+        self.__loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.__loop)
+
+        # Connect to external services and create the InOrbit session
+        self.__loop.run_until_complete(self.__connect())
+
+        # Set up camera feeds
+        for idx, camera_config in enumerate(self.config.cameras):
+            self._logger.info(
+                f"Registering camera {idx}: {str(camera_config.video_url)}"
             )
-            self._last_published_frame_id = frame_id
-        else:
-            self._logger.error(
-                f"Map {frame_id} not found in the current configuration."
-                " Map message will not be sent."
-            )
+            # If values are None, use default instead
+            dump = camera_config.model_dump()
+            clean = {k: v for k, v in dump.items() if v is not None}
+            # TODO: Register cameras per robot, intead of all cameras to all robots
+            for session in self.__robot_sessions.values():
+                session.register_camera(str(idx), OpenCVCamera(**clean))
 
-    def publish_pose(
-        self, x: float, y: float, yaw: float, frame_id: str, *args, **kwargs
-    ) -> None:
-        """Publish a pose to InOrbit. If the frame_id is different from the last
-        published, it calls self.publish_map() to update the map.
+        try:
+            self.__loop.run_until_complete(self.__run_loop())
+        except Exception as e:
+            self._logger.error(f"Error in execution loop: {e}")
+            self._logger.error(f"Traceback: {traceback.format_exc()}")
+        finally:
+            self.__loop.run_until_complete(self.__disconnect())
+            self.__loop.close()
+
+    async def __run_loop(self) -> None:
+        """The main coroutine of the connector.
+
+        This coroutine will run the execution loop of the connector until the stop event
+        is set.
+        It uses self.config.update_freq to set a maximum frequency for the execution
+        loop, but it will never run faster than the actual execution of the loop body.
+
+        Exceptions raised by self._execution_loop() are caught and logged to prevent
+        the connector from crashing. It is recommended to handle exceptions within the
+        loop and publish the errors.
         """
-        if frame_id != self._last_published_frame_id:
-            self._logger.info(f"Updating map {frame_id} with new pose.")
-            self.publish_map(frame_id, is_update=True)
-        self._robot_session.publish_pose(x, y, yaw, frame_id, *args, **kwargs)
+        while not self.__stop_event.is_set():
+            try:
+                await asyncio.gather(
+                    self._execution_loop(),
+                    asyncio.sleep(1.0 / self.config.update_freq),
+                )
+            except Exception as e:
+                self._logger.error(f"Error in execution loop: {e}")
+                self._logger.error(f"Traceback: {traceback.format_exc()}")
+                # Continue execution after a brief pause to avoid tight error loops
+                await asyncio.sleep(1.0)
+
+    def _get_robot_session(self, robot_id: str) -> RobotSession:
+        """Get a robot session for a specific robot ID.
+
+        Usually the connector API is enough to abstract from the edge-sdk, but in some
+        cases accessing the robot session directly may be necessary.
+
+        This method provides thread-safe access to robot sessions through the session
+        pool.
+
+        Args:
+            robot_id (str): The robot ID to get the session for
+
+        Returns:
+            RobotSession: The robot session for the specified robot
+
+        Raises:
+            KeyError: If the robot_id is not found in the pool
+        """
+        return self.__session_pool.get_session(robot_id)
 
     def start(self) -> None:
         """Start the connector in a new thread.
@@ -346,59 +380,313 @@ class Connector(ABC):
         if self.__thread.is_alive():
             raise Exception("Thread did not stop in time")
 
-    def __run_connector(self):
-        """The target function of the connector's thread.
+    def publish_robot_pose(
+        self,
+        robot_id: str,
+        x: float,
+        y: float,
+        yaw: float,
+        frame_id: str = None,
+        **kwargs,
+    ) -> None:
+        """Publish a pose for a specific robot to InOrbit.
+        If the frame_id has changed from the last published, the map will be updated.
 
-        It connects to InOrbit via the edge-sdk, start the execution loop and
-        disconnects all services when the connector is signaled stop via self.stop().
+        Args:
+            robot_id (str): The robot ID to publish pose for
+            x (float): X coordinate
+            y (float): Y coordinate
+            yaw (float): Yaw angle
+            frame_id (str): Frame ID for the pose
+            **kwargs: Additional arguments for pose publishing
         """
-
-        # Create a new event loop for this thread
-        self.__loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.__loop)
-
-        # Connect to external services and create the InOrbit session
-        self.__loop.run_until_complete(self.__connect())
-
-        # Set up camera feeds
-        for idx, camera_config in enumerate(self.config.cameras):
+        session = self._get_robot_session(robot_id)
+        last_published_frame_id = self.__last_published_frame_ids.get(robot_id, None)
+        if frame_id != last_published_frame_id:
             self._logger.info(
-                f"Registering camera {idx}: {str(camera_config.video_url)}"
+                f"Updating map {frame_id} with new pose for robot {robot_id}."
             )
-            # If values are None, use default instead
-            dump = camera_config.model_dump()
-            clean = {k: v for k, v in dump.items() if v is not None}
-            self._robot_session.register_camera(str(idx), OpenCVCamera(**clean))
+            self.publish_robot_map(robot_id, frame_id, is_update=True)
+        session.publish_pose(x, y, yaw, frame_id, **kwargs)
 
-        try:
-            self.__loop.run_until_complete(self.__run_loop())
-        except Exception as e:
-            self._logger.error(f"Error in execution loop: {e}")
-            self._logger.error(f"Traceback: {traceback.format_exc()}")
-        finally:
-            self.__loop.run_until_complete(self.__disconnect())
-            self.__loop.close()
+    def publish_robot_map(
+        self, robot_id: str, frame_id: str, is_update: bool = False
+    ) -> None:
+        """Publish the map metadata for a specific robot to InOrbit.
 
-    async def __run_loop(self) -> None:
-        """The main coroutine of the connector.
-
-        This coroutine will run the execution loop of the connector until the stop event
-        is set.
-        It uses self.config.update_freq to set a maximum frequency for the execution
-        loop, but it will never run faster than the actual execution of the loop body.
-
-        Exceptions raised by self._execution_loop() are caught and logged to prevent
-        the connector from crashing. It is recommended to handle exceptions within the
-        loop and publish the errors.
+        Args:
+            robot_id (str): The robot ID to publish map for
+            frame_id (str): The frame ID of the map
+            is_update (bool): Whether this is an update to an existing map
         """
-        while not self.__stop_event.is_set():
-            try:
-                await asyncio.gather(
-                    self._execution_loop(),
-                    asyncio.sleep(1.0 / self.config.update_freq),
-                )
-            except Exception as e:
-                self._logger.error(f"Error in execution loop: {e}")
-                self._logger.error(f"Traceback: {traceback.format_exc()}")
-                # Continue execution after a brief pause to avoid tight error loops
-                await asyncio.sleep(1.0)
+        session = self._get_robot_session(robot_id)
+        if map_config := self.config.maps.get(frame_id):
+            session.publish_map(
+                file=map_config.file,
+                map_id=map_config.map_id,
+                map_label=map_config.map_label,
+                frame_id=frame_id,
+                x=map_config.origin_x,
+                y=map_config.origin_y,
+                resolution=map_config.resolution,
+                ts=None,
+                is_update=is_update,
+            )
+            self.__last_published_frame_ids[robot_id] = frame_id
+        else:
+            self._logger.error(
+                f"Map {frame_id} not found in the current configuration."
+                " Map message will not be sent."
+            )
+
+    def publish_robot_odometry(self, robot_id: str, **kwargs) -> None:
+        """Publish odometry for a specific robot to InOrbit.
+
+        Args:
+            robot_id (str): The robot ID to publish odometry for
+            **kwargs: Odometry data
+        """
+        session = self._get_robot_session(robot_id)
+        session.publish_odometry(**kwargs)
+
+    def publish_robot_key_values(self, robot_id: str, **kwargs) -> None:
+        """Publish key values for a specific robot to InOrbit.
+
+        Args:
+            robot_id (str): The robot ID to publish key values for
+            **kwargs: Key-value data
+        """
+        session = self._get_robot_session(robot_id)
+        session.publish_key_values(kwargs)
+
+    def publish_robot_system_stats(self, robot_id: str, **kwargs) -> None:
+        """Publish system stats for a specific robot to InOrbit.
+
+        Args:
+            robot_id (str): The robot ID to publish system stats for
+            **kwargs: System stats data
+        """
+        session = self._get_robot_session(robot_id)
+        session.publish_system_stats(**kwargs)
+
+    # Methods meant to be extended by subclasses
+    @abstractmethod
+    async def _connect(self) -> None:
+        """Connect to any external services.
+
+        This method should not be called directly. Instead, call the start() method to
+        start the connector. This ensures that the connector is only started once.
+        """
+        ...
+
+    @abstractmethod
+    async def _disconnect(self) -> None:
+        """Disconnect from any external services.
+
+        This method should not be called directly. Instead, call the stop() method to
+        stop the connector. This ensures that the connector is only stopped once.
+        """
+        ...
+
+    @abstractmethod
+    async def _execution_loop(self) -> None:
+        """The main execution loop for the connector.
+
+        This method should be overridden by subclasses to provide the execution loop for
+        the connector, will be called repeatedly until the connector is stopped, and
+        should not be called directly. Instead, call the start() or stop() methods to
+        start or stop the connector. This ensures that the connector is only started or
+        stopped once.
+        """
+        ...
+
+    @abstractmethod
+    async def _inorbit_robot_command_handler(
+        self, robot_id: str, command_name: str, args: list, options: dict
+    ) -> None:
+        """Callback method for command messages for a specific robot.
+
+        This method is called when a command is received from InOrbit for a specific
+        robot.
+        Will automatically be registered if `register_custom_command_handler`
+        constructor keyword argument is set, which is the default behavior.
+
+        The result function will always be included in the options dictionary and must
+        be called in order to report the result of a command. It has the following
+        signature:
+
+        options['result_function'](
+            result_code: CommandResultCode,
+            execution_status_details: str | None = None,
+            stdout: str | None = None,
+            stderr: str | None = None,
+        ) -> None
+
+        Args:
+            robot_id (str): The robot ID that received the command
+            command_name (str): The name of the command
+            args (list): The list of arguments
+            options (dict): The dictionary of options.
+                It contains the `result_function` explained above.
+        """
+        ...
+
+    def _is_fleet_robot_online(self, robot_id: str) -> bool:
+        """Check if a specific robot is online.
+
+        Default implementation assumes robot is online if connector is running.
+        Override this method in specific connectors to provide robot-specific
+        health checks (e.g., API connectivity, robot state, etc.).
+
+        Args:
+            robot_id (str): The robot ID to check
+
+        Returns:
+            bool: True if robot is online, False otherwise.
+        """
+        return True  # Base assumption: if connector is running, robot is online
+
+
+class Connector(FleetConnector, ABC):
+    """Generic InOrbit connector.
+
+    This is the base class of an InOrbit connector. Subclasses should implement all
+    abstract methods.
+
+    It is a subclass of FleetConnector, but managing a single robot.
+
+    A lot of initialization logic is customizable through the configuration object. See
+    FleetConnector.__init__() for more details.
+    """
+
+    def __init__(self, robot_id: str, config: InorbitConnectorConfig, **kwargs) -> None:
+        """Initialize a new InOrbit connector.
+
+        This class handles bidirectional communication with InOrbit.
+
+        Args:
+            robot_id (str): The ID of the InOrbit robot
+            config (InorbitConnectorConfig): The connector configuration
+
+        Keyword Args:
+            register_user_scripts (bool): Register user scripts automatically.
+                Default is False
+            default_user_scripts_dir (str): The default user scripts directory path to
+                use if not explicitly set in the config.
+                Default is "~/.inorbit_connectors/connector-{robot_id}/local/"
+            create_user_scripts_dir (bool): The path to the user scripts directory.
+                Relevant only if register_user_scripts is True.
+                Default is False
+        """
+        self.robot_id = robot_id
+        super().__init__([robot_id], config, **kwargs)
+
+    def _get_session(self) -> RobotSession:
+        """Get the edge-sdk robot session for the current robot.
+
+        Usually the connector API is enough to abstract from the edge-sdk, but in some
+        cases accessing the robot session directly may be necessary.
+        """
+        return super()._get_robot_session(self.robot_id)
+
+    @property
+    @deprecated("Use self._get_session() instead")
+    def _robot_session(self) -> RobotSession:
+        return self._get_session()
+
+    def _is_robot_online(self) -> bool:
+        """Check if the robot is online.
+
+        Default implementation assumes robot is online if connector is running.
+        Override this method in specific connectors to provide robot-specific
+        health checks (e.g., API connectivity, robot state, etc.).
+
+        Returns:
+            bool: True if robot is online, False otherwise.
+        """
+        return True  # Base assumption: if connector is running, robot is online
+
+    @override
+    def _is_fleet_robot_online(self, robot_id: str) -> bool:
+        return self._is_robot_online()
+
+    @abstractmethod
+    async def _inorbit_command_handler(
+        self, command_name: str, args: list, options: dict
+    ):
+        """Callback method for command messages. This method is called when a command
+        is received from InOrbit.
+        Will automatically be registered if `register_custom_command_handler`
+        constructor keyword argument is set, which is the default behavior.
+
+        The result function will always be included in the options dictionary and must
+        be called in order to report the result of a command. It has the following
+        signature:
+
+        options['result_function'](
+            result_code: CommandResultCode,
+            execution_status_details: str | None = None,
+            stdout: str | None = None,
+            stderr: str | None = None,
+        ) -> None
+
+        e.g.:
+        if success:
+            return options['result_function'](CommandResultCode.SUCCESS)
+        else:
+            return options['result_function'](
+                CommandResultCode.FAILURE,
+                stderr="Example error"
+            )
+
+        Args:
+            command_name (str): The name of the command
+            args (list): The list of arguments
+            options (dict): The dictionary of options.
+                It contains the `result_function` explained above.
+        """
+        pass
+
+    @override
+    async def _inorbit_robot_command_handler(
+        self, robot_id: str, command_name: str, args: list, options: dict
+    ) -> None:
+        self._inorbit_command_handler(command_name, args, options)
+
+    def publish_map(self, frame_id: str, is_update: bool = False) -> None:
+        """Publish the map metadata to InOrbit. If `frame_id` is not found in the maps
+        configuration, this method will not publish anything.
+        """
+        super().publish_robot_map(self.robot_id, frame_id, is_update)
+
+    def publish_pose(
+        self, x: float, y: float, yaw: float, frame_id: str, *args, **kwargs
+    ) -> None:
+        """Publish a pose to InOrbit. If the frame_id is different from the last
+        published, it calls self.publish_map() to update the map.
+        """
+        super().publish_robot_pose(self.robot_id, x, y, yaw, frame_id, *args, **kwargs)
+
+    def publish_odometry(self, **kwargs) -> None:
+        """Publish odometry for a specific robot to InOrbit.
+
+        Args:
+            **kwargs: Odometry data
+        """
+        super().publish_robot_odometry(self.robot_id, **kwargs)
+
+    def publish_key_values(self, **kwargs) -> None:
+        """Publish key values for a specific robot to InOrbit.
+
+        Args:
+            **kwargs: Key-value data
+        """
+        super().publish_robot_key_values(self.robot_id, **kwargs)
+
+    def publish_system_stats(self, **kwargs) -> None:
+        """Publish system stats for a specific robot to InOrbit.
+
+        Args:
+            **kwargs: System stats data
+        """
+        super().publish_robot_system_stats(self.robot_id, **kwargs)

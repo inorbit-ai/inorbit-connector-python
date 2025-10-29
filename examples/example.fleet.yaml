@@ -1,0 +1,48 @@
+common:
+  # The timezone of the robot location as a pytz timezone (https://pythonhosted.org/pytz/#helpers)
+  location_tz: America/Los_Angeles
+  # Logging configuration
+  logging:
+    # Connector log level (optional, can be set in the logging_config file) (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    # Comment out to use the log level set in the logging_config file
+    log_level: INFO
+    # Logging configuration file (optional). Comment out to use the default configuration file
+    config_file: ./logging.example.conf
+    # Variables the logs configuration file can use (optional)
+    # defaults:
+    #   # When the default config file is in use, this sets the output log file
+    #   log_file: ./logs/my-example-robot.log
+  # The type of connector
+  connector_type: example_bot
+  # Update rate of the connector's main execution loop in Hz
+  update_freq: 1.0
+  # The ID of the InOrbit account that owns the robots (optional, required for use of footprints)
+  account_id: my_inorbit_account
+  # Robot key for InOrbit Connect robots (optional, delete if unused)
+  # See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
+  inorbit_robot_key:
+  # Map configuration (optional)
+  maps:
+    frameIdA:
+      file: ./example_map.png
+      map_id: mapA
+      map_label: Building A - Floor 1
+      origin_x: 0.0
+      origin_y: 0.0
+      resolution: 0.05
+  # User scripts directory (optional)
+  user_scripts_dir: ./
+  # Extra environment variables, useful for running user scripts (optional)
+  env_vars:
+    MY_ENV_VAR: my_value
+
+  # This is where you define custom fields specific to your robot's connector
+  connector_config:
+    example_bot_api_version: v1
+    example_bot_hw_rev: v3
+    example_bot_custom_value: test123
+
+robots:
+  - fleet-robot-1
+  - fleet-robot-2
+  - fleet-robot-3

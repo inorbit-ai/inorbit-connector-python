@@ -6,10 +6,14 @@
 # Standard
 import asyncio
 import logging
-import os
 import random
 import signal
-from typing import override
+from pathlib import Path
+
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 # Third-party
 from pydantic import field_validator, BaseModel
@@ -19,9 +23,7 @@ from inorbit_connector.connector import CommandResultCode, Connector
 from inorbit_connector.models import InorbitConnectorConfig
 from inorbit_connector.utils import read_yaml
 
-CONFIG_FILE = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), "../example.yaml"
-)
+CONFIG_FILE = Path(__file__).resolve().parent.parent / "example.yaml"  # ../example.yaml
 ROBOT_ID = "my-example-robot"
 CONNECTOR_TYPE = "example_bot"
 
@@ -142,13 +144,15 @@ class ExampleBotConnector(Connector):
 
         # Publish key-values...
         key_values = self.config.connector_config.model_dump()
-        self._robot_session.publish_key_values(key_values)
+        self.publish_key_values(**key_values)
 
         # Publish system stats...
         cpu = random.uniform(0.1, 0.9)
         ram = random.uniform(0.2, 0.8)
         hdd = random.uniform(0.3, 0.7)
-        self._robot_session.publish_system_stats(cpu, ram, hdd)
+        self.publish_system_stats(
+            cpu_load_percentage=cpu, ram_usage_percentage=ram, hdd_usage_percentage=hdd
+        )
 
         # Publish pose...
         x = random.uniform(-1.0, 1.0)
@@ -169,7 +173,7 @@ class ExampleBotConnector(Connector):
             "linear_speed": linear_speed,
             "angular_speed": angular_speed,
         }
-        self._robot_session.publish_odometry(**odometry)
+        self.publish_odometry(**odometry)
 
         self._logger.info("Robot data updated and published")
 
