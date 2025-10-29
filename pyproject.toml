@@ -2,14 +2,99 @@
 #
 # SPDX-License-Identifier: MIT
 
+[build-system]
+requires = ["setuptools~=80.9", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inorbit-connector"
+dynamic = ["version", "urls"]
+description = "A Python library for connectors in the InOrbit RobOps ecosystem."
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = {file = "LICENSE"}
+authors = [
+    {name = "InOrbit, Inc.", email = "support@inorbit.ai"},
+]
+maintainers = [
+    {name = "InOrbit, Inc.", email = "support@inorbit.ai"},
+]
+keywords = ["inorbit", "robops", "robotics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "inorbit-edge[video]>=1.24.0,<2.0",
+    "pydantic>=2.11,<3.0",
+    "pytz>=2025.1",
+    "PyYAML>=6.0.2,<7.0",
+    "typing_extensions>=4.5.0; python_version < \"3.12\"",
+]
+
+[project.optional-dependencies]
+dev = [
+    "bump2version~=1.0",
+    "black~=25.9",
+    "coverage~=7.10",
+    "flake8~=7.3",
+    "flake8-pyproject~=1.2",
+    "pytest~=8.4",
+    "pytest-asyncio~=1.2",
+    "setuptools~=80.9",
+    "tox~=4.30",
+]
+colorlog = [
+    "colorlog==6.9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["inorbit_connector*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "inorbit_connector.__version__"}
+
+[tool.setuptools.package-data]
+"inorbit_connector.logging" = ["logging.default.conf"]
+
 [tool.coverage.run]
 source = ["inorbit_connector/", "tests/"]
 
 [tool.flake8]
-exclude = [".venv/", ".tox/"]
+exclude = [".venv*", "venv", ".tox/"]
 max-line-length = 88
 show-source = true
 statistics = true
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.tox]
+env_list = ["py310", "py311", "py312", "py313"]
+
+[tool.tox.gh]
+python = { "3.10" = "py310", "3.11" = "py311", "3.12" = "py312", "3.13" = "py313" }
+
+[tool.tox.env_run_base]
+extras = ["dev"]
+commands = [
+    ["flake8", "inorbit_connector"],
+    ["black", "--check", "--diff", "inorbit_connector"],
+    ["coverage", "run", "-m", "pytest"],
+    ["coverage", "html", "-d", "{envlogdir}/coverage"],
+]
