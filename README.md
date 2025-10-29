@@ -28,8 +28,10 @@ There are two ways of installing the `inorbit-connector` Python package.
 git clone https://github.com/inorbit-ai/inorbit-connector-python.git
 virtualenv venv
 . venv/bin/activate
-pip install -r requirements.txt
+pip install .
 ```
+
+See the [CONTRIBUTING.md](CONTRIBUTING.md) file for information on how to develop the project.
 
 ## Quick Start
 

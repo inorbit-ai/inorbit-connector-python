@@ -19,8 +19,16 @@ Ready to contribute? Here's how to set up `inorbit-connector-python` for local d
     ```bash
     cd inorbit-connector-python
     virtualenv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt -r requirements-dev.txt
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    pip install -e .[dev]
+    ```
+
+    If you prefer to use [`uv`](https://github.com/astral-sh/uv):
+
+    ```bash
+    uv venv --python 3.13
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    uv pip install -e .[dev]
     ```
 
 4. Create a branch for local development:
