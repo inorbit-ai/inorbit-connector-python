@@ -13,7 +13,7 @@ authors = [
     {name = "InOrbit, Inc.", email = "support@inorbit.ai"},
 ]
 maintainers = [
-    {name = "Russell Toris", email = "russell@inorbit.ai"},
+    {name = "InOrbit, Inc.", email = "support@inorbit.ai"},
 ]
 keywords = ["inorbit", "robops", "robotics"]
 classifiers = [
