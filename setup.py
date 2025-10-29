@@ -5,15 +5,11 @@
 
 """The setup script."""
 
-import tomllib
-from pathlib import Path
 from setuptools import setup
 
 GITHUB_ORG_URL = "https://github.com/inorbit-ai"
 GITHUB_REPO_URL = f"{GITHUB_ORG_URL}/inorbit-connector-python"
-VERSION = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"][
-    "version"
-]
+VERSION = "1.4.0"
 
 setup(
     download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/v{VERSION}.zip",
