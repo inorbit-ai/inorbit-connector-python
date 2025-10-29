@@ -6,9 +6,9 @@
 # Standard
 import asyncio
 import logging
-import os
 import random
 import signal
+from pathlib import Path
 
 try:
     from typing import override
@@ -23,9 +23,9 @@ from inorbit_connector.connector import CommandResultCode, FleetConnector
 from inorbit_connector.models import InorbitConnectorConfig
 from inorbit_connector.utils import read_yaml
 
-CONFIG_FILE = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), "../example.fleet.yaml"
-)
+CONFIG_FILE = (
+    Path(__file__).resolve().parent.parent / "example.fleet.yaml"
+)  # ../example.fleet.yaml
 CONNECTOR_TYPE = "example_bot"
 
 

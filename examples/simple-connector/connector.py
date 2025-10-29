@@ -6,10 +6,14 @@
 # Standard
 import asyncio
 import logging
-import os
 import random
 import signal
-from typing import override
+from pathlib import Path
+
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 # Third-party
 from pydantic import field_validator, BaseModel
@@ -19,9 +23,7 @@ from inorbit_connector.connector import CommandResultCode, Connector
 from inorbit_connector.models import InorbitConnectorConfig
 from inorbit_connector.utils import read_yaml
 
-CONFIG_FILE = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), "../example.yaml"
-)
+CONFIG_FILE = Path(__file__).resolve().parent.parent / "example.yaml"  # ../example.yaml
 ROBOT_ID = "my-example-robot"
 CONNECTOR_TYPE = "example_bot"
 
