@@ -8,7 +8,7 @@ dynamic = ["version", "urls"]
 description = "A Python library for connectors in the InOrbit RobOps ecosystem."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
-license = "MIT"
+license = {file = "LICENSE"}
 authors = [
     {name = "InOrbit, Inc.", email = "support@inorbit.ai"},
 ]
@@ -28,6 +28,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
     "inorbit-edge[video]>=1.24.0,<2.0",
