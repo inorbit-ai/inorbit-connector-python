@@ -19,8 +19,16 @@ Ready to contribute? Here's how to set up `inorbit-connector-python` for local d
     ```bash
     cd inorbit-connector-python
     virtualenv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt -r requirements-dev.txt
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    pip install -e .[dev]
+    ```
+
+    If you prefer to use [`uv`](https://github.com/astral-sh/uv):
+
+    ```bash
+    uv venv --python 3.13
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    uv pip install -e .[dev]
     ```
 
 4. Create a branch for local development:
@@ -48,3 +56,36 @@ Ready to contribute? Here's how to set up `inorbit-connector-python` for local d
     ```
 
 7. Submit a pull request through the [GitHub](https://github.com/inorbit-ai/inorbit-connector-python/pulls) website.
+
+## Version bump and release - Maintainers only
+
+To release a new version:
+
+1. Ensure you're on the latest `main` branch:
+
+    ```bash
+    git checkout main
+    git pull
+    ```
+
+2. Bump the version using `bump2version`. This automatically increments the version number in the
+   places specified in the `.bumpversion.cfg` file:
+
+    ```bash
+    # Use major, minor, or patch to increment the version number
+    bump2version patch --dry-run --verbose
+    bump2version patch
+    ```
+
+3. Push both the commit and the tag:
+
+    ```bash
+    git push
+    git push --tags
+    ```
+
+CI automatically publishes to PyPI when either:
+- A tag is pushed, or
+- A commit message contains "Bump version"
+
+After publishing to PyPI, CI also signs the artifacts and creates/updates the GitHub Release.
