@@ -5,10 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "inorbit-connector"
 version = "1.4.0"
+dynamic = ["urls"]
 description = "A Python library for connectors in the InOrbit RobOps ecosystem."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "InOrbit, Inc.", email = "support@inorbit.ai"},
 ]
@@ -19,7 +20,6 @@ keywords = ["inorbit", "robops", "robotics"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: Microsoft :: Windows",
@@ -54,8 +54,12 @@ colorlog = [
     "colorlog==6.9.0",
 ]
 
-[tool.setuptools]
-packages = ["inorbit_connector"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["inorbit_connector*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "inorbit_connector.__version__"}
 
 [tool.setuptools.package-data]
 "inorbit_connector.logging" = ["logging.default.conf"]

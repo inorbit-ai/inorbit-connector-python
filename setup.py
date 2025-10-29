@@ -5,33 +5,22 @@
 
 """The setup script."""
 
+import tomllib
+from pathlib import Path
 from setuptools import setup
 
 GITHUB_ORG_URL = "https://github.com/inorbit-ai"
 GITHUB_REPO_URL = f"{GITHUB_ORG_URL}/inorbit-connector-python"
-
-from inorbit_connector import __version__ as VERSION
-
-with open("README.md") as file:
-    long_description = file.read()
+VERSION = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"][
+    "version"
+]
 
 setup(
-    author="InOrbit, Inc.",
-    author_email="support@inorbit.ai",
-    description="A Python library for connectors in the InOrbit RobOps ecosystem.",
     download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/v{VERSION}.zip",
-    keywords=["inorbit", "robops", "robotics"],
-    license="MIT",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    maintainer="Russell Toris",
-    maintainer_email="russell@inorbit.ai",
-    name="inorbit-connector",
     project_urls={
         "Tracker": f"{GITHUB_REPO_URL}/issues",
         "Contributing": f"{GITHUB_REPO_URL}/blob/v{VERSION}/CONTRIBUTING.md",
         "Code of Conduct": f"{GITHUB_REPO_URL}/blob/v{VERSION}/CODE_OF_CONDUCT.md",
-        "Changelog": f"{GITHUB_REPO_URL}/blob/v{VERSION}/CHANGELOG.md",
         "Issue Tracker": f"{GITHUB_REPO_URL}/issues",
         "License": f"{GITHUB_REPO_URL}/blob/v{VERSION}/LICENSE",
         "About": "https://www.inorbit.ai/company",
@@ -43,7 +32,4 @@ setup(
         "Website": "https://www.inorbit.ai/",
         "Source": f"{GITHUB_REPO_URL}/tree/v{VERSION}",
     },
-    python_requires=">=3.10, <3.14",
-    url=GITHUB_REPO_URL,
-    # Version, classifiers, and dependencies are read from pyproject.toml
 )
