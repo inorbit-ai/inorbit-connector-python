@@ -1,0 +1,43 @@
+version = 1
+SPDX-PackageName = "inorbit-connector-python"
+SPDX-PackageSupplier = "https://github.com/inorbit-ai/inorbit-connector-python"
+
+# Configuration files that don't require copyright/license headers in the file itself
+# These are annotated here with MIT (same as the rest of the project)
+[[annotations]]
+path = ".pypirc"
+SPDX-FileCopyrightText = "N/A"
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "PyPI configuration file (user-specific, may contain credentials)"
+
+[[annotations]]
+path = ".bumpversion.cfg"
+SPDX-FileCopyrightText = "N/A"
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Tool configuration file"
+
+[[annotations]]
+path = "examples/example.env"
+SPDX-FileCopyrightText = "N/A"
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Example environment file (template)"
+
+# Image files that don't support inline license headers
+# These are annotated here to avoid separate .license files
+[[annotations]]
+path = "assets/inorbit_github_footer.png"
+SPDX-FileCopyrightText = "2025 InOrbit, Inc."
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "InOrbit GitHub footer image"
+
+[[annotations]]
+path = "examples/example_map.png"
+SPDX-FileCopyrightText = "2025 InOrbit, Inc."
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Example map image"
+
+[[annotations]]
+path = "tests/dir/test_map.png"
+SPDX-FileCopyrightText = "2025 InOrbit, Inc."
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Test map image"

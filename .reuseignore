@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
+#
+# This file lists files and patterns that REUSE should ignore.
+# Format is similar to .gitignore
+#
+# Note: .pypirc and .bumpversion.cfg are handled via REUSE.toml annotations instead
+
+# Build artifacts and generated files
+__pycache__/
+*.pyc
+*.pyo
+dist/
+build/
+*.egg-info/
+*.egg-info
+
+# Log files
+*.log
+
+# Environment files (may contain secrets)
+.env
+*.env
+
+# Database files (generated)
+*.db
+missions_*.db
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+venv-*/
+env.bak/
+venv.bak/
+
+# IDE files
+.idea/
+.vscode/
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.hypothesis/
+
+# Tox
+.tox/
+.nox/
