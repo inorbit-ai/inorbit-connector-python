@@ -1,6 +1,7 @@
-# -*- coding: utf-8 -*-
-# License: MIT License
 # Copyright 2025 InOrbit, Inc.
+# SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
 
 import logging
 

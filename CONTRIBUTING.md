@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+
+SPDX-License-Identifier: MIT
+-->
+
 # Contributing
 
 Contributions are encouraged, and they are greatly appreciated! Every little bit helps, and credit will always be given.
@@ -48,3 +54,17 @@ Ready to contribute? Here's how to set up `inorbit-connector-python` for local d
     ```
 
 7. Submit a pull request through the [GitHub](https://github.com/inorbit-ai/inorbit-connector-python/pulls) website.
+
+## Reuse compliance check
+
+To check if the project is compliant with the REUSE compliance, run the following command:
+
+```bash
+reuse --root . lint
+```
+
+To fix the issues, run the following command:
+
+```bash
+reuse annotate --copyright "InOrbit, Inc." --license "MIT" --recursive . --skip-unrecognised
+```

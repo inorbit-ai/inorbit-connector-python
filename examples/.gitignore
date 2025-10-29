@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
+
 # Ignore all .env files, but do not ignore example.env
 *.env
 !example.env
