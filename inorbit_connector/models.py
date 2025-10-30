@@ -51,7 +51,6 @@ class MapConfig(BaseModel):
     origin_y: float
     resolution: float
 
-    # noinspection PyMethodParameters
     @field_validator("file")
     def validate_png_file(cls, file: FilePath) -> FilePath:
         """Validate that the file is a PNG file.
@@ -65,7 +64,7 @@ class MapConfig(BaseModel):
         Returns:
             FilePath: The given file path if it is a PNG file
         """
-        if not file.suffix.lower() == ".png":
+        if file.suffix.lower() != ".png":
             raise ValueError("The map file must be a PNG file")
         return file
 
@@ -135,7 +134,7 @@ class ConnectorConfig(BaseModel):
         inorbit_robot_key (str | None, optional): Robot key for InOrbit Connect robots.
             See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
         maps (dict[str, MapConfig], optional): frame_id to map configuration mapping
-        environment (dict[str, str], optional): Environment variables to be set in the
+        env_vars (dict[str, str], optional): Environment variables to be set in the
             connector or user scripts. The key is the environment variable name and the
             value is the value to set.
         fleet (list[RobotConfig]): The list of robot configurations.

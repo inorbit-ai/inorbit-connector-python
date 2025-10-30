@@ -59,7 +59,7 @@ class FleetConnector(ABC):
         """Initialize the base connector with common functionality.
 
         Args:
-            config (FleetConnectorConfig): The connector configuration
+            config (ConnectorConfig): The connector configuration
 
         Keyword Args:
             register_user_scripts (bool): Register user scripts automatically.
