@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+
+SPDX-License-Identifier: MIT
+-->
+
 # Connector Examples
 
 This directory contains examples of connectors that can be used as a starting point for developing your own connectors.

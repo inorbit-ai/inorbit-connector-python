@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
+
 [build-system]
 requires = ["setuptools~=80.9", "wheel"]
 build-backend = "setuptools.build_meta"

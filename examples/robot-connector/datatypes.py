@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
+
 from pydantic import BaseModel, field_validator
 
 from inorbit_connector.models import InorbitConnectorConfig

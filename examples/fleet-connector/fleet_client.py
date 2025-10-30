@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
+
 """
 This file represents a fleet manager API client that fetches information for
 multiple robots at once.

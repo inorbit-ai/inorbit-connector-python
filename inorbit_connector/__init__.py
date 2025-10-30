@@ -1,7 +1,9 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# License: MIT License
+
 # Copyright 2024 InOrbit, Inc.
+# SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
 
 __author__ = "InOrbit, Inc."
 __version__ = "1.4.0"
