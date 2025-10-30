@@ -36,7 +36,7 @@ class ExampleBotFleetConnector(FleetConnector):
     """
 
     def __init__(self, robot_ids: list[str], config: ExampleBotConnectorConfig) -> None:
-        super().__init__(robot_ids, config)
+        super().__init__(config)
 
         # Setup any other initialization things here
         self.api_version = config.connector_config.example_bot_api_version
