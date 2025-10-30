@@ -35,8 +35,8 @@ class ExampleBotFleetConnector(FleetConnector):
         config (ExampleBotConnectorConfig): The configuration for the connector
     """
 
-    def __init__(self, robot_ids: list[str], config: ExampleBotConnectorConfig) -> None:
-        super().__init__(robot_ids, config)
+    def __init__(self, config: ExampleBotConnectorConfig) -> None:
+        super().__init__(config)
 
         # Setup any other initialization things here
         self.api_version = config.connector_config.example_bot_api_version
@@ -46,7 +46,7 @@ class ExampleBotFleetConnector(FleetConnector):
         # Initialize the fleet manager abstraction
         # This simulates a fleet manager API that provides data for all robots
         self._fleet_manager = FleetManager(
-            robot_ids=robot_ids,
+            robot_ids=self.robot_ids,
             api_wrapper=FleetManagerAPIWrapper(
                 endpoint=config.connector_config.example_bot_custom_value,
                 api_key=config.connector_config.example_bot_custom_value,

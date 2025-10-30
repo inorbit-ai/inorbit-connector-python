@@ -4,7 +4,7 @@
 
 from pydantic import BaseModel, field_validator
 
-from inorbit_connector.models import InorbitConnectorConfig
+from inorbit_connector.models import ConnectorConfig
 
 
 CONNECTOR_TYPE = "example_bot"
@@ -26,10 +26,10 @@ class ExampleBotConfig(BaseModel):
     example_bot_custom_value: str
 
 
-class ExampleBotConnectorConfig(InorbitConnectorConfig):
+class ExampleBotConnectorConfig(ConnectorConfig):
     """The configuration for the example bot connector.
 
-    Each connector should create a class that inherits from InorbitConnectorConfig.
+    Each connector should create a class that inherits from ConnectorConfig.
 
     Attributes:
         connector_config (ExampleBotConfig): The config with custom fields for the robot

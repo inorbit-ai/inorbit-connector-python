@@ -7,6 +7,7 @@ import logging
 import signal
 import sys
 
+from inorbit_connector.utils import read_yaml
 from connector import ExampleBotFleetConnector
 from datatypes import ExampleBotConnectorConfig
 
@@ -42,32 +43,15 @@ def start():
     args = parser.parse_args()
     config_filename = args.config
 
-    # TODO: Update configuration management utilities to support fleet configurations
     try:
         # Read the fleet configuration file
-        import yaml
+        yaml_data = read_yaml(config_filename)
 
-        with open(config_filename, "r") as f:
-            yaml_data = yaml.safe_load(f)
+        # Create the connector configuration
+        config = ExampleBotConnectorConfig(**yaml_data)
 
-        # Extract the common configuration and robot IDs
-        if "common" not in yaml_data:
-            LOGGER.error("'common' section not found in configuration file")
-            exit(1)
-
-        if "robots" not in yaml_data:
-            LOGGER.error("'robots' section not found in configuration file")
-            exit(1)
-
-        common_config = yaml_data["common"]
-        robot_ids = yaml_data["robots"]
-
-        if not isinstance(robot_ids, list) or len(robot_ids) == 0:
-            LOGGER.error("'robots' must be a non-empty list of robot IDs")
-            exit(1)
-
-        # Create the connector configuration from the common section
-        config = ExampleBotConnectorConfig(**common_config)
+        # Extract robot IDs from the fleet configuration for logging purposes
+        robot_ids = [robot.robot_id for robot in config.fleet]
 
         LOGGER.info(f"Configuration loaded for fleet of {len(robot_ids)} robots")
         LOGGER.info(f"Robot IDs: {robot_ids}")
@@ -76,15 +60,12 @@ def start():
     except FileNotFoundError:
         LOGGER.error(f"Configuration file '{config_filename}' not found")
         exit(1)
-    except yaml.YAMLError as e:
-        LOGGER.error(f"Error parsing YAML file: {e}")
-        exit(1)
     except ValueError as e:
         LOGGER.error(f"Configuration validation error: {e}")
         exit(1)
 
     # Create and start the fleet connector
-    connector = ExampleBotFleetConnector(robot_ids, config)
+    connector = ExampleBotFleetConnector(config)
     LOGGER.info("Starting fleet connector...")
     connector.start()
 

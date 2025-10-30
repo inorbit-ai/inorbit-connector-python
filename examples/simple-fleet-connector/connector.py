@@ -22,7 +22,7 @@ from pydantic import field_validator, BaseModel
 
 # InOrbit
 from inorbit_connector.connector import CommandResultCode, FleetConnector
-from inorbit_connector.models import InorbitConnectorConfig
+from inorbit_connector.models import ConnectorConfig
 from inorbit_connector.utils import read_yaml
 
 CONFIG_FILE = (
@@ -47,10 +47,10 @@ class ExampleBotConfig(BaseModel):
     example_bot_custom_value: str
 
 
-class ExampleBotConnectorConfig(InorbitConnectorConfig):
+class ExampleBotConnectorConfig(ConnectorConfig):
     """The configuration for the example bot connector.
 
-    Each connector should create a class that inherits from InorbitConnectorConfig.
+    Each connector should create a class that inherits from ConnectorConfig.
 
     Attributes:
         connector_config (ExampleBotConfig): The config with custom fields for the fleet
@@ -122,8 +122,8 @@ class ExampleBotFleetConnector(FleetConnector):
         config (ExampleBotConnectorConfig): The configuration for the connector
     """
 
-    def __init__(self, robot_ids: list[str], config: ExampleBotConnectorConfig) -> None:
-        super().__init__(robot_ids, config)
+    def __init__(self, config: ExampleBotConnectorConfig) -> None:
+        super().__init__(config)
 
         # Setup any other initialization things here
         self.api_version = config.connector_config.example_bot_api_version
@@ -245,31 +245,14 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     try:
-        # Parse the YAML - for fleet connectors, we need to read the entire config
-        # since it contains configuration for multiple robots
-        import yaml
+        # Read the YAML configuration
+        yaml_data = read_yaml(CONFIG_FILE)
 
-        with open(CONFIG_FILE, "r") as f:
-            yaml_data = yaml.safe_load(f)
+        # Create the connector configuration
+        config = ExampleBotConnectorConfig(**yaml_data)
 
-        # Extract the common configuration and robot IDs
-        if "common" not in yaml_data:
-            logger.error("'common' section not found in configuration file")
-            exit(1)
-
-        if "robots" not in yaml_data:
-            logger.error("'robots' section not found in configuration file")
-            exit(1)
-
-        common_config = yaml_data["common"]
-        robot_ids = yaml_data["robots"]
-
-        if not isinstance(robot_ids, list) or len(robot_ids) == 0:
-            logger.error("'robots' must be a non-empty list of robot IDs")
-            exit(1)
-
-        # Create the connector configuration from the common section
-        config = ExampleBotConnectorConfig(**common_config)
+        # Extract robot IDs from the fleet configuration for logging purposes
+        robot_ids = [robot.robot_id for robot in config.fleet]
 
     except FileNotFoundError:
         logger.error(f"'{CONFIG_FILE}' configuration file does not exist")
@@ -285,7 +268,7 @@ def main():
     )
 
     logger.info("Starting fleet connector...")
-    connector = ExampleBotFleetConnector(robot_ids, config)
+    connector = ExampleBotFleetConnector(config)
     connector.start()
 
     # Register a signal handler for graceful shutdown

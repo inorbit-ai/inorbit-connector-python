@@ -44,12 +44,14 @@ def test_read_yaml_returns_entire_file(_):
     assert result == expected
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 @mock.patch(
     "builtins.open",
     new_callable=mock.mock_open,
     read_data="id1: {k1: v1, k2: v2}\nid2: {k3: v3, k4: v4}",
 )
 def test_read_yaml_returns_specific_robot(_):
+    """Test reading YAML for specific robot (deprecated format)."""
     result = utils.read_yaml("dummy.yaml", "id1")
     expected = {"k1": "v1", "k2": "v2"}
     assert result == expected

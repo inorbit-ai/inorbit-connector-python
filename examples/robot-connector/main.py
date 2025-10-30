@@ -51,15 +51,14 @@ def start():
     robot_id, config_filename = args.robot_id, args.config
 
     try:
-        yaml = read_yaml(config_filename, robot_id)
+        yaml_data = read_yaml(config_filename)
+        config = ExampleBotConnectorConfig(**yaml_data)
     except FileNotFoundError:
-        LOGGER.info("Missing configuration file")
+        LOGGER.error(f"Configuration file '{config_filename}' not found")
         exit(1)
-    except IndexError:
-        LOGGER.info("robot_id not found in configuration file")
+    except ValueError as e:
+        LOGGER.error(f"Configuration validation error: {e}")
         exit(1)
-
-    config = ExampleBotConnectorConfig(**yaml)
     connector = ExampleBotConnector(robot_id, config)
     LOGGER.info("Starting connector...")
     connector.start()

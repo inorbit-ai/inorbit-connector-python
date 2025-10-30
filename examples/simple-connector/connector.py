@@ -22,7 +22,7 @@ from pydantic import field_validator, BaseModel
 
 # InOrbit
 from inorbit_connector.connector import CommandResultCode, Connector
-from inorbit_connector.models import InorbitConnectorConfig
+from inorbit_connector.models import ConnectorConfig
 from inorbit_connector.utils import read_yaml
 
 CONFIG_FILE = Path(__file__).resolve().parent.parent / "example.yaml"  # ../example.yaml
@@ -46,10 +46,10 @@ class ExampleBotConfig(BaseModel):
     example_bot_custom_value: str
 
 
-class ExampleBotConnectorConfig(InorbitConnectorConfig):
+class ExampleBotConnectorConfig(ConnectorConfig):
     """The configuration for the example bot connector.
 
-    Each connector should create a class that inherits from InorbitConnectorConfig.
+    Each connector should create a class that inherits from ConnectorConfig.
 
     Attributes:
         connector_config (ExampleBotConfig): The config with custom fields for the robot
@@ -199,17 +199,13 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     try:
-        # Parse the YAML
-        yaml = read_yaml(CONFIG_FILE, ROBOT_ID)
-        config = ExampleBotConnectorConfig(**yaml)
+        yaml_data = read_yaml(CONFIG_FILE)
+        config = ExampleBotConnectorConfig(**yaml_data)
     except FileNotFoundError:
         logger.error(f"'{CONFIG_FILE}' configuration file does not exist")
         exit(1)
-    except IndexError:
-        logger.error(f"'{ROBOT_ID}' not found in '{CONFIG_FILE}'")
-        exit(1)
     except ValueError as e:
-        logger.error(e)
+        logger.error(f"Configuration validation error: {e}")
         exit(1)
 
     logger.info(
