@@ -8,6 +8,7 @@
 # Third-party
 import yaml
 import os
+import warnings
 
 # Constants
 DEFAULT_TIMEZONE = "UTC"
@@ -27,8 +28,9 @@ def read_yaml(fname: str, robot_id: str = None) -> dict:
 
     Args:
         fname (str): The file name or path of the YAML file
-        robot_id (str, optional): The ID of the robot to retrieve from the YAML or None
-                                  to return the entire file
+        robot_id (str, optional, deprecated): The ID of the robot to retrieve from the
+            YAML or None to return the entire file
+
     Returns:
         dict: The data read from the YAML file as a dictionary
     Raises:
@@ -49,6 +51,11 @@ def read_yaml(fname: str, robot_id: str = None) -> dict:
 
         # If the `robot_id` is provided, return that abstract robot.
         elif robot_id in data:
+            warnings.warn(
+                "This configuration format is deprecated. Refer to the documentation for the new format.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return data[robot_id]
 
         # If the `robot_id` is provided but not found, raise an error.

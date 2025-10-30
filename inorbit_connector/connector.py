@@ -9,6 +9,7 @@
 from enum import Enum
 import os
 import logging
+import warnings
 import asyncio
 import threading
 import traceback
@@ -34,7 +35,7 @@ from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
 from inorbit_connector.logging.logger import setup_logger
-from inorbit_connector.models import InorbitConnectorConfig
+from inorbit_connector.models import ConnectorConfig, InorbitConnectorConfig
 
 
 class CommandResultCode(str, Enum):
@@ -54,13 +55,11 @@ class FleetConnector(ABC):
     See self.__init__() for more details.
     """
 
-    def __init__(
-        self, robot_ids: list[str], config: InorbitConnectorConfig, **kwargs
-    ) -> None:
+    def __init__(self, config: ConnectorConfig, **kwargs) -> None:
         """Initialize the base connector with common functionality.
 
         Args:
-            config (InorbitConnectorConfig): The connector configuration
+            config (FleetConnectorConfig): The connector configuration
 
         Keyword Args:
             register_user_scripts (bool): Register user scripts automatically.
@@ -77,8 +76,8 @@ class FleetConnector(ABC):
         """
 
         # Common information
-        self.robot_ids = robot_ids
         self.config = config
+        self.robot_ids = [robot.robot_id for robot in config.fleet]
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
@@ -270,16 +269,18 @@ class FleetConnector(ABC):
         self.__loop.run_until_complete(self.__connect())
 
         # Set up camera feeds
-        for idx, camera_config in enumerate(self.config.cameras):
-            self._logger.info(
-                f"Registering camera {idx}: {str(camera_config.video_url)}"
-            )
-            # If values are None, use default instead
-            dump = camera_config.model_dump()
-            clean = {k: v for k, v in dump.items() if v is not None}
-            # TODO: Register cameras per robot, intead of all cameras to all robots
-            for session in self.__robot_sessions.values():
-                session.register_camera(str(idx), OpenCVCamera(**clean))
+        for robot_config in self.config.fleet:
+            for idx, camera_config in enumerate(robot_config.cameras):
+                self._logger.info(
+                    f"Registering camera {idx} for robot {robot_config.robot_id}: {str(camera_config.video_url)}"
+                )
+                # If values are None, remove the key from the dictionary to use
+                # edge-sdk defaults
+                dump = camera_config.model_dump()
+                clean = {k: v for k, v in dump.items() if v is not None}
+                self.__robot_sessions[robot_config.robot_id].register_camera(
+                    str(idx), OpenCVCamera(**clean)
+                )
 
         try:
             self.__loop.run_until_complete(self.__run_loop())
@@ -561,27 +562,43 @@ class Connector(FleetConnector, ABC):
     FleetConnector.__init__() for more details.
     """
 
-    def __init__(self, robot_id: str, config: InorbitConnectorConfig, **kwargs) -> None:
+    def __init__(self, robot_id: str, config: ConnectorConfig, **kwargs) -> None:
         """Initialize a new InOrbit connector.
 
         This class handles bidirectional communication with InOrbit.
 
         Args:
             robot_id (str): The ID of the InOrbit robot
-            config (InorbitConnectorConfig): The connector configuration
+            config (ConnectorConfig): The connector configuration.
+                - New API: pass `ConnectorConfig` with a `fleet` field containing multiple
+                  robot configurations. The one for the current robot will be selected
+                  using `robot_id`.
+                - Deprecated: pass `InorbitConnectorConfig` (single-robot); it will be
+                  converted to a `ConnectorConfig`.
 
         Keyword Args:
-            register_user_scripts (bool): Register user scripts automatically.
-                Default is False
-            default_user_scripts_dir (str): The default user scripts directory path to
-                use if not explicitly set in the config.
-                Default is "~/.inorbit_connectors/connector-{robot_id}/local/"
-            create_user_scripts_dir (bool): The path to the user scripts directory.
-                Relevant only if register_user_scripts is True.
-                Default is False
+            register_user_scripts (bool): Register user scripts automatically. Default False
+            default_user_scripts_dir (str): Default user scripts directory path to use if not
+                explicitly set in the config. Default is
+                "~/.inorbit_connectors/connector-{robot_id}/local/"
+            create_user_scripts_dir (bool): Whether to create the user scripts directory.
+                Relevant only if register_user_scripts is True. Default False
         """
         self.robot_id = robot_id
-        super().__init__([robot_id], config, **kwargs)
+
+        if isinstance(config, InorbitConnectorConfig):
+            # Deprecated behavior
+            warnings.warn(
+                "Passing InorbitConnectorConfig to Connector.__init__ is deprecated; "
+                "pass ConnectorConfig instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            fleet_config = config.to_fleet_config(robot_id)
+        else:
+            fleet_config = config.to_singular_config(robot_id)
+
+        super().__init__(fleet_config, **kwargs)
 
     def _get_session(self) -> RobotSession:
         """Get the edge-sdk robot session for the current robot.

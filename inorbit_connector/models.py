@@ -89,7 +89,13 @@ class LoggingConfig(BaseModel):
     }
 
 
-class InorbitConnectorConfig(BaseModel):
+class RobotConfig(BaseModel):
+    robot_id: str
+    robot_name: str | None = None
+    cameras: List[CameraConfig] = []
+
+
+class ConnectorConfig(BaseModel):
     """Class representing an Inorbit connector model.
 
     This should not be instantiated on its own.
@@ -103,11 +109,12 @@ class InorbitConnectorConfig(BaseModel):
     * INORBIT_API_URL: The URL of the API endpoint or inorbit_edge's
                        INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
 
+    in addition to those read by the Edge SDK during connector initialization.
+
     Attributes:
         api_key (str | None, optional): The InOrbit API key
         api_url (HttpUrl, optional): The URL of the API or inorbit_edge's
                                      INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
-        cameras (List[CameraConfig], optional): The list of cameras
         connector_type (str): The type of connector (see Class comment above)
         connector_config (BaseModel): The configuration for the connector
         update_freq (float, optional): Update frequency or 1 Hz by default
@@ -123,11 +130,12 @@ class InorbitConnectorConfig(BaseModel):
         environment (dict[str, str], optional): Environment variables to be set in the
             connector or user scripts. The key is the environment variable name and the
             value is the value to set.
+        fleet (list[RobotConfig]): The list of robot configurations. Each robot configuration
+            includes the robot id, name, and cameras.
     """
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
     api_url: HttpUrl = os.getenv("INORBIT_API_URL", INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL)
-    cameras: List[CameraConfig] = []
     connector_type: str
     connector_config: BaseModel
     update_freq: float = 1.0
@@ -138,11 +146,36 @@ class InorbitConnectorConfig(BaseModel):
     inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
-    # Kept for backwards compatibility
+    # Kept for backwards compatibility. Deprecated in version 1.1.0
+    # Use logging.log_level instead
     log_level: LogLevels | None = Field(default=None, exclude=True)
+    fleet: list[RobotConfig]
+
+    def to_singular_config(self, robot_id: str) -> "ConnectorConfig":
+        """Filters out configurations not related to the given robot. The result is a
+        config with a fleet field of length 1.
+
+        Args:
+            robot_id (str): The ID of the robot to filter the configuration for
+
+        Returns:
+            ConnectorConfig: The filtered configuration (preserves the subclass type)
+        """
+        # Use self.__class__ to preserve the subclass type (e.g., ExampleBotConnectorConfig)
+        config = self.__class__(
+            **self.model_dump(exclude={"fleet"}),
+            fleet=[robot for robot in self.fleet if robot.robot_id == robot_id],
+        )
+        # The robot_ids_must_be_unique validator will raise an error if the robot ids
+        # are not unique. This is a redundant sanity check.
+        if len(config.fleet) != 1:
+            raise ValueError(
+                f"Expected 1 robot configuration for robot {robot_id}, got {len(config.fleet)}"
+            )
+        return config
 
     @model_validator(mode="after")
-    def warn_log_level_deprecated(self) -> "InorbitConnectorConfig":
+    def warn_log_level_deprecated(self) -> "ConnectorConfig":
         """Warn if log_level is set as it is deprecated.
 
         Returns:
@@ -159,7 +192,36 @@ class InorbitConnectorConfig(BaseModel):
                 self.logging.log_level = self.log_level
         return self
 
-    # noinspection PyMethodParameters
+    @field_validator("fleet")
+    def must_contain_at_least_one_robot(
+        cls, fleet: list[RobotConfig]
+    ) -> list[RobotConfig]:
+        """Validate that the fleet contains at least one robot.
+
+        Args:
+            fleet (list[RobotConfig]): The fleet configuration
+
+        Returns:
+            list[RobotConfig]: The fleet configuration
+        """
+        if len(fleet) < 1:
+            raise ValueError("Fleet must contain at least one robot")
+        return fleet
+
+    @field_validator("fleet")
+    def robot_ids_must_be_unique(cls, fleet: list[RobotConfig]) -> list[RobotConfig]:
+        """Validate that the robot ids are unique.
+
+        Args:
+            fleet (list[RobotConfig]): The fleet configuration
+
+        Returns:
+            list[RobotConfig]: The fleet configuration
+        """
+        if len(set([robot.robot_id for robot in fleet])) != len(fleet):
+            raise ValueError("Robot ids must be unique")
+        return fleet
+
     @field_validator("api_key", "account_id")
     def check_whitespace(cls, value: str) -> str:
         """Check if the api_key contains whitespace.
@@ -179,7 +241,6 @@ class InorbitConnectorConfig(BaseModel):
             raise ValueError("Whitespaces are not allowed")
         return value
 
-    # noinspection PyMethodParameters
     @field_validator("location_tz")
     def location_tz_must_exist(cls, location_tz: str) -> str:
         """Validate the timezone exists in the pytz package.
@@ -199,7 +260,6 @@ class InorbitConnectorConfig(BaseModel):
             raise ValueError("Timezone must exist in pytz")
         return location_tz
 
-    # noinspection PyMethodParameters
     @field_validator("update_freq")
     def check_positive(cls, update_freq: float | None) -> float | None:
         """Check if an argument is positive and non-zero.
@@ -218,3 +278,41 @@ class InorbitConnectorConfig(BaseModel):
         if update_freq <= 0:
             raise ValueError("Must be positive and non-zero")
         return update_freq
+
+
+class InorbitConnectorConfig(ConnectorConfig, RobotConfig):
+    """Class representing an Inorbit connector model for a single robot.
+
+    This class is deprecated. Use ConnectorConfig instead.
+    """
+
+    # Exclude robot_id from single-robot configs - it will be provided when converting to fleet
+    robot_id: str | None = Field(default=None, exclude=True)
+    fleet: list[RobotConfig] = Field(default_factory=list, exclude=True)
+
+    def to_fleet_config(self, robot_id: str) -> ConnectorConfig:
+        """Convert a single-robot config to a fleet config.
+
+        Creates a ConnectorConfig with a fleet list containing this robot's configuration.
+
+        Args:
+            robot_id: The robot ID to use for the fleet config (ensures consistency)
+        """
+        # Collect base connector fields (everything except fleet and robot-specific fields)
+        connector_fields = {
+            k: getattr(self, k)
+            for k in ConnectorConfig.model_fields.keys()
+            if k != "fleet"
+        }
+
+        # Create RobotConfig instance from this config's robot-specific fields
+        robot_fields = RobotConfig.model_fields.keys()
+        robot_data = {k: getattr(self, k) for k in robot_fields if k != "robot_id"}
+        # Use the passed robot_id to ensure consistency
+        robot_data["robot_id"] = robot_id
+        robot_config = RobotConfig(**robot_data)
+
+        return ConnectorConfig(
+            **connector_fields,
+            fleet=[robot_config],
+        )
