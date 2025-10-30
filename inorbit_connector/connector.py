@@ -272,7 +272,8 @@ class FleetConnector(ABC):
         for robot_config in self.config.fleet:
             for idx, camera_config in enumerate(robot_config.cameras):
                 self._logger.info(
-                    f"Registering camera {idx} for robot {robot_config.robot_id}: {str(camera_config.video_url)}"
+                    f"Registering camera {idx} for robot {robot_config.robot_id}: "
+                    f"{str(camera_config.video_url)}"
                 )
                 # If values are None, remove the key from the dictionary to use
                 # edge-sdk defaults
@@ -570,19 +571,21 @@ class Connector(FleetConnector, ABC):
         Args:
             robot_id (str): The ID of the InOrbit robot
             config (ConnectorConfig): The connector configuration.
-                - New API: pass `ConnectorConfig` with a `fleet` field containing multiple
-                  robot configurations. The one for the current robot will be selected
-                  using `robot_id`.
+                - New API: pass `ConnectorConfig` with a `fleet` field containing
+                  multiple robot configurations. The one for the current robot will be
+                  selected by the `robot_id` parameter.
                 - Deprecated: pass `InorbitConnectorConfig` (single-robot); it will be
                   converted to a `ConnectorConfig`.
 
         Keyword Args:
-            register_user_scripts (bool): Register user scripts automatically. Default False
-            default_user_scripts_dir (str): Default user scripts directory path to use if not
-                explicitly set in the config. Default is
+            register_user_scripts (bool): Register user scripts automatically.
+                Default False
+            default_user_scripts_dir (str): Default user scripts directory path to use
+                if not explicitly set in the config. Default is
                 "~/.inorbit_connectors/connector-{robot_id}/local/"
-            create_user_scripts_dir (bool): Whether to create the user scripts directory.
-                Relevant only if register_user_scripts is True. Default False
+            create_user_scripts_dir (bool): Whether to create the user scripts
+                directory. Default False
+                Relevant only if register_user_scripts is True.
         """
         self.robot_id = robot_id
 

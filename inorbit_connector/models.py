@@ -138,8 +138,7 @@ class ConnectorConfig(BaseModel):
         environment (dict[str, str], optional): Environment variables to be set in the
             connector or user scripts. The key is the environment variable name and the
             value is the value to set.
-        fleet (list[RobotConfig]): The list of robot configurations. Each robot configuration
-            includes the robot id, name, and cameras.
+        fleet (list[RobotConfig]): The list of robot configurations.
     """
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
@@ -169,7 +168,8 @@ class ConnectorConfig(BaseModel):
         Returns:
             ConnectorConfig: The filtered configuration (preserves the subclass type)
         """
-        # Use self.__class__ to preserve the subclass type (e.g., ExampleBotConnectorConfig)
+        # Use self.__class__ to preserve the subclass type
+        # (e.g., ExampleBotConnectorConfig)
         config = self.__class__(
             **self.model_dump(exclude={"fleet"}),
             fleet=[robot for robot in self.fleet if robot.robot_id == robot_id],
@@ -178,7 +178,8 @@ class ConnectorConfig(BaseModel):
         # are not unique. This is a redundant sanity check.
         if len(config.fleet) != 1:
             raise ValueError(
-                f"Expected 1 robot configuration for robot {robot_id}, got {len(config.fleet)}"
+                f"Expected 1 robot configuration for robot {robot_id}, "
+                f"got {len(config.fleet)}"
             )
         return config
 
@@ -294,19 +295,22 @@ class InorbitConnectorConfig(ConnectorConfig, RobotConfig):
     This class is deprecated. Use ConnectorConfig instead.
     """
 
-    # Exclude robot_id from single-robot configs - it will be provided when converting to fleet
+    # Exclude robot_id from single-robot configs - it will be provided when converting
+    # to fleet
     robot_id: str | None = Field(default=None, exclude=True)
     fleet: list[RobotConfig] = Field(default_factory=list, exclude=True)
 
     def to_fleet_config(self, robot_id: str) -> ConnectorConfig:
         """Convert a single-robot config to a fleet config.
 
-        Creates a ConnectorConfig with a fleet list containing this robot's configuration.
+        Creates a ConnectorConfig with a fleet list containing this robot's
+        configuration.
 
         Args:
             robot_id: The robot ID to use for the fleet config (ensures consistency)
         """
-        # Collect base connector fields (everything except fleet and robot-specific fields)
+        # Collect base connector fields (everything except fleet and robot-specific
+        # fields)
         connector_fields = {
             k: getattr(self, k)
             for k in ConnectorConfig.model_fields.keys()

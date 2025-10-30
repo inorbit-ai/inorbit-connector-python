@@ -52,7 +52,8 @@ def read_yaml(fname: str, robot_id: str = None) -> dict:
         # If the `robot_id` is provided, return that abstract robot.
         elif robot_id in data:
             warnings.warn(
-                "This configuration format is deprecated. Refer to the documentation for the new format.",
+                "This configuration format is deprecated. Refer to the documentation "
+                "for the new format.",
                 DeprecationWarning,
                 stacklevel=2,
             )
