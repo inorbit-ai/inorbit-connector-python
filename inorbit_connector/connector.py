@@ -230,6 +230,10 @@ class FleetConnector(ABC):
 
         for robot_id in self.robot_ids:
             self.__robot_sessions[robot_id] = self.__initialize_session(robot_id)
+        self._logger.info(
+            f"Initialized {len(self.__robot_sessions)} robot sessions for robots "
+            f"{', '.join(self.robot_ids)}"
+        )
 
     async def __connect(self) -> None:
         """Initialize the connection to InOrbit based on the provided configuration,

@@ -65,7 +65,7 @@ def start():
         exit(1)
 
     # Create and start the fleet connector
-    connector = ExampleBotFleetConnector(robot_ids, config)
+    connector = ExampleBotFleetConnector(config)
     LOGGER.info("Starting fleet connector...")
     connector.start()
 

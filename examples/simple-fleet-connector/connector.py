@@ -122,7 +122,7 @@ class ExampleBotFleetConnector(FleetConnector):
         config (ExampleBotConnectorConfig): The configuration for the connector
     """
 
-    def __init__(self, robot_ids: list[str], config: ExampleBotConnectorConfig) -> None:
+    def __init__(self, config: ExampleBotConnectorConfig) -> None:
         super().__init__(config)
 
         # Setup any other initialization things here
@@ -268,7 +268,7 @@ def main():
     )
 
     logger.info("Starting fleet connector...")
-    connector = ExampleBotFleetConnector(robot_ids, config)
+    connector = ExampleBotFleetConnector(config)
     connector.start()
 
     # Register a signal handler for graceful shutdown
