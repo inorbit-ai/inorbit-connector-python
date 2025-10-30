@@ -90,9 +90,17 @@ class LoggingConfig(BaseModel):
 
 
 class RobotConfig(BaseModel):
+    """Class representing a robot configuration.
+
+    Attributes:
+        robot_id (str): The InOrbit ID of the robot
+        cameras (list[CameraConfig]): The list of cameras
+    """
+
     robot_id: str
-    robot_name: str | None = None
     cameras: List[CameraConfig] = []
+    # TODO: Implement support for robot name
+    # robot_name: str | None = None
 
 
 class ConnectorConfig(BaseModel):
