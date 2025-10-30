@@ -677,7 +677,7 @@ class Connector(FleetConnector, ABC):
     async def _inorbit_robot_command_handler(
         self, robot_id: str, command_name: str, args: list, options: dict
     ) -> None:
-        self._inorbit_command_handler(command_name, args, options)
+        await self._inorbit_command_handler(command_name, args, options)
 
     def publish_map(self, frame_id: str, is_update: bool = False) -> None:
         """Publish the map metadata to InOrbit. If `frame_id` is not found in the maps
