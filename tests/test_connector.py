@@ -19,7 +19,11 @@ from inorbit_edge.robot import RobotSession
 from inorbit_connector.connector import (
     Connector,
     FleetConnector,
+)
+from inorbit_connector.models import (
+    ConnectorConfig,
     InorbitConnectorConfig,
+    RobotConfig,
 )
 
 
@@ -83,7 +87,7 @@ class TestFleetConnectorIsAbstract:
 
     def test_cannot_be_instantiated(self):
         with pytest.raises(TypeError):
-            FleetConnector(["TestRobot1", "TestRobot2"], MagicMock())
+            FleetConnector(MagicMock())
 
     def test_cannot_be_subclassed_without_overriding_abstract_methods(self):
 
@@ -91,7 +95,7 @@ class TestFleetConnectorIsAbstract:
             pass
 
         with pytest.raises(TypeError):
-            SubFleetConnector(["TestRobot1", "TestRobot2"], MagicMock())
+            SubFleetConnector(MagicMock())
 
     def test_can_be_subclassed_with_all_abstract_methods_implemented(self):
 
@@ -111,12 +115,15 @@ class TestFleetConnectorIsAbstract:
                 pass
 
         connector = SubFleetConnector(
-            ["TestRobot1", "TestRobot2"],
-            InorbitConnectorConfig(
+            ConnectorConfig(
                 api_key="valid_key",
                 api_url="https://valid.com/",
                 connector_type="valid_connector",
                 connector_config=DummyConfig(),
+                fleet=[
+                    RobotConfig(robot_id="TestRobot1"),
+                    RobotConfig(robot_id="TestRobot2"),
+                ],
             ),
         )
         assert isinstance(connector, FleetConnector)
@@ -140,25 +147,42 @@ class TestFleetConnector:
     @pytest.fixture
     def base_fleet_connector(self, base_model):
         return FleetConnector(
-            ["TestRobot1", "TestRobot2"], InorbitConnectorConfig(**base_model)
+            ConnectorConfig(
+                **base_model,
+                fleet=[
+                    RobotConfig(robot_id="TestRobot1"),
+                    RobotConfig(robot_id="TestRobot2"),
+                ],
+            )
         )
 
     def test_init(self, base_model):
-        config = InorbitConnectorConfig(**base_model)
+        config = ConnectorConfig(
+            **base_model,
+            fleet=[
+                RobotConfig(robot_id="TestRobot1"),
+                RobotConfig(robot_id="TestRobot2"),
+            ],
+        )
         robot_ids = ["TestRobot1", "TestRobot2"]
 
-        connector = FleetConnector(robot_ids, config)
+        connector = FleetConnector(config)
         assert connector.robot_ids == robot_ids
         assert connector.config == config
         assert connector._logger.name == FleetConnector.__module__
 
     def test_init_with_robot_key(self, base_model):
-        config = InorbitConnectorConfig(
-            **base_model, inorbit_robot_key="valid_robot_key"
+        config = ConnectorConfig(
+            **base_model,
+            inorbit_robot_key="valid_robot_key",
+            fleet=[
+                RobotConfig(robot_id="TestRobot1"),
+                RobotConfig(robot_id="TestRobot2"),
+            ],
         )
         robot_ids = ["TestRobot1", "TestRobot2"]
 
-        connector = FleetConnector(robot_ids, config)
+        connector = FleetConnector(config)
         # Fleet connector should configure the session factory with robot_key
 
     def test_get_robot_session(self, base_fleet_connector, mock_robot_session_pool):
@@ -192,7 +216,12 @@ class TestFleetConnector:
                 "resolution": 0.1,
             }
         }
-        connector = FleetConnector(["TestRobot1"], InorbitConnectorConfig(**base_model))
+        connector = FleetConnector(
+            ConnectorConfig(
+                **base_model,
+                fleet=[RobotConfig(robot_id="TestRobot1")],
+            )
+        )
 
         connector.publish_robot_pose("TestRobot1", 0, 0, 0, "frameA")
 
@@ -245,8 +274,13 @@ class TestFleetConnector:
         """Test user scripts registration for fleet connector."""
         # Create a connector with user scripts enabled
         connector = FleetConnector(
-            ["TestRobot1", "TestRobot2"],
-            InorbitConnectorConfig(**base_model),
+            ConnectorConfig(
+                **base_model,
+                fleet=[
+                    RobotConfig(robot_id="TestRobot1"),
+                    RobotConfig(robot_id="TestRobot2"),
+                ],
+            ),
             register_user_scripts=True,
             default_user_scripts_dir=tmp_path,
         )
@@ -263,7 +297,12 @@ class TestFleetConnector:
 
     def test_uses_env_vars(self, base_model):
         base_model["env_vars"] = {"FLEET_ENV_VAR": "fleet_value"}
-        FleetConnector(["TestRobot1"], InorbitConnectorConfig(**base_model))
+        FleetConnector(
+            ConnectorConfig(
+                **base_model,
+                fleet=[RobotConfig(robot_id="TestRobot1")],
+            )
+        )
         assert "FLEET_ENV_VAR" in os.environ
         assert os.environ["FLEET_ENV_VAR"] == "fleet_value"
 
@@ -346,8 +385,26 @@ class TestConnector:
         connector = Connector(robot_id, config)
         assert connector.robot_id == robot_id
         assert connector.robot_ids == [robot_id]  # Single robot wrapped in list
-        assert connector.config == config
+        # Config is converted from InorbitConnectorConfig to ConnectorConfig
+        assert isinstance(connector.config, ConnectorConfig)
+        assert len(connector.config.fleet) == 1
+        assert connector.config.fleet[0].robot_id == robot_id
         assert connector._logger.name == Connector.__module__
+
+    def test_init_with_connector_config(self, base_model):
+        """Test initialization with new ConnectorConfig API."""
+        robot_id = "TestRobot"
+        config = ConnectorConfig(
+            **base_model,
+            fleet=[RobotConfig(robot_id=robot_id)],
+        )
+
+        connector = Connector(robot_id, config)
+        assert connector.robot_id == robot_id
+        assert connector.robot_ids == [robot_id]
+        assert isinstance(connector.config, ConnectorConfig)
+        assert len(connector.config.fleet) == 1
+        assert connector.config.fleet[0].robot_id == robot_id
 
     def test_init_with_robot_key(self, base_model, mock_robot_session_pool):
         config = InorbitConnectorConfig(

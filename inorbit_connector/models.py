@@ -168,19 +168,21 @@ class ConnectorConfig(BaseModel):
         Returns:
             ConnectorConfig: The filtered configuration (preserves the subclass type)
         """
+        # Filter the fleet first to validate robot_id exists
+        filtered_fleet = [robot for robot in self.fleet if robot.robot_id == robot_id]
+
+        if len(filtered_fleet) != 1:
+            raise ValueError(
+                f"Expected 1 robot configuration for robot {robot_id}, "
+                f"got {len(filtered_fleet)}"
+            )
+
         # Use self.__class__ to preserve the subclass type
         # (e.g., ExampleBotConnectorConfig)
         config = self.__class__(
             **self.model_dump(exclude={"fleet"}),
-            fleet=[robot for robot in self.fleet if robot.robot_id == robot_id],
+            fleet=filtered_fleet,
         )
-        # The robot_ids_must_be_unique validator will raise an error if the robot ids
-        # are not unique. This is a redundant sanity check.
-        if len(config.fleet) != 1:
-            raise ValueError(
-                f"Expected 1 robot configuration for robot {robot_id}, "
-                f"got {len(config.fleet)}"
-            )
         return config
 
     @model_validator(mode="after")
@@ -232,21 +234,21 @@ class ConnectorConfig(BaseModel):
         return fleet
 
     @field_validator("api_key", "account_id")
-    def check_whitespace(cls, value: str) -> str:
+    def check_whitespace(cls, value: str | None) -> str | None:
         """Check if the api_key contains whitespace.
 
         This is used for the api_key.
 
         Args:
-            value (str): The api_key to be checked
+            value (str | None): The api_key to be checked
 
         Raises:
             ValueError: If the api_key contains whitespace
 
         Returns:
-            str: The given value if it does not contain whitespaces
+            str | None: The given value if it does not contain whitespaces
         """
-        if any(char.isspace() for char in value):
+        if value is not None and any(char.isspace() for char in value):
             raise ValueError("Whitespaces are not allowed")
         return value
 
@@ -309,22 +311,16 @@ class InorbitConnectorConfig(ConnectorConfig, RobotConfig):
         Args:
             robot_id: The robot ID to use for the fleet config (ensures consistency)
         """
-        # Collect base connector fields (everything except fleet and robot-specific
-        # fields)
-        connector_fields = {
-            k: getattr(self, k)
-            for k in ConnectorConfig.model_fields.keys()
-            if k != "fleet"
-        }
+        # Get the full config dump, excluding fleet and robot-specific fields
+        connector_data = self.model_dump(exclude={"fleet", "robot_id", "cameras"})
 
         # Create RobotConfig instance from this config's robot-specific fields
-        robot_fields = RobotConfig.model_fields.keys()
-        robot_data = {k: getattr(self, k) for k in robot_fields if k != "robot_id"}
-        # Use the passed robot_id to ensure consistency
-        robot_data["robot_id"] = robot_id
-        robot_config = RobotConfig(**robot_data)
+        robot_config = RobotConfig(
+            robot_id=robot_id,
+            cameras=self.cameras,
+        )
 
         return ConnectorConfig(
-            **connector_fields,
+            **connector_data,
             fleet=[robot_config],
         )

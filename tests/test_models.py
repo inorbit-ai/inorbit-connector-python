@@ -19,7 +19,12 @@ from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 from pydantic import ValidationError, BaseModel
 
 # InOrbit
-from inorbit_connector.models import InorbitConnectorConfig, LoggingConfig
+from inorbit_connector.models import (
+    InorbitConnectorConfig,
+    ConnectorConfig,
+    RobotConfig,
+    LoggingConfig,
+)
 from inorbit_connector.logging.logger import LogLevels
 
 
@@ -261,3 +266,125 @@ class TestInorbitConnectorConfig:
         }
         model = InorbitConnectorConfig(**init_input)
         assert model.api_key is None
+
+
+class TestRobotConfig:
+    def test_with_valid_input(self):
+        robot_config = RobotConfig(robot_id="test_robot")
+        assert robot_config.robot_id == "test_robot"
+        assert robot_config.cameras == []
+
+    def test_with_cameras(self):
+        robot_config = RobotConfig(
+            robot_id="test_robot",
+            cameras=[CameraConfig(video_url="https://test.com/")],
+        )
+        assert robot_config.robot_id == "test_robot"
+        assert len(robot_config.cameras) == 1
+        assert str(robot_config.cameras[0].video_url) == "https://test.com/"
+
+
+class TestConnectorConfig:
+    @pytest.fixture
+    def base_model(self):
+        return {
+            "api_key": "valid_key",
+            "api_url": "https://valid.com/",
+            "connector_type": "valid_connector",
+            "connector_config": DummyConfig(),
+            "fleet": [
+                {"robot_id": "robot1"},
+                {"robot_id": "robot2"},
+            ],
+        }
+
+    def test_with_valid_input(self, base_model):
+        model = ConnectorConfig(**base_model)
+        assert model.api_key == base_model["api_key"]
+        assert str(model.api_url) == base_model["api_url"]
+        assert model.connector_type == base_model["connector_type"]
+        assert isinstance(model.connector_config, DummyConfig)
+        assert len(model.fleet) == 2
+        assert model.fleet[0].robot_id == "robot1"
+        assert model.fleet[1].robot_id == "robot2"
+
+    def test_fleet_must_contain_at_least_one_robot(self, base_model):
+        init_input = base_model.copy()
+        init_input["fleet"] = []
+        with pytest.raises(
+            ValidationError, match="Fleet must contain at least one robot"
+        ):
+            ConnectorConfig(**init_input)
+
+    def test_robot_ids_must_be_unique(self, base_model):
+        init_input = base_model.copy()
+        init_input["fleet"] = [
+            {"robot_id": "robot1"},
+            {"robot_id": "robot1"},
+        ]
+        with pytest.raises(ValidationError, match="Robot ids must be unique"):
+            ConnectorConfig(**init_input)
+
+    def test_with_robot_cameras(self, base_model):
+        init_input = base_model.copy()
+        init_input["fleet"] = [
+            {
+                "robot_id": "robot1",
+                "cameras": [CameraConfig(video_url="https://test.com/")],
+            },
+        ]
+        model = ConnectorConfig(**init_input)
+        assert len(model.fleet[0].cameras) == 1
+        assert str(model.fleet[0].cameras[0].video_url) == "https://test.com/"
+
+    def test_to_singular_config(self, base_model):
+        model = ConnectorConfig(**base_model)
+        singular = model.to_singular_config("robot1")
+        assert len(singular.fleet) == 1
+        assert singular.fleet[0].robot_id == "robot1"
+        assert singular.connector_type == model.connector_type
+        assert singular.api_key == model.api_key
+
+    def test_to_singular_config_invalid_robot_id(self, base_model):
+        model = ConnectorConfig(**base_model)
+        with pytest.raises(
+            ValueError,
+            match="Expected 1 robot configuration for robot invalid_robot, got 0",
+        ):
+            model.to_singular_config("invalid_robot")
+
+    def test_to_singular_config_preserves_subclass_type(self, base_model):
+        class CustomConnectorConfig(ConnectorConfig):
+            pass
+
+        model = CustomConnectorConfig(**base_model)
+        singular = model.to_singular_config("robot1")
+        assert isinstance(singular, CustomConnectorConfig)
+
+
+class TestInorbitConnectorConfigToFleetConfig:
+    @pytest.fixture
+    def base_model(self):
+        return {
+            "api_key": "valid_key",
+            "api_url": "https://valid.com/",
+            "connector_type": "valid_connector",
+            "connector_config": DummyConfig(),
+        }
+
+    def test_to_fleet_config(self, base_model):
+        model = InorbitConnectorConfig(**base_model)
+        fleet_config = model.to_fleet_config("test_robot")
+        assert type(fleet_config).__name__ == "ConnectorConfig"
+        assert len(fleet_config.fleet) == 1
+        assert fleet_config.fleet[0].robot_id == "test_robot"
+        assert fleet_config.connector_type == model.connector_type
+        assert fleet_config.api_key == model.api_key
+
+    def test_to_fleet_config_with_cameras(self, base_model):
+        model = InorbitConnectorConfig(
+            **base_model, cameras=[CameraConfig(video_url="https://test.com/")]
+        )
+        fleet_config = model.to_fleet_config("test_robot")
+        assert len(fleet_config.fleet[0].cameras) == 1
+        assert str(fleet_config.fleet[0].cameras[0].video_url) == "https://test.com/"
