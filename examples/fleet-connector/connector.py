@@ -61,8 +61,15 @@ class ExampleBotFleetConnector(FleetConnector):
         This starts the API polling loops that fetch data for all robots.
         """
         self._fleet_manager.start()
+
+        # Here the connector may fetch a robot list from the fleet manager. e.g.:
+        # robots: RobotConfig[] = self._fleet_manager.fetch_robot_list()
+        # self.update_fleet(robots)
+        # `robots` will be added to the InOrbit fleet
+
         self._logger.info(
-            f"Connected to fleet manager API {self.api_version} for {len(self.robot_ids)} robots"
+            f"Connected to fleet manager API {self.api_version} for {len(self.robot_ids)} "
+            f"robots: {self.robot_ids}"
         )
 
     @override
