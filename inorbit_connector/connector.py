@@ -157,8 +157,7 @@ class FleetConnector(ABC):
 
         This method may be called during the user-defined implementation of _connect()
         to update the fleet configuration before initializing the robot sessions.
-        e.g. setting the robot names from a fleet manager API or fetching the robot list
-        altogether.
+        e.g. fetching the robot list from a fleet manager API.
 
         Args:
             fleet (list[RobotConfig]): The new fleet configuration
@@ -227,12 +226,13 @@ class FleetConnector(ABC):
             # bash scripts
             session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
-    def __initialize_session(
-        self, robot_id: str, robot_name: str | None = None
-    ) -> RobotSession:
+    def __initialize_session(self, robot_id: str) -> RobotSession:
         """Initialize a robot session."""
 
-        session = self.__session_pool.get_session(robot_id, robot_name=robot_name)
+        # The InOrbit hostname of the robot is set to the robot_id by default
+        # There is no support for setting the display name of a robot through the
+        # edge-sdk yet
+        session = self.__session_pool.get_session(robot_id, robot_name=robot_id)
 
         # If enabled, register user scripts
         if self.__register_user_scripts:
@@ -260,12 +260,7 @@ class FleetConnector(ABC):
         """Initialize the robot sessions."""
 
         for robot_id in self.robot_ids:
-            robot_config = next(
-                robot for robot in self.config.fleet if robot.robot_id == robot_id
-            )
-            self.__robot_sessions[robot_id] = self.__initialize_session(
-                robot_id, robot_config.robot_name if robot_config.robot_name else ""
-            )
+            self.__robot_sessions[robot_id] = self.__initialize_session(robot_id)
         self._logger.info(
             f"Initialized {len(self.__robot_sessions)} robot sessions for robots "
             f"{', '.join(self.robot_ids)}"
@@ -274,6 +269,9 @@ class FleetConnector(ABC):
     async def __connect(self) -> None:
         """Initialize the connection to InOrbit based on the provided configuration,
         and connect to external services calling self._connect().
+
+        this.update_fleet() may be called during this method to update the fleet
+        configuration before initializing the robot sessions.
 
         Raises:
             Exception: If the robot session cannot connect.
@@ -520,6 +518,9 @@ class FleetConnector(ABC):
 
         This method should not be called directly. Instead, call the start() method to
         start the connector. This ensures that the connector is only started once.
+
+        this.update_fleet() may be called during this method to update the fleet
+        configuration before initializing the robot sessions.
         """
         ...
 

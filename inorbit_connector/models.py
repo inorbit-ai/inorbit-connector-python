@@ -91,20 +91,13 @@ class LoggingConfig(BaseModel):
 class RobotConfig(BaseModel):
     """Class representing a robot configuration.
 
-    Robots whose robot_name is not set up will appear in InOrbit with its robot_id as
-    the name.
-    The robot display name can be set from the Control Dashboard in Settings >
-    Organization > Robots and will take precedence over the robot_id and robot_name.
-
     Attributes:
         robot_id (str): The InOrbit ID of the robot
         cameras (list[CameraConfig]): The list of cameras
-        robot_name (str | None, optional): The name of the robot
     """
 
     robot_id: str
     cameras: List[CameraConfig] = []
-    robot_name: str | None = None
 
 
 class ConnectorConfig(BaseModel):
