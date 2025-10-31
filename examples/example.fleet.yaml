@@ -48,8 +48,5 @@ connector_config:
 # Fleet configuration - contains robot-specific data
 fleet:
   - robot_id: fleet-robot-1
-    robot_name: Fleet Robot 1
   - robot_id: fleet-robot-2
-    robot_name: Fleet Robot 2
   - robot_id: fleet-robot-3
-    robot_name: Fleet Robot 3

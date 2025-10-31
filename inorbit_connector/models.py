@@ -98,8 +98,6 @@ class RobotConfig(BaseModel):
 
     robot_id: str
     cameras: List[CameraConfig] = []
-    # TODO: Implement support for robot name
-    # robot_name: str | None = None
 
 
 class ConnectorConfig(BaseModel):
