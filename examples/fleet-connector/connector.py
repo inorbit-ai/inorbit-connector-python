@@ -63,7 +63,7 @@ class ExampleBotFleetConnector(FleetConnector):
         self._fleet_manager.start()
 
         # Here the connector may fetch a robot list from the fleet manager. e.g.:
-        # robots: RobotConfig[] = self._fleet_manager.fetch_robot_list()
+        # robots: list[RobotConfig] = self._fleet_manager.fetch_robot_list()
         # self.update_fleet(robots)
         # `robots` will be added to the InOrbit fleet
 
