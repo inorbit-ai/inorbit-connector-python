@@ -51,5 +51,6 @@ fleet:
     robot_name: Fleet Robot 1
   - robot_id: fleet-robot-2
     robot_name: Fleet Robot 2
+    # If robot_name is not set, the robot will appear in InOrbit with its robot_id as the name
   - robot_id: fleet-robot-3
-    robot_name: Fleet Robot 3
+    robot_name: robot 3 hostname 2

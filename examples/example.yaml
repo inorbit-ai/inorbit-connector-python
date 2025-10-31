@@ -48,4 +48,5 @@ connector_config:
 # Fleet configuration - contains robot-specific data
 fleet:
   - robot_id: my-example-robot
+    # If robot_name is not set, the robot will appear in InOrbit with its robot_id as the name
     robot_name: My Example Robot

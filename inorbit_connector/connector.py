@@ -35,7 +35,11 @@ from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
 from inorbit_connector.logging.logger import setup_logger
-from inorbit_connector.models import ConnectorConfig, InorbitConnectorConfig
+from inorbit_connector.models import (
+    ConnectorConfig,
+    InorbitConnectorConfig,
+    RobotConfig,
+)
 
 
 class CommandResultCode(str, Enum):
@@ -77,7 +81,13 @@ class FleetConnector(ABC):
 
         # Common information
         self.config = config
-        self.robot_ids = [robot.robot_id for robot in config.fleet]
+        # Cache of robot IDs in config.fleet. Accessed through the robot_ids property
+        # Updated by update_fleet()
+        self.__robot_ids: list[str] = []
+        # update_fleet() may be called during user-defined implementation of _connect()
+        # to update the fleet before initializing the robot sessions
+        # Initialize the robot_ids cache
+        self.update_fleet(config.fleet)
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
@@ -135,6 +145,28 @@ class FleetConnector(ABC):
 
         # Create RobotSessionPool
         self.__session_pool = RobotSessionPool(self.__session_factory)
+
+    @property
+    def robot_ids(self) -> list[str]:
+        """Get the list of robot IDs in the fleet."""
+        # Return the cached list of robot IDs
+        return self.__robot_ids
+
+    def update_fleet(self, fleet: list[RobotConfig]) -> None:
+        """Update the robot fleet.
+
+        This method may be called during the user-defined implementation of _connect()
+        to update the fleet configuration before initializing the robot sessions.
+        e.g. setting the robot names from a fleet manager API or fetching the robot list
+        altogether.
+
+        Args:
+            fleet (list[RobotConfig]): The new fleet configuration
+        """
+        # Update the fleet configuration
+        self.config.fleet = fleet
+        # Update robot ID cache
+        self.__robot_ids = [robot.robot_id for robot in self.config.fleet]
 
     def __register_custom_command_handler_for_session(
         self, session: RobotSession, async_handler: Coroutine
@@ -195,13 +227,12 @@ class FleetConnector(ABC):
             # bash scripts
             session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
-    def __initialize_session(self, robot_id: str) -> RobotSession:
+    def __initialize_session(
+        self, robot_id: str, robot_name: str | None = None
+    ) -> RobotSession:
         """Initialize a robot session."""
 
-        # TODO: allow customizing the robot names in the connector config, and/or
-        # allowing subclasses to set it dynamically (for example, to match the name the
-        # robot may have in its own system)
-        session = self.__session_pool.get_session(robot_id, robot_name=robot_id)
+        session = self.__session_pool.get_session(robot_id, robot_name=robot_name)
 
         # If enabled, register user scripts
         if self.__register_user_scripts:
@@ -229,7 +260,12 @@ class FleetConnector(ABC):
         """Initialize the robot sessions."""
 
         for robot_id in self.robot_ids:
-            self.__robot_sessions[robot_id] = self.__initialize_session(robot_id)
+            robot_config = next(
+                robot for robot in self.config.fleet if robot.robot_id == robot_id
+            )
+            self.__robot_sessions[robot_id] = self.__initialize_session(
+                robot_id, robot_config.robot_name if robot_config.robot_name else ""
+            )
         self._logger.info(
             f"Initialized {len(self.__robot_sessions)} robot sessions for robots "
             f"{', '.join(self.robot_ids)}"
