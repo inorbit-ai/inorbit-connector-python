@@ -519,7 +519,7 @@ class FleetConnector(ABC):
         This method should not be called directly. Instead, call the start() method to
         start the connector. This ensures that the connector is only started once.
 
-        this.update_fleet() may be called during this method to update the fleet
+        self.update_fleet() may be called during this method to update the fleet
         configuration before initializing the robot sessions.
         """
         ...
