@@ -270,7 +270,7 @@ class FleetConnector(ABC):
         """Initialize the connection to InOrbit based on the provided configuration,
         and connect to external services calling self._connect().
 
-        this.update_fleet() may be called during this method to update the fleet
+        self.update_fleet() may be called during this method to update the fleet
         configuration before initializing the robot sessions.
 
         Raises:
