@@ -35,7 +35,11 @@ from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
 from inorbit_connector.logging.logger import setup_logger
-from inorbit_connector.models import ConnectorConfig, InorbitConnectorConfig
+from inorbit_connector.models import (
+    ConnectorConfig,
+    InorbitConnectorConfig,
+    RobotConfig,
+)
 
 
 class CommandResultCode(str, Enum):
@@ -77,7 +81,13 @@ class FleetConnector(ABC):
 
         # Common information
         self.config = config
-        self.robot_ids = [robot.robot_id for robot in config.fleet]
+        # Cache of robot IDs in config.fleet. Accessed through the robot_ids property
+        # Updated by update_fleet()
+        self.__robot_ids: list[str] = []
+        # update_fleet() may be called during user-defined implementation of _connect()
+        # to update the fleet before initializing the robot sessions
+        # Initialize the robot_ids cache
+        self.update_fleet(config.fleet)
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
@@ -135,6 +145,27 @@ class FleetConnector(ABC):
 
         # Create RobotSessionPool
         self.__session_pool = RobotSessionPool(self.__session_factory)
+
+    @property
+    def robot_ids(self) -> list[str]:
+        """Get the list of robot IDs in the fleet."""
+        # Return the cached list of robot IDs
+        return self.__robot_ids
+
+    def update_fleet(self, fleet: list[RobotConfig]) -> None:
+        """Update the robot fleet.
+
+        This method may be called during the user-defined implementation of _connect()
+        to update the fleet configuration before initializing the robot sessions.
+        e.g. fetching the robot list from a fleet manager API.
+
+        Args:
+            fleet (list[RobotConfig]): The new fleet configuration
+        """
+        # Update the fleet configuration
+        self.config.fleet = fleet
+        # Update robot ID cache
+        self.__robot_ids = [robot.robot_id for robot in self.config.fleet]
 
     def __register_custom_command_handler_for_session(
         self, session: RobotSession, async_handler: Coroutine
@@ -198,9 +229,9 @@ class FleetConnector(ABC):
     def __initialize_session(self, robot_id: str) -> RobotSession:
         """Initialize a robot session."""
 
-        # TODO: allow customizing the robot names in the connector config, and/or
-        # allowing subclasses to set it dynamically (for example, to match the name the
-        # robot may have in its own system)
+        # The InOrbit hostname of the robot is set to the robot_id by default
+        # There is no support for setting the display name of a robot through the
+        # edge-sdk yet
         session = self.__session_pool.get_session(robot_id, robot_name=robot_id)
 
         # If enabled, register user scripts
@@ -238,6 +269,9 @@ class FleetConnector(ABC):
     async def __connect(self) -> None:
         """Initialize the connection to InOrbit based on the provided configuration,
         and connect to external services calling self._connect().
+
+        self.update_fleet() may be called during this method to update the fleet
+        configuration before initializing the robot sessions.
 
         Raises:
             Exception: If the robot session cannot connect.
@@ -484,6 +518,9 @@ class FleetConnector(ABC):
 
         This method should not be called directly. Instead, call the start() method to
         start the connector. This ensures that the connector is only started once.
+
+        self.update_fleet() may be called during this method to update the fleet
+        configuration before initializing the robot sessions.
         """
         ...
 

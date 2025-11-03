@@ -48,4 +48,3 @@ connector_config:
 # Fleet configuration - contains robot-specific data
 fleet:
   - robot_id: my-example-robot
-    robot_name: My Example Robot
