@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+
+SPDX-License-Identifier: MIT
+-->
+
 # Configuration
 
 Use `ConnectorConfig` (Pydantic) with a `fleet` of `RobotConfig` entries.

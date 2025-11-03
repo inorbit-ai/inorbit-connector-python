@@ -53,6 +53,7 @@ dev = [
     "pytest-asyncio~=1.2",
     "setuptools~=80.9",
     "tox~=4.30",
+    "reuse~=6.2",
 ]
 docs = [
     "sphinx~=8.2",

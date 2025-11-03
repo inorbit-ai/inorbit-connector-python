@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+
+SPDX-License-Identifier: MIT
+-->
+
 # inorbit-connector
 
 A Python framework for building InOrbit connectors (single robot and fleet) using the InOrbit Edge SDK.

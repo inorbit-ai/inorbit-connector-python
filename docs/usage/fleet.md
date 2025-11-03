@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+
+SPDX-License-Identifier: MIT
+-->
+
 # Fleet Connector
 
 Subclass `inorbit_connector.connector.FleetConnector` to manage multiple robots.

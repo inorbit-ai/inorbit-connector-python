@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+
+SPDX-License-Identifier: MIT
+-->
+
 # Single-Robot Connector
 
 Subclass `inorbit_connector.connector.Connector` and implement:
