@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - main  
-      - b-Tomas/docs # Temporary branch for initial docs setup
   workflow_dispatch: # Allow manual triggering of the workflow
 
 permissions:
