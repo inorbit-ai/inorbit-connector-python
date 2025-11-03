@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT
 
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg) ![PyPI - Package Version](https://img.shields.io/pypi/v/inorbit-connector) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/inorbit-connector)
 
-![Lint and Test](https://github.com/inorbit-ai/inorbit-connector-python/actions/workflows/lint-and-test.yaml/badge.svg) ![Build and Publish](https://github.com/inorbit-ai/inorbit-connector-python/actions/workflows/build-and-publish.yaml/badge.svg) 
+![Lint and Test](https://github.com/inorbit-ai/inorbit-connector-python/actions/workflows/lint-and-test.yaml/badge.svg) ![Build and Publish](https://github.com/inorbit-ai/inorbit-connector-python/actions/workflows/build-and-publish.yaml/badge.svg) ![Docs](https://github.com/inorbit-ai/inorbit-connector-python/actions/workflows/docs.yaml/badge.svg)
 
 A Python framework for developing _connectors_ for the [InOrbit](https://inorbit.ai/) RobOps ecosystem.
 
