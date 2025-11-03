@@ -46,3 +46,9 @@ source_suffix = {
     '.md': 'markdown',
     '.rst': 'restructuredtext',
 }
+
+# Brand the Furo theme
+html_theme_options = {
+    "light_logo": "inorbit-logo-black.svg",
+    "dark_logo": "inorbit-logo-white.svg",
+}
