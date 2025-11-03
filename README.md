@@ -41,7 +41,7 @@ See the [CONTRIBUTING.md](CONTRIBUTING.md) file for information on how to develo
 
 ## Quick Start
 
-The [`examples`](examples) directory contains usage examples of the connector. See [scripts/README](scripts/README.md) for more information.
+The [`examples`](examples) directory contains usage examples of the connector. See [examples/README](examples/README.md) for more information.
 
 ## Contributing
 
