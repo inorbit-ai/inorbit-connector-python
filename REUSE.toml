@@ -29,19 +29,19 @@ SPDX-FileComment = "Example environment file (template)"
 # Image files that don't support inline license headers
 # These are annotated here to avoid separate .license files
 [[annotations]]
-path = "assets/inorbit_github_footer.png"
+path = "**/*.png"
 SPDX-FileCopyrightText = "2025 InOrbit, Inc."
 SPDX-License-Identifier = "MIT"
-SPDX-FileComment = "InOrbit GitHub footer image"
+SPDX-FileComment = "PNG assets"
 
 [[annotations]]
-path = "examples/example_map.png"
+path = "**/*.svg"
 SPDX-FileCopyrightText = "2025 InOrbit, Inc."
 SPDX-License-Identifier = "MIT"
-SPDX-FileComment = "Example map image"
+SPDX-FileComment = "SVG assets"
 
 [[annotations]]
-path = "tests/dir/test_map.png"
+path = "**/*.ico"
 SPDX-FileCopyrightText = "2025 InOrbit, Inc."
 SPDX-License-Identifier = "MIT"
-SPDX-FileComment = "Test map image"
+SPDX-FileComment = "ICO assets"

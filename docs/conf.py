@@ -52,3 +52,6 @@ html_theme_options = {
     "light_logo": "inorbit-logo-black.svg",
     "dark_logo": "inorbit-logo-white.svg",
 }
+
+# Favicon
+html_favicon = "_static/favicon.ico"
