@@ -54,6 +54,11 @@ dev = [
     "setuptools~=80.9",
     "tox~=4.30",
 ]
+docs = [
+    "sphinx~=8.2",
+    "myst-parser",
+    "furo",
+]
 colorlog = [
     "colorlog==6.9.0",
 ]
