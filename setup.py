@@ -16,6 +16,7 @@ VERSION = "1.4.0"
 setup(
     download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/v{VERSION}.zip",
     project_urls={
+        "Documentation": "https://inorbit-ai.github.io/inorbit-connector-python/",
         "Tracker": f"{GITHUB_REPO_URL}/issues",
         "Contributing": f"{GITHUB_REPO_URL}/blob/v{VERSION}/CONTRIBUTING.md",
         "Code of Conduct": f"{GITHUB_REPO_URL}/blob/v{VERSION}/CODE_OF_CONDUCT.md",

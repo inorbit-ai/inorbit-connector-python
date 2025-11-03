@@ -17,6 +17,18 @@ A Python framework for developing _connectors_ for the [InOrbit](https://inorbit
 This repository contains a Python framework that provides a base structure for developing [InOrbit](https://inorbit.ai/) robot connectors.
 Making use of InOrbit's [Edge SDK](https://developer.inorbit.ai/docs#edge-sdk), `inorbit-connector` provides a starting point for the integration of a fleet of robots in InOrbit, unlocking interoperability.
 
+## Documentation
+
+For detailed documentation, including installation guides, usage examples, configuration reference, and API details, see the [Documentation](docs/index.md).
+
+To build the documentation locally:
+
+```bash
+make -C docs html
+```
+
+The documentation will be available in `docs/_build/html/index.html`.
+
 ## Requirements
 
 - Python 3.10 or later
@@ -41,7 +53,7 @@ See the [CONTRIBUTING.md](CONTRIBUTING.md) file for information on how to develo
 
 ## Quick Start
 
-The [`examples`](examples) directory contains usage examples of the connector. See [scripts/README](scripts/README.md) for more information.
+The [`examples`](examples) directory contains usage examples of the connector. See [examples/README](examples/README.md) for more information.
 
 ## Contributing
 
