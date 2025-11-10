@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+
+SPDX-License-Identifier: MIT
+-->
+
 # Commands Handling
 
 Commands from InOrbit are automatically routed to your `_inorbit_robot_command_handler()` method in the case of a fleet connector, or to your `_inorbit_command_handler()` method in the case of a single-robot connector.
