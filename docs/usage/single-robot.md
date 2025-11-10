@@ -79,9 +79,15 @@ async def _disconnect(self) -> None:
 
 ### `_inorbit_command_handler()`
 
-Handle commands received from InOrbit. This method is automatically registered if `register_custom_command_handler` is True (default). For more details see the {ref}`command-handling` section below.
+:::{hint}
+See the [Commands Handling](commands-handling) chapter for more details.
+:::
+
+Handle commands received from InOrbit. This method is automatically registered if `register_custom_command_handler` is True (default).
 
 ```python
+from inorbit_connector.connector import CommandResultCode, CommandFailure
+
 @override
 async def _inorbit_command_handler(
     self, command_name: str, args: list, options: dict
@@ -92,15 +98,13 @@ async def _inorbit_command_handler(
         if result:
             options["result_function"](CommandResultCode.SUCCESS)
         else:
-            options["result_function"](
-                CommandResultCode.FAILURE,
-                stderr="Failed to start mission"
+            raise CommandFailure(
+                execution_status_details="Mission start failed",
+                stderr="Robot returned error code"
             )
 ```
 
-The `options` dictionary contains a `result_function` that must be called to report the command result:
-- `CommandResultCode.SUCCESS`: Command executed successfully
-- `CommandResultCode.FAILURE`: Command failed
+Exceptions raised in the command handler are automatically caught and reported. Use `CommandFailure` to provide specific error details that will be displayed in InOrbit's audit logs and action execution details.
 
 ## Lifecycle Methods
 
@@ -177,15 +181,6 @@ def _is_robot_online(self) -> bool:
         return False
 ```
 
-(command-handling)=
-## Command Handling
-
-Commands from InOrbit are automatically routed to your `_inorbit_command_handler()` method. The handler receives:
-- `command_name` (str): The name of the command
-- `args` (list): Command arguments
-- `options` (dict): Options including `result_function` to report results
-
-You must call `options["result_function"]` with a `CommandResultCode` to report the command result.
 
 ## User Scripts
 
