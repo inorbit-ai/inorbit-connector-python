@@ -49,6 +49,25 @@ class CommandResultCode(str, Enum):
     FAILURE = "1"
 
 
+class CommandFailure(Exception):
+    """
+    Exception raised when a command fails to execute.
+
+    Its data will be passed to the result function and result_code will be set to FAILURE if the
+    exception is raised during the execution of a custom command registered by a connector.
+
+    If the command is dispatched from the actions UI, the following applies:
+    - execution_status_details will be displayed in the alert
+    - both values will appear in the robot audit logs
+    - both values will be available through the action execution details API endpoint. See
+        https://api.inorbit.ai/docs/index.html#operation/getActionExecutionStatus    
+    """
+    def __init__(self, execution_status_details: str, stderr: str):
+        super().__init__(execution_status_details)
+        self.execution_status_details = execution_status_details
+        self.stderr = stderr
+
+
 class FleetConnector(ABC):
     """Generic InOrbit fleet connector.
 
@@ -191,13 +210,23 @@ class FleetConnector(ABC):
                     f"{session.robot_id} with args {args}. "
                     f"Exception:\n{str(e) or e.__class__.__name__}"
                 )
-                options["result_function"](
-                    CommandResultCode.FAILURE,
-                    execution_status_details=(
-                        "An error occured executing custom command"
-                    ),
-                    stderr=str(e) or e.__class__.__name__,
-                )
+                # If the exception was intentionally raised by the connector to indicate a failure,
+                # pass the data to the result function and set the result code to FAILURE
+                if isinstance(e, CommandFailure):
+                    options["result_function"](
+                        CommandResultCode.FAILURE,
+                        execution_status_details=e.execution_status_details,
+                        stderr=e.stderr,
+                    )
+                # otherwise report a generic error and attachthe exception message to stderr
+                else:
+                    options["result_function"](
+                        CommandResultCode.FAILURE,
+                        execution_status_details=(
+                            "An error occured executing custom command"
+                        ),
+                        stderr=str(e) or e.__class__.__name__,
+                    )
 
         session.register_command_callback(handler_wrapper)
 
