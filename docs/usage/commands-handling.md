@@ -52,13 +52,13 @@ options["result_function"](
 
 ### Reporting Failure
 
-There is three ways to report a failed command execution:
+There are three ways to report a failed command execution:
 
 1. (Recommended) Raise a `CommandFailure` exception.
 2. Raise any other exception.
 3. Call the `result_function` with a `CommandResultCode.FAILURE` and provide the `execution_status_details` and `stderr` parameters.
 
-Any exception raised during the execution of the command handler will be caught and reported with a generic error message in its execution details, and the exception message attached to the `stderr` field. All exceptions are logged.
+Unhandled exceptions raised during the execution of the command handler will be caught and reported with a generic error message in its execution details, and the exception message attached to the `stderr` field. All exceptions are logged.
 
 The `CommandFailure` exception can be used to intentionally indicate a failure:
 - Error details are automatically passed to InOrbit's result function

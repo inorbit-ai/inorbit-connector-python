@@ -223,7 +223,7 @@ class FleetConnector(ABC):
         else:
             options["result_function"](
                 CommandResultCode.FAILURE,
-                execution_status_details="An error occured executing custom command",
+                execution_status_details="An error occurred executing custom command",
                 stderr=str(exception) or exception.__class__.__name__,
             )
 

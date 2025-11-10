@@ -736,7 +736,7 @@ class TestConnectorCommandHandler:
 
         result_function.assert_called_once_with(
             CommandResultCode.FAILURE,
-            execution_status_details="An error occured executing custom command",
+            execution_status_details="An error occurred executing custom command",
             stderr="Something went wrong",
         )
 
@@ -760,6 +760,6 @@ class TestConnectorCommandHandler:
 
         result_function.assert_called_once_with(
             CommandResultCode.FAILURE,
-            execution_status_details="An error occured executing custom command",
+            execution_status_details="An error occurred executing custom command",
             stderr="CustomException",
         )
