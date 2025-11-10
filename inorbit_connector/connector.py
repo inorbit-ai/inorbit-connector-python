@@ -53,15 +53,18 @@ class CommandFailure(Exception):
     """
     Exception raised when a command fails to execute.
 
-    Its data will be passed to the result function and result_code will be set to FAILURE if the
-    exception is raised during the execution of a custom command registered by a connector.
+    Its data will be passed to the result function and result_code will be set to
+    FAILURE if the exception is raised during the execution of a custom command
+    registered by a connector.
 
-    If the command is dispatched from the actions UI, the following applies:
-    - execution_status_details will be displayed in the alert
-    - both values will appear in the robot audit logs
-    - both values will be available through the action execution details API endpoint. See
-        https://api.inorbit.ai/docs/index.html#operation/getActionExecutionStatus    
+    Both values will be displayed in the audit logs and will be available through the
+    action execution details API endpoint. See
+        https://api.inorbit.ai/docs/index.html#operation/getActionExecutionStatus
+
+    If the command is dispatched from the actions UI, execution_status_details will be
+    displayed in the alert message upon command execution failure.
     """
+
     def __init__(self, execution_status_details: str, stderr: str):
         super().__init__(execution_status_details)
         self.execution_status_details = execution_status_details
@@ -208,8 +211,8 @@ class FleetConnector(ABC):
             f"{robot_id} with args {args}. "
             f"Exception:\n{str(exception) or exception.__class__.__name__}"
         )
-        # If the exception was intentionally raised by the connector to indicate a failure,
-        # pass the data to the result function and set the result code to FAILURE
+        # If the exception was intentionally raised by the connector to indicate a
+        # failure, pass the data to the result function and set the code to FAILURE
         if isinstance(exception, CommandFailure):
             options["result_function"](
                 CommandResultCode.FAILURE,
@@ -750,9 +753,10 @@ class Connector(FleetConnector, ABC):
                 stderr="XYZ happened"
             )
 
-        Notice the use of the CommandFailure exception to intentionally indicate a failure. Other
-        exceptions will be handled too, but the messages displayed in the UI will be generic.
-        See CommandFailure for more details.
+        Notice the use of the CommandFailure exception to intentionally indicate a
+        failure. Other exceptions will be handled too, but the messages displayed in the
+        UI will be generic.
+        See the CommandFailure class for more details.
 
         Args:
             command_name (str): The name of the command
