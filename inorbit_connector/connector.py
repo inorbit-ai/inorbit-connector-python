@@ -186,6 +186,44 @@ class FleetConnector(ABC):
         # Update robot ID cache
         self.__robot_ids = [robot.robot_id for robot in self.config.fleet]
 
+    def _handle_command_exception(
+        self,
+        exception: Exception,
+        command_name: str,
+        robot_id: str,
+        args: list,
+        options: dict,
+    ) -> None:
+        """Handle exceptions raised during command execution.
+
+        Args:
+            exception: The exception that was raised
+            command_name: Name of the command that failed
+            robot_id: ID of the robot
+            args: Command arguments
+            options: Command options containing result_function
+        """
+        self._logger.error(
+            f"Failed to execute command '{command_name}' for robot "
+            f"{robot_id} with args {args}. "
+            f"Exception:\n{str(exception) or exception.__class__.__name__}"
+        )
+        # If the exception was intentionally raised by the connector to indicate a failure,
+        # pass the data to the result function and set the result code to FAILURE
+        if isinstance(exception, CommandFailure):
+            options["result_function"](
+                CommandResultCode.FAILURE,
+                execution_status_details=exception.execution_status_details,
+                stderr=exception.stderr,
+            )
+        # otherwise report a generic error and attach the exception message to stderr
+        else:
+            options["result_function"](
+                CommandResultCode.FAILURE,
+                execution_status_details="An error occured executing custom command",
+                stderr=str(exception) or exception.__class__.__name__,
+            )
+
     def __register_custom_command_handler_for_session(
         self, session: RobotSession, async_handler: Coroutine
     ) -> None:
@@ -205,28 +243,9 @@ class FleetConnector(ABC):
                     self.__loop,
                 ).result()
             except Exception as e:
-                self._logger.error(
-                    f"Failed to execute command '{command_name}' for robot "
-                    f"{session.robot_id} with args {args}. "
-                    f"Exception:\n{str(e) or e.__class__.__name__}"
+                self._handle_command_exception(
+                    e, command_name, session.robot_id, args, options
                 )
-                # If the exception was intentionally raised by the connector to indicate a failure,
-                # pass the data to the result function and set the result code to FAILURE
-                if isinstance(e, CommandFailure):
-                    options["result_function"](
-                        CommandResultCode.FAILURE,
-                        execution_status_details=e.execution_status_details,
-                        stderr=e.stderr,
-                    )
-                # otherwise report a generic error and attachthe exception message to stderr
-                else:
-                    options["result_function"](
-                        CommandResultCode.FAILURE,
-                        execution_status_details=(
-                            "An error occured executing custom command"
-                        ),
-                        stderr=str(e) or e.__class__.__name__,
-                    )
 
         session.register_command_callback(handler_wrapper)
 
@@ -726,10 +745,14 @@ class Connector(FleetConnector, ABC):
         if success:
             return options['result_function'](CommandResultCode.SUCCESS)
         else:
-            return options['result_function'](
-                CommandResultCode.FAILURE,
-                stderr="Example error"
+            raise CommandFailure(
+                execution_status_details="Oops!",
+                stderr="XYZ happened"
             )
+
+        Notice the use of the CommandFailure exception to intentionally indicate a failure. Other
+        exceptions will be handled too, but the messages displayed in the UI will be generic.
+        See CommandFailure for more details.
 
         Args:
             command_name (str): The name of the command
