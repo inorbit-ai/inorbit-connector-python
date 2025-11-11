@@ -106,7 +106,19 @@ make -C docs clean
 
 ### Publishing (CI)
 
-On pushes to the `main` branch, the workflow at `.github/workflows/docs.yaml` builds the docs and deploys them via GitHub Pages using the GitHub Actions flow. The deployment URL is shown in the workflow output (`page_url`).
+The workflow at `.github/workflows/docs.yaml` builds the docs and deploys them via GitHub Pages. The documentation is automatically deployed when a new release is published. The deployment URL is shown in the workflow output (`page_url`).
+
+#### Manual Deployment
+
+To manually deploy the documentation, you can trigger the workflow using the GitHub Actions UI:
+
+1. Navigate to the [Actions](https://github.com/inorbit-ai/inorbit-connector-python/actions) tab in the repository
+2. Select the "Publish documentation" workflow from the left sidebar
+3. Click the "Run workflow" button (located at the top right of the workflow runs list)
+4. Select the branch you want to deploy from (typically `main`)
+5. Click the green "Run workflow" button to start the deployment
+
+The workflow will build and deploy the documentation to GitHub Pages, and the deployment URL will be available in the workflow run output.
 
 ## Reuse compliance check
 

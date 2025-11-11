@@ -2,16 +2,12 @@
 #
 # SPDX-License-Identifier: MIT
 
-name: docs
+name: Publish documentation
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "docs/**"
-      - ".github/workflows/docs.yaml"
-      - ".bumpversion.cfg" # Update on version bumps too
+  # Automatically deploy when a release is published
+  release:
+    types: [published]
   workflow_dispatch: # Allow manual triggering of the workflow
 
 permissions:
