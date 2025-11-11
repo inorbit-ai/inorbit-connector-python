@@ -71,6 +71,66 @@ class CommandFailure(Exception):
         self.stderr = stderr
 
 
+def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, str]]:
+    """Parse custom command arguments of a COMMAND_CUSTOM_COMMAND command from the
+    edge-sdk.
+
+    Assumes custom_command_args corresponds to a COMMAND_CUSTOM_COMMAND command from the
+    edge-sdk. The first item of the list corresponds to the script name, and the second
+    is a list of arguments.
+    In the case of InOrbit actions of RunScript type, the script name corresponds to the
+    filename, and the arguments are pairs of named arguments.
+    Refer to the InOrbit Actions documentation for details on how to configure actions:
+     - https://developer.inorbit.ai/docs#configuring-action-definitions
+
+    Outputs the script name and a dictionary with argument-value pairs. e.g.:
+        ("script.sh", {"x": "1.0", "y": "2.0"})
+
+    Args:
+        custom_command_args: List-like container with the custom command arguments.
+
+    Returns:
+        Tuple with the script name and a dictionary with argument-value pairs.
+
+    Raises:
+        ValueError: If the arguments are not compliant with edge-sdk types. If this
+            function is used correctly, this should never happen.
+        CommandFailure: If the arguments cannot be parsed as key-value pairs.
+            Note: This exception should not be handled by the commands handler.
+            See connector.CommandFailure for more details.
+    """
+    if not isinstance(custom_command_args, list):
+        raise ValueError(f"Expected custom command arguments to be a list, got {type(custom_command_args)}")
+    
+    if len(custom_command_args) != 2:
+        raise ValueError("Expected custom command arguments to be a list with two elements.")
+
+    script_name = custom_command_args[0]
+    args_list_raw = custom_command_args[1]
+
+    if not isinstance(script_name, str):
+        raise ValueError("Script name must be a string")
+
+    # Convert any iterable container into a list for processing and verify the result
+    # Exclude strings and bytes, because they are iterables that can be converted to lists
+    if isinstance(args_list_raw, (str, bytes)):
+        raise ValueError("Arguments must be a list-like container")
+    try:
+        args_list = list(args_list_raw)
+    except TypeError:
+        raise ValueError("Arguments must be a list-like container")
+
+    if len(args_list) % 2 != 0:
+        raise CommandFailure(
+            execution_status_details=f"Invalid script arguments provided",
+            stderr=f"The script arguments must be a list of key-value pairs, got {len(args_list)} elements",
+        )
+
+    # Last value wins on duplicate keys; preserve original types
+    params = {k: v for k, v in zip(args_list[::2], args_list[1::2])}
+    return script_name, params
+
+
 class FleetConnector(ABC):
     """Generic InOrbit fleet connector.
 
