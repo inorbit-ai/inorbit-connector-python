@@ -29,9 +29,15 @@ Subclasses must implement the same abstract methods as single-robot connectors, 
 
 ### `_inorbit_robot_command_handler()`
 
-Handle commands for a specific robot. The signature includes `robot_id` as the first parameter:
+:::{hint}
+See the [Commands Handling](commands-handling) chapter for more details.
+:::
+
+Handle commands for a specific robot. This method is automatically registered if `register_custom_command_handler` is True (default).
 
 ```python
+from inorbit_connector.connector import CommandResultCode, CommandFailure
+
 @override
 async def _inorbit_robot_command_handler(
     self, robot_id: str, command_name: str, args: list, options: dict
@@ -44,11 +50,13 @@ async def _inorbit_robot_command_handler(
         if result:
             options["result_function"](CommandResultCode.SUCCESS)
         else:
-            options["result_function"](
-                CommandResultCode.FAILURE,
-                stderr=f"Failed to start mission for {robot_id}"
+            raise CommandFailure(
+                execution_status_details=f"Failed to start mission for {robot_id}",
+                stderr="Fleet manager returned error"
             )
 ```
+
+Exceptions raised in the command handler are automatically caught and reported. Use `CommandFailure` to provide specific error details that will be displayed in InOrbit's audit logs and action execution details.
 
 ## Fleet Management
 

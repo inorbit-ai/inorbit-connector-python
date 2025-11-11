@@ -17,6 +17,8 @@ from inorbit_edge.robot import RobotSession
 
 # InOrbit
 from inorbit_connector.connector import (
+    CommandFailure,
+    CommandResultCode,
     Connector,
     FleetConnector,
 )
@@ -692,3 +694,72 @@ class TestConnectorCommandHandler:
         # Verify the callback calls _is_robot_online
         callback = session.set_online_status_callback.call_args[0][0]
         assert callback() is True  # Should return True by default
+
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_handle_command_exception_with_command_failure(
+        self, base_model, mock_robot_session_pool
+    ):
+        """Test that CommandFailure exceptions are properly handled and passed to result_function."""
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        result_function = MagicMock()
+
+        command_failure = CommandFailure(
+            execution_status_details="Command execution failed",
+            stderr="Error details here"
+        )
+
+        connector._handle_command_exception(
+            command_failure, "test_command", "TestRobot", ["arg1"], 
+            {"result_function": result_function}
+        )
+
+        result_function.assert_called_once_with(
+            CommandResultCode.FAILURE,
+            execution_status_details="Command execution failed",
+            stderr="Error details here",
+        )
+
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_handle_command_exception_with_generic_exception(
+        self, base_model, mock_robot_session_pool
+    ):
+        """Test that generic exceptions are handled and passed to result_function with generic message."""
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        result_function = MagicMock()
+
+        error = ValueError("Something went wrong")
+
+        connector._handle_command_exception(
+            error, "test_command", "TestRobot", ["arg1"], 
+            {"result_function": result_function}
+        )
+
+        result_function.assert_called_once_with(
+            CommandResultCode.FAILURE,
+            execution_status_details="An error occurred executing custom command",
+            stderr="Something went wrong",
+        )
+
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    def test_handle_command_exception_without_message(
+        self, base_model, mock_robot_session_pool
+    ):
+        """Test that exceptions without a message use the class name as stderr."""
+        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        result_function = MagicMock()
+
+        class CustomException(Exception):
+            pass
+
+        error = CustomException()
+
+        connector._handle_command_exception(
+            error, "test_command", "TestRobot", ["arg1"], 
+            {"result_function": result_function}
+        )
+
+        result_function.assert_called_once_with(
+            CommandResultCode.FAILURE,
+            execution_status_details="An error occurred executing custom command",
+            stderr="CustomException",
+        )
