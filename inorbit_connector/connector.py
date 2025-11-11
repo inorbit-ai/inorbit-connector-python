@@ -71,7 +71,7 @@ class CommandFailure(Exception):
         self.stderr = stderr
 
 
-def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, str]]:
+def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, any]]:
     """Parse custom command arguments of a COMMAND_CUSTOM_COMMAND command from the
     edge-sdk.
 
@@ -100,10 +100,15 @@ def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, str]]
             See connector.CommandFailure for more details.
     """
     if not isinstance(custom_command_args, list):
-        raise ValueError(f"Expected custom command arguments to be a list, got {type(custom_command_args)}")
-    
+        raise ValueError(
+            "Expected custom command arguments to be a list, "
+            f"got {type(custom_command_args)}"
+        )
+
     if len(custom_command_args) != 2:
-        raise ValueError("Expected custom command arguments to be a list with two elements.")
+        raise ValueError(
+            "Expected custom command arguments to be a list with two elements."
+        )
 
     script_name = custom_command_args[0]
     args_list_raw = custom_command_args[1]
@@ -112,7 +117,7 @@ def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, str]]
         raise ValueError("Script name must be a string")
 
     # Convert any iterable container into a list for processing and verify the result
-    # Exclude strings and bytes, because they are iterables that can be converted to lists
+    # Exclude strings and bytes, which are iterables that can be converted to lists
     if isinstance(args_list_raw, (str, bytes)):
         raise ValueError("Arguments must be a list-like container")
     try:
@@ -122,8 +127,11 @@ def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, str]]
 
     if len(args_list) % 2 != 0:
         raise CommandFailure(
-            execution_status_details=f"Invalid script arguments provided",
-            stderr=f"The script arguments must be a list of key-value pairs, got {len(args_list)} elements",
+            execution_status_details="Invalid script arguments provided",
+            stderr=(
+                "The script arguments must be a list of key-value pairs, "
+                f"got {len(args_list)} elements"
+            ),
         )
 
     # Last value wins on duplicate keys; preserve original types
