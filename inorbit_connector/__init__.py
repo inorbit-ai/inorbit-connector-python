@@ -6,4 +6,4 @@
 # SPDX-License-Identifier: MIT
 
 __author__ = "InOrbit, Inc."
-__version__ = "1.5.0"
+__version__ = "1.6.0"
