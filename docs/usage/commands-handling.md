@@ -104,3 +104,35 @@ async def _inorbit_robot_command_handler(
                 stderr=str(e)
             )
 ```
+
+## Parsing Script Arguments
+
+When handling custom script commands, the Edge SDK delivers arguments in the form:
+
+- `args[0]`: script file name (e.g., `"script.sh"`)
+- `args[1]`: a flat list of alternating keys and values (e.g., `["x", "1.0", "y", "2.0"]`)
+
+Use the helper `parse_custom_command_args()` to turn these into a script name and a parameters dictionary.
+
+```python
+from inorbit_connector.connector import (
+    parse_custom_command_args,
+    CommandResultCode,
+    CommandFailure,
+)
+from inorbit_edge.commands import COMMAND_CUSTOM_COMMAND
+
+@override
+async def _inorbit_robot_command_handler(
+    self, robot_id: str, command_name: str, args: list, options: dict
+) -> None:
+    if command_name == COMMAND_CUSTOM_COMMAND:
+        # args format: [file_name, [k1, v1, k2, v2, ...]]
+        script, params = parse_custom_command_args(args)
+        # Example: script == "script.sh", params == {"x": "1.0", "y": "2.0"}
+        # Use script and params as needed
+        options["result_function"](
+            CommandResultCode.SUCCESS,
+            stdout=f"Ran {script} with params {params}",
+        )
+```
