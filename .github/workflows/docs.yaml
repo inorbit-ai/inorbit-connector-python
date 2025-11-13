@@ -5,10 +5,15 @@
 name: Publish documentation
 
 on:
-  # Automatically deploy when a release is published
-  release:
-    types: [published]
-  workflow_dispatch: # Allow manual triggering of the workflow
+  # Trigger when build-and-publish workflow completes
+  workflow_run:
+    workflows: ["Build and Publish"]
+    types:
+      - completed
+    branches:
+      - main
+  # Allow manual triggering of the workflow
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,6 +28,13 @@ concurrency:
 
 jobs:
   build:
+    # Only run if manually dispatched, or if build-and-publish workflow succeeded AND created a release
+    if: |
+      github.event_name == 'workflow_dispatch' || (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        contains(github.event.workflow_run.head_commit.message, 'Bump version')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
