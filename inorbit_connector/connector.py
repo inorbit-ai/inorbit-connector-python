@@ -6,7 +6,6 @@
 # SPDX-License-Identifier: MIT
 
 # Standard
-from enum import Enum
 import os
 import logging
 import warnings
@@ -34,109 +33,19 @@ from inorbit_edge.robot import RobotSession, RobotSessionPool, RobotSessionFacto
 from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
+from inorbit_connector.commands import (  # noqa: F401
+    # Re-export command-related functionality for backwards compatibility
+    # TODO: Remove in the next major release
+    CommandFailure,
+    CommandResultCode,
+    parse_custom_command_args,
+)
 from inorbit_connector.logging.logger import setup_logger
 from inorbit_connector.models import (
     ConnectorConfig,
     InorbitConnectorConfig,
     RobotConfig,
 )
-
-
-class CommandResultCode(str, Enum):
-    """The result code of a command execution."""
-
-    SUCCESS = "0"
-    FAILURE = "1"
-
-
-class CommandFailure(Exception):
-    """
-    Exception raised when a command fails to execute.
-
-    Its data will be passed to the result function and result_code will be set to
-    FAILURE if the exception is raised during the execution of a custom command
-    registered by a connector.
-
-    Both values will be displayed in the audit logs and will be available through the
-    action execution details API endpoint. See
-        https://api.inorbit.ai/docs/index.html#operation/getActionExecutionStatus
-
-    If the command is dispatched from the actions UI, execution_status_details will be
-    displayed in the alert message upon command execution failure.
-    """
-
-    def __init__(self, execution_status_details: str, stderr: str):
-        super().__init__(execution_status_details)
-        self.execution_status_details = execution_status_details
-        self.stderr = stderr
-
-
-def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, any]]:
-    """Parse custom command arguments of a COMMAND_CUSTOM_COMMAND command from the
-    edge-sdk.
-
-    Assumes custom_command_args corresponds to a COMMAND_CUSTOM_COMMAND command from the
-    edge-sdk. The first item of the list corresponds to the script name, and the second
-    is a list of arguments.
-    In the case of InOrbit actions of RunScript type, the script name corresponds to the
-    filename, and the arguments are pairs of named arguments.
-    Refer to the InOrbit Actions documentation for details on how to configure actions:
-     - https://developer.inorbit.ai/docs#configuring-action-definitions
-
-    Outputs the script name and a dictionary with argument-value pairs. e.g.:
-        ("script.sh", {"x": "1.0", "y": "2.0"})
-
-    Args:
-        custom_command_args: List-like container with the custom command arguments.
-
-    Returns:
-        Tuple with the script name and a dictionary with argument-value pairs.
-
-    Raises:
-        ValueError: If the arguments are not compliant with edge-sdk types. If this
-            function is used correctly, this should never happen.
-        CommandFailure: If the arguments cannot be parsed as key-value pairs.
-            Note: This exception should not be handled by the commands handler.
-            See connector.CommandFailure for more details.
-    """
-    if not isinstance(custom_command_args, list):
-        raise ValueError(
-            "Expected custom command arguments to be a list, "
-            f"got {type(custom_command_args)}"
-        )
-
-    if len(custom_command_args) != 2:
-        raise ValueError(
-            "Expected custom command arguments to be a list with two elements."
-        )
-
-    script_name = custom_command_args[0]
-    args_list_raw = custom_command_args[1]
-
-    if not isinstance(script_name, str):
-        raise ValueError("Script name must be a string")
-
-    # Convert any iterable container into a list for processing and verify the result
-    # Exclude strings and bytes, which are iterables that can be converted to lists
-    if isinstance(args_list_raw, (str, bytes)):
-        raise ValueError("Arguments must be a list-like container")
-    try:
-        args_list = list(args_list_raw)
-    except TypeError:
-        raise ValueError("Arguments must be a list-like container")
-
-    if len(args_list) % 2 != 0:
-        raise CommandFailure(
-            execution_status_details="Invalid script arguments provided",
-            stderr=(
-                "The script arguments must be a list of key-value pairs, "
-                f"got {len(args_list)} elements"
-            ),
-        )
-
-    # Last value wins on duplicate keys; preserve original types
-    params = {k: v for k, v in zip(args_list[::2], args_list[1::2])}
-    return script_name, params
 
 
 class FleetConnector(ABC):
