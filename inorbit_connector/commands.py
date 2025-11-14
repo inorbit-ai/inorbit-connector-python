@@ -54,7 +54,7 @@ class CommandFailure(Exception):
         self.stderr = stderr
 
 
-def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, any]]:
+def parse_custom_command_args(custom_command_args) -> tuple[str, dict[str, Any]]:
     """Parse custom command arguments of a COMMAND_CUSTOM_COMMAND command from the
     edge-sdk.
 
