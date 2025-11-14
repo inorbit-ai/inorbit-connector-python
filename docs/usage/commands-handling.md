@@ -16,8 +16,6 @@ The fleet handler `_inorbit_robot_command_handler()` receives the following para
 
 While the single-robot handler `_inorbit_command_handler()` omits the `robot_id` parameter.
 
-## Example Usage
-
 ```python
 @override
 async def _inorbit_robot_command_handler(
@@ -29,6 +27,8 @@ async def _inorbit_robot_command_handler(
             robot_id, "start_mission", args[0]
         )
 ```
+
+A more complete example including all provided utilities is available [at the bottom](#example-usage) of this page.
 
 ## Reporting Command Results
 
@@ -252,7 +252,8 @@ command.model_dump()
 # All fields are included, even if they have default values
 ```
 
-### Example
+(example-usage)=
+## Example Usage
 
 Here's a concrete example of using `CommandModel` with `ExcludeUnsetMixin` to handle a custom command.
 
