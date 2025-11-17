@@ -159,3 +159,4 @@ cython_debug/
 # Covers various IDEs
 .idea/
 .vscode/
+.cursor/
