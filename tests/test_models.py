@@ -93,6 +93,59 @@ class TestInorbitConnectorConfig:
         )
         assert len(model.maps.keys()) == 1
 
+    def test_format_version_valid_values(self, base_model):
+        model_1 = InorbitConnectorConfig(
+            **base_model,
+            maps={
+                "frameA": {
+                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                    "map_id": "valid_map_id",
+                    "origin_x": 0.0,
+                    "origin_y": 0.0,
+                    "resolution": 0.1,
+                    "formatVersion": 1,
+                }
+            },
+        )
+        model_2 = InorbitConnectorConfig(
+            **base_model,
+            maps={
+                "frameA": {
+                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                    "map_id": "valid_map_id",
+                    "origin_x": 0.0,
+                    "origin_y": 0.0,
+                    "resolution": 0.1,
+                    "formatVersion": 2,
+                }
+            },
+        )
+        model_null = InorbitConnectorConfig(
+            **base_model,
+            maps={
+                "frameA": {
+                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                    "map_id": "valid_map_id",
+                    "origin_x": 0.0,
+                    "origin_y": 0.0,
+                    "resolution": 0.1,
+                    "formatVersion": None,
+                }
+            },
+        )
+        model_empty = InorbitConnectorConfig(
+            **base_model,
+            maps={
+                "frameA": {
+                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                    "map_id": "valid_map_id",
+                    "origin_x": 0.0,
+                    "origin_y": 0.0,
+                    "resolution": 0.1,
+                }
+            },
+        )
+
     def test_with_valid_input_and_env_vars(self, base_model):
         model = InorbitConnectorConfig(
             **base_model,
