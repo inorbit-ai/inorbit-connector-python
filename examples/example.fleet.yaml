@@ -33,6 +33,7 @@ maps:
     origin_x: 0.0
     origin_y: 0.0
     resolution: 0.05
+    formatVersion: 2
 # User scripts directory (optional)
 user_scripts_dir: ./
 # Extra environment variables, useful for running user scripts (optional)

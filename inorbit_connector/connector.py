@@ -501,6 +501,7 @@ class FleetConnector(ABC):
                 resolution=map_config.resolution,
                 ts=None,
                 is_update=is_update,
+                formatVersion=2,
             )
             self.__last_published_frame_ids[robot_id] = frame_id
         else:

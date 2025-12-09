@@ -87,6 +87,7 @@ class TestInorbitConnectorConfig:
                     "origin_x": 0.0,
                     "origin_y": 0.0,
                     "resolution": 0.1,
+                    "formatVersion": 2,
                 }
             },
         )
@@ -197,6 +198,7 @@ class TestInorbitConnectorConfig:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
+                # "formatVersion": 1,
             }
         }
         with pytest.raises(ValidationError, match="Path does not point to a file"):
@@ -209,6 +211,7 @@ class TestInorbitConnectorConfig:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
+                # "formatVersion": 1,
             }
         }
         with pytest.raises(ValidationError, match="The map file must be a PNG file"):

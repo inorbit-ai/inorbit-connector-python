@@ -229,6 +229,7 @@ class TestFleetConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
+                "formatVersion": 2,
             }
         }
         connector = FleetConnector(
@@ -458,6 +459,7 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
+                "formatVersion": 2,
             }
         }
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
@@ -478,6 +480,7 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
+                # "formatVersion": 2,
             }
         }
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
@@ -498,6 +501,7 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
+                # "formatVersion": 2,
             },
             "frameB": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -505,6 +509,7 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
+                # "formatVersion": 2,
             },
         }
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
@@ -705,12 +710,15 @@ class TestConnectorCommandHandler:
 
         command_failure = CommandFailure(
             execution_status_details="Command execution failed",
-            stderr="Error details here"
+            stderr="Error details here",
         )
 
         connector._handle_command_exception(
-            command_failure, "test_command", "TestRobot", ["arg1"], 
-            {"result_function": result_function}
+            command_failure,
+            "test_command",
+            "TestRobot",
+            ["arg1"],
+            {"result_function": result_function},
         )
 
         result_function.assert_called_once_with(
@@ -730,8 +738,11 @@ class TestConnectorCommandHandler:
         error = ValueError("Something went wrong")
 
         connector._handle_command_exception(
-            error, "test_command", "TestRobot", ["arg1"], 
-            {"result_function": result_function}
+            error,
+            "test_command",
+            "TestRobot",
+            ["arg1"],
+            {"result_function": result_function},
         )
 
         result_function.assert_called_once_with(
@@ -754,8 +765,11 @@ class TestConnectorCommandHandler:
         error = CustomException()
 
         connector._handle_command_exception(
-            error, "test_command", "TestRobot", ["arg1"], 
-            {"result_function": result_function}
+            error,
+            "test_command",
+            "TestRobot",
+            ["arg1"],
+            {"result_function": result_function},
         )
 
         result_function.assert_called_once_with(

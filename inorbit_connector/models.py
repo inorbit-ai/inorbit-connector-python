@@ -42,6 +42,7 @@ class MapConfig(BaseModel):
         origin_x (float): The x origin of the map
         origin_y (float): The y origin of the map
         resolution (float): The resolution
+        formatVersion (int): Map Format Version
     """
 
     file: FilePath
@@ -50,6 +51,7 @@ class MapConfig(BaseModel):
     origin_x: float
     origin_y: float
     resolution: float
+    formatVersion: int
 
     @field_validator("file")
     def validate_png_file(cls, file: FilePath) -> FilePath:
