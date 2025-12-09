@@ -54,7 +54,7 @@ Configuration for a map that can be associated with a frame_id:
 - **`origin_x`** (float): X coordinate of the map origin
 - **`origin_y`** (float): Y coordinate of the map origin
 - **`resolution`** (float): Map resolution in meters per pixel
-- **`formatVersion`**(int): Map Format Version 
+- **`formatVersion`**(int, optional): Default value i 2 to keep the map unflipped
 
 ## LoggingConfig
 
