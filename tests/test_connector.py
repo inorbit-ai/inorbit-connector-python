@@ -229,7 +229,6 @@ class TestFleetConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
-                "formatVersion": 2,
             }
         }
         connector = FleetConnector(
@@ -459,7 +458,6 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
-                "formatVersion": 2,
             }
         }
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
@@ -480,7 +478,6 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
-                "formatVersion": 2,
             }
         }
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
@@ -501,7 +498,6 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
-                "formatVersion": 2,
             },
             "frameB": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -509,7 +505,6 @@ class TestConnector:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
-                "formatVersion": 2,
             },
         }
         connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
