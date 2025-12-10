@@ -286,12 +286,6 @@ class TestInorbitConnectorConfig:
         model = InorbitConnectorConfig(**init_input)
         assert model.api_key is None
 
-    @field_validator("formatVersion")
-    def validate_format_version(cls, v):
-        if v not in (1, 2):
-            raise ValueError("formatVersion must be 1 or 2")
-        return v
-
 
 class TestRobotConfig:
     def test_with_valid_input(self):

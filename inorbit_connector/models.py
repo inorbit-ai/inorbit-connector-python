@@ -70,6 +70,12 @@ class MapConfig(BaseModel):
             raise ValueError("The map file must be a PNG file")
         return file
 
+    @field_validator("formatVersion")
+    def validate_format_version(cls, v):
+        if v not in (1, 2):
+            raise ValueError("formatVersion must be 1 or 2")
+        return v
+
 
 class LoggingConfig(BaseModel):
     """Class representing a logging configuration.
