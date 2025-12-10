@@ -107,6 +107,8 @@ class TestInorbitConnectorConfig:
                 }
             },
         )
+        assert model_1.maps["frameA"].formatVersion == 1
+
         model_2 = InorbitConnectorConfig(
             **base_model,
             maps={
@@ -120,6 +122,8 @@ class TestInorbitConnectorConfig:
                 }
             },
         )
+        assert model_2.maps["frameA"].formatVersion == 2
+
         model_empty = InorbitConnectorConfig(
             **base_model,
             maps={
@@ -132,6 +136,7 @@ class TestInorbitConnectorConfig:
                 }
             },
         )
+        assert model_empty.maps["frameA"].formatVersion == 2
 
     def test_with_valid_input_and_env_vars(self, base_model):
         model = InorbitConnectorConfig(
