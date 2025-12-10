@@ -16,7 +16,7 @@ from unittest import mock
 import pytest
 from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
-from pydantic import ValidationError, BaseModel
+from pydantic import ValidationError, BaseModel, field_validator
 
 # InOrbit
 from inorbit_connector.models import (
@@ -94,49 +94,20 @@ class TestInorbitConnectorConfig:
         assert len(model.maps.keys()) == 1
 
     def test_format_version_valid_values(self, base_model):
-        model_1 = InorbitConnectorConfig(
-            **base_model,
-            maps={
-                "frameA": {
-                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
-                    "map_id": "valid_map_id",
-                    "origin_x": 0.0,
-                    "origin_y": 0.0,
-                    "resolution": 0.1,
-                    "formatVersion": 1,
-                }
-            },
-        )
-        assert model_1.maps["frameA"].formatVersion == 1
-
-        model_2 = InorbitConnectorConfig(
-            **base_model,
-            maps={
-                "frameA": {
-                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
-                    "map_id": "valid_map_id",
-                    "origin_x": 0.0,
-                    "origin_y": 0.0,
-                    "resolution": 0.1,
-                    "formatVersion": 2,
-                }
-            },
-        )
-        assert model_2.maps["frameA"].formatVersion == 2
-
-        model_empty = InorbitConnectorConfig(
-            **base_model,
-            maps={
-                "frameA": {
-                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
-                    "map_id": "valid_map_id",
-                    "origin_x": 0.0,
-                    "origin_y": 0.0,
-                    "resolution": 0.1,
-                }
-            },
-        )
-        assert model_empty.maps["frameA"].formatVersion == 2
+        with pytest.raises(ValidationError, match="formatVersion must be 1 or 2"):
+            model_1 = InorbitConnectorConfig(
+                **base_model,
+                maps={
+                    "frameA": {
+                        "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                        "map_id": "valid_map_id",
+                        "origin_x": 0.0,
+                        "origin_y": 0.0,
+                        "resolution": 0.1,
+                        "formatVersion": 3,
+                    }
+                },
+            )
 
     def test_with_valid_input_and_env_vars(self, base_model):
         model = InorbitConnectorConfig(
@@ -314,6 +285,12 @@ class TestInorbitConnectorConfig:
         }
         model = InorbitConnectorConfig(**init_input)
         assert model.api_key is None
+
+    @field_validator("formatVersion")
+    def validate_format_version(cls, v):
+        if v not in (1, 2):
+            raise ValueError("formatVersion must be 1 or 2")
+        return v
 
 
 class TestRobotConfig:
