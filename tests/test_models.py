@@ -94,7 +94,7 @@ class TestInorbitConnectorConfig:
         assert len(model.maps.keys()) == 1
 
     def test_format_version_valid_values(self, base_model):
-        with pytest.raises(ValidationError, match="formatVersion must be 1 or 2"):
+        with pytest.raises(ValidationError, match="formatVersion must be 1, 2 or None"):
             model_1 = InorbitConnectorConfig(
                 **base_model,
                 maps={
