@@ -54,7 +54,7 @@ Configuration for a map that can be associated with a frame_id:
 - **`origin_x`** (float): X coordinate of the map origin
 - **`origin_y`** (float): Y coordinate of the map origin
 - **`resolution`** (float): Map resolution in meters per pixel
-- **`format_version`** (int, optional): Default is 2. A value of 1 indicates the Y axis is inverted while a value of 2 indicates natural map rendering.
+- **`format_version`** (int, optional): Default is 2. A value of 1 indicates the Y axis is inverted while a value of 2 indicates natural map rendering. See https://developer.inorbit.ai/docs#maps
 
 ## LoggingConfig
 

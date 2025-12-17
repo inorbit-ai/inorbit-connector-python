@@ -42,7 +42,7 @@ class MapConfig(BaseModel):
         origin_x (float): The x origin of the map
         origin_y (float): The y origin of the map
         resolution (float): The resolution
-        format_version (int): Map Format Version
+        format_version (int): Map format version. Refer to https://developer.inorbit.ai/docs#maps
     """
 
     file: FilePath
