@@ -92,6 +92,54 @@ class TestInorbitConnectorConfig:
         )
         assert len(model.maps.keys()) == 1
 
+    def test_format_version_invalid_value(self, base_model):
+        with pytest.raises(ValidationError, match="format_version must be 1 or 2"):
+            InorbitConnectorConfig(
+                **base_model,
+                maps={
+                    "frameA": {
+                        "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                        "map_id": "valid_map_id",
+                        "origin_x": 0.0,
+                        "origin_y": 0.0,
+                        "resolution": 0.1,
+                        "format_version": 3,
+                    }
+                },
+            )
+
+    def test_format_version_defaults_to_2(self, base_model):
+        model = InorbitConnectorConfig(
+            **base_model,
+            maps={
+                "frameA": {
+                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                    "map_id": "valid_map_id",
+                    "origin_x": 0.0,
+                    "origin_y": 0.0,
+                    "resolution": 0.1,
+                    # format_version omitted
+                }
+            },
+        )
+        assert model.maps["frameA"].format_version == 2
+
+    def test_format_version_accepts_1(self, base_model):
+        model = InorbitConnectorConfig(
+            **base_model,
+            maps={
+                "frameA": {
+                    "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
+                    "map_id": "valid_map_id",
+                    "origin_x": 0.0,
+                    "origin_y": 0.0,
+                    "resolution": 0.1,
+                    "format_version": 1,
+                }
+            },
+        )
+        assert model.maps["frameA"].format_version == 1
+
     def test_with_valid_input_and_env_vars(self, base_model):
         model = InorbitConnectorConfig(
             **base_model,

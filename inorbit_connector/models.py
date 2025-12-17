@@ -42,6 +42,8 @@ class MapConfig(BaseModel):
         origin_x (float): The x origin of the map
         origin_y (float): The y origin of the map
         resolution (float): The resolution
+        format_version (int): Map format version. Refer to
+            https://developer.inorbit.ai/docs#maps
     """
 
     file: FilePath
@@ -50,6 +52,7 @@ class MapConfig(BaseModel):
     origin_x: float
     origin_y: float
     resolution: float
+    format_version: int = 2
 
     @field_validator("file")
     def validate_png_file(cls, file: FilePath) -> FilePath:
@@ -67,6 +70,20 @@ class MapConfig(BaseModel):
         if file.suffix.lower() != ".png":
             raise ValueError("The map file must be a PNG file")
         return file
+
+    @field_validator("format_version")
+    def validate_format_version(cls, v: int) -> int:
+        """Validate that the format version is 1 or 2.
+
+        Args:
+            v (int): The format version to be validated
+
+        Raises:
+            ValueError: If the format version is not 1 or 2
+        """
+        if v not in (1, 2):
+            raise ValueError("format_version must be 1 or 2")
+        return v
 
 
 class LoggingConfig(BaseModel):

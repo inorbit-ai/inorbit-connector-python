@@ -35,7 +35,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-    "inorbit-edge[video]>=1.24.0,<2.0",
+    "inorbit-edge[video]>=2.0,<3.0",
     "pydantic>=2.11,<3.0",
     "pytz>=2025.1",
     "PyYAML>=6.0.2,<7.0",
