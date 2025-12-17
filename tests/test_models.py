@@ -16,7 +16,7 @@ from unittest import mock
 import pytest
 from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
-from pydantic import ValidationError, BaseModel, field_validator
+from pydantic import ValidationError, BaseModel
 
 # InOrbit
 from inorbit_connector.models import (
@@ -87,15 +87,15 @@ class TestInorbitConnectorConfig:
                     "origin_x": 0.0,
                     "origin_y": 0.0,
                     "resolution": 0.1,
-                    "formatVersion": 2,
+                    "format_version": 2,
                 }
             },
         )
         assert len(model.maps.keys()) == 1
 
     def test_format_version_valid_values(self, base_model):
-        with pytest.raises(ValidationError, match="formatVersion must be 1 or 2"):
-            model_1 = InorbitConnectorConfig(
+        with pytest.raises(ValidationError, match="format_version must be 1 or 2"):
+            InorbitConnectorConfig(
                 **base_model,
                 maps={
                     "frameA": {
@@ -104,7 +104,7 @@ class TestInorbitConnectorConfig:
                         "origin_x": 0.0,
                         "origin_y": 0.0,
                         "resolution": 0.1,
-                        "formatVersion": 3,
+                        "format_version": 3,
                     }
                 },
             )
@@ -214,7 +214,7 @@ class TestInorbitConnectorConfig:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
-                "formatVersion": 2,
+                "format_version": 2,
             }
         }
         with pytest.raises(ValidationError, match="Path does not point to a file"):
@@ -227,7 +227,7 @@ class TestInorbitConnectorConfig:
                 "origin_x": 0.0,
                 "origin_y": 0.0,
                 "resolution": 0.1,
-                "formatVersion": 2,
+                "format_version": 2,
             }
         }
         with pytest.raises(ValidationError, match="The map file must be a PNG file"):

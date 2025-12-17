@@ -42,7 +42,7 @@ class MapConfig(BaseModel):
         origin_x (float): The x origin of the map
         origin_y (float): The y origin of the map
         resolution (float): The resolution
-        formatVersion (int): Map Format Version
+        format_version (int): Map Format Version
     """
 
     file: FilePath
@@ -51,7 +51,7 @@ class MapConfig(BaseModel):
     origin_x: float
     origin_y: float
     resolution: float
-    formatVersion: Optional[int] = 2
+    format_version: Optional[int] = 2
 
     @field_validator("file")
     def validate_png_file(cls, file: FilePath) -> FilePath:
@@ -70,10 +70,10 @@ class MapConfig(BaseModel):
             raise ValueError("The map file must be a PNG file")
         return file
 
-    @field_validator("formatVersion")
+    @field_validator("format_version")
     def validate_format_version(cls, v):
         if v not in (1, 2):
-            raise ValueError("formatVersion must be 1 or 2")
+            raise ValueError("format_version must be 1 or 2")
         return v
 
 
