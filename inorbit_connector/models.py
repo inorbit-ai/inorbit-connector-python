@@ -71,7 +71,15 @@ class MapConfig(BaseModel):
         return file
 
     @field_validator("format_version")
-    def validate_format_version(cls, v):
+    def validate_format_version(cls, v: int) -> int:
+        """Validate that the format version is 1 or 2.
+
+        Args:
+            v (int): The format version to be validated
+
+        Raises:
+            ValueError: If the format version is not 1 or 2
+        """
         if v not in (1, 2):
             raise ValueError("format_version must be 1 or 2")
         return v
