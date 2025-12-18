@@ -12,7 +12,7 @@ This page specifies the connector base classes you subclass to build connectors.
 
 `inorbit_connector.connector.FleetConnector` is the base class for connectors that manage multiple robots.
 
-(spec-connector-fleetconnector-connect)=
+<a id="spec-connector-fleetconnector-connect"></a>
 ### `_connect()`
 
 **Override.**
@@ -25,7 +25,7 @@ Typical responsibilities:
 - Optionally fetch the fleet membership and call `update_fleet()` **before** sessions are created.
 - Start background polling tasks that keep fresh state for all robots.
 
-(spec-connector-fleetconnector-execution-loop)=
+<a id="spec-connector-fleetconnector-execution-loop"></a>
 ### `_execution_loop()`
 
 **Override.**
@@ -37,14 +37,14 @@ Typical responsibilities:
 - For each robot in `self.robot_ids`, fetch the latest state (often from background polling state) and publish data via the `publish_robot_*` methods.
 - Handle exceptions inside the loop when possible (the framework logs and continues on exceptions).
 
-(spec-connector-fleetconnector-disconnect)=
+<a id="spec-connector-fleetconnector-disconnect"></a>
 ### `_disconnect()`
 
 **Override.**
 
 Called once during shutdown, after Edge SDK sessions are disconnected. Use this to stop polling tasks, close sockets, and release resources.
 
-(spec-connector-fleetconnector-command-handler)=
+<a id="spec-connector-fleetconnector-command-handler"></a>
 ### `_inorbit_robot_command_handler(robot_id, command_name, args, options)`
 
 **Override.**
@@ -55,9 +55,9 @@ Contract:
 
 - `options["result_function"](...)` must be called to report success/failure, or you may raise `CommandFailure` for structured failure reporting.
 
-See {doc}`../usage/commands-handling` for the full command result contract.
+See [Commands Handling](../usage/commands-handling.md) for the full command result contract.
 
-(spec-connector-fleetconnector-fetch-robot-map)=
+<a id="spec-connector-fleetconnector-fetch-robot-map"></a>
 ### `fetch_robot_map(robot_id, frame_id) -> MapConfigTemp | None`
 
 **Optional override.**
@@ -70,14 +70,14 @@ If `publish_robot_pose()` references a `frame_id` that is not present in `config
 
 Return `None` if the map can’t be fetched.
 
-(spec-connector-fleetconnector-is-online)=
+<a id="spec-connector-fleetconnector-is-online"></a>
 ### `_is_fleet_robot_online(robot_id) -> bool`
 
 **Optional override.**
 
 The Edge SDK uses this callback to determine if a robot should be considered online. Default implementation returns `True`.
 
-(spec-connector-fleetconnector-lifecycle)=
+<a id="spec-connector-fleetconnector-lifecycle"></a>
 ### `start()` / `join()` / `stop()`
 
 **Callable.**
@@ -86,7 +86,7 @@ The Edge SDK uses this callback to determine if a robot should be considered onl
 - `join()` blocks until the background thread exits.
 - `stop()` signals the event loop to stop and waits briefly for shutdown.
 
-(spec-connector-fleetconnector-fleet-management)=
+<a id="spec-connector-fleetconnector-fleet-management"></a>
 ### `robot_ids` / `update_fleet(fleet)`
 
 **Callable.**
@@ -96,14 +96,14 @@ The Edge SDK uses this callback to determine if a robot should be considered onl
 
 This is designed to be used during `_connect()` when your fleet membership comes from an external system.
 
-(spec-connector-fleetconnector-publish-robot-pose)=
+<a id="spec-connector-fleetconnector-publish-robot-pose"></a>
 ### `publish_robot_pose(robot_id, x, y, yaw, frame_id=None, **kwargs)`
 
 **Callable.**
 
 Publishes pose for one robot. If the `frame_id` differs from the last published `frame_id` for that robot, the framework triggers `publish_robot_map(..., is_update=True)`.
 
-(spec-connector-fleetconnector-publish-robot-map)=
+<a id="spec-connector-fleetconnector-publish-robot-map"></a>
 ### `publish_robot_map(robot_id, frame_id, is_update=False)`
 
 **Callable.**
@@ -111,22 +111,22 @@ Publishes pose for one robot. If the `frame_id` differs from the last published 
 - If `frame_id` exists in `config.maps`, publishes the configured map to InOrbit.
 - Otherwise schedules an async fetch via `fetch_robot_map()` (see above).
 
-(spec-connector-fleetconnector-publish-robot-odometry)=
+<a id="spec-connector-fleetconnector-publish-robot-odometry"></a>
 ### `publish_robot_odometry(robot_id, **kwargs)`
 
 **Callable.** Publishes odometry data for one robot.
 
-(spec-connector-fleetconnector-publish-robot-key-values)=
+<a id="spec-connector-fleetconnector-publish-robot-key-values"></a>
 ### `publish_robot_key_values(robot_id, **kwargs)`
 
 **Callable.** Publishes key-value telemetry for one robot.
 
-(spec-connector-fleetconnector-publish-robot-system-stats)=
+<a id="spec-connector-fleetconnector-publish-robot-system-stats"></a>
 ### `publish_robot_system_stats(robot_id, **kwargs)`
 
 **Callable.** Publishes system stats for one robot.
 
-(spec-connector-fleetconnector-get-robot-session)=
+<a id="spec-connector-fleetconnector-get-robot-session"></a>
 ### `_get_robot_session(robot_id) -> RobotSession`
 
 **Callable (advanced).**
@@ -137,7 +137,7 @@ Returns the underlying Edge SDK session for `robot_id`. Use this if you need Edg
 
 `inorbit_connector.connector.Connector` is a single-robot specialization of `FleetConnector`. It selects a single robot out of the fleet config and provides convenience wrappers that omit `robot_id`.
 
-(spec-connector-connector-lifecycle-hooks)=
+<a id="spec-connector-connector-lifecycle-hooks"></a>
 ### Lifecycle hooks
 
 **Override.** Same intent as fleet:
@@ -146,28 +146,28 @@ Returns the underlying Edge SDK session for `robot_id`. Use this if you need Edg
 - `_execution_loop()`
 - `_disconnect()`
 
-(spec-connector-connector-command-handler)=
+<a id="spec-connector-connector-command-handler"></a>
 ### `_inorbit_command_handler(command_name, args, options)`
 
 **Override.**
 
 Single-robot command handler. It is called through the fleet-level handler internally, but without requiring you to accept `robot_id`.
 
-(spec-connector-connector-fetch-map)=
+<a id="spec-connector-connector-fetch-map"></a>
 ### `fetch_map(frame_id) -> MapConfigTemp | None`
 
 **Optional override.**
 
 Single-robot convenience for map fetching. The framework uses it by delegating `fetch_robot_map()` to `fetch_map()`.
 
-(spec-connector-connector-is-online)=
+<a id="spec-connector-connector-is-online"></a>
 ### `_is_robot_online() -> bool`
 
 **Optional override.**
 
 Single-robot convenience for online status. The fleet-level online check delegates to this method.
 
-(spec-connector-connector-publishing)=
+<a id="spec-connector-connector-publishing"></a>
 ### Publishing wrappers
 
 **Callable.** Single-robot wrappers over the fleet publishing methods:
@@ -177,7 +177,7 @@ Single-robot convenience for online status. The fleet-level online check delegat
 - `publish_key_values(...)`
 - `publish_system_stats(...)`
 
-(spec-connector-connector-get-session)=
+<a id="spec-connector-connector-get-session"></a>
 ### `_get_session() -> RobotSession`
 
 **Callable (advanced).**

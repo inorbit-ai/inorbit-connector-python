@@ -1,0 +1,4 @@
+```{include} ../contents/publishing.md
+```
+
+

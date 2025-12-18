@@ -31,21 +31,10 @@ Both connector types provide:
 - Python 3.10 or later
 - InOrbit account ([it's free to sign up!](https://control.inorbit.ai))
 
-```{toctree}
-:maxdepth: 2
-:hidden:
-
-getting-started
-specification/index
-usage/index
-configuration
-publishing
-```
-
 ## Documentation Sections
 
-- **Getting Started**: Installation, environment setup, and running a connector
-- **Specification**: Package-level specification of the connector API (what you can call and what you can override)
-- **Usage**: Detailed guides for implementing single-robot and fleet connectors
-- **Configuration**: Complete connector customization guide
-- **Publishing**: How to publish data to InOrbit
+- **Getting Started**: Installation, environment setup, and running a connector ([Getting Started](getting-started.md))
+- **Specification**: Package-level specification of the connector API ([Specification](specification/index.md))
+- **Usage**: Detailed guides for implementing single-robot and fleet connectors ([Usage](usage/index.md))
+- **Configuration**: Connector configuration models and file formats ([Configuration](configuration.md))
+- **Publishing**: How to publish data to InOrbit ([Publishing](publishing.md))

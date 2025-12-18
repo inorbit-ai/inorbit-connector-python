@@ -8,12 +8,9 @@ SPDX-License-Identifier: MIT
 
 Guides for implementing connectors.
 
-```{toctree}
-:maxdepth: 2
-:hidden:
+## Guides
 
-single-robot
-fleet
-commands-handling
-```
+- [Single-Robot Connector](single-robot.md)
+- [Fleet Connector](fleet.md)
+- [Commands Handling](commands-handling.md)
 

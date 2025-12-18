@@ -7,23 +7,31 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Project information -----------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-import os
+import re
 from pathlib import Path
-import sys
 
-from inorbit_connector import __version__
 
-# Ensure the package can be imported so we can read its version
-sys.path.insert(0, os.path.abspath(".."))
+def _read_package_version() -> str:
+    """Read __version__ from the package without importing it.
+
+    This keeps the docs build independent from the environment (no need to have the
+    package importable).
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    init_py = repo_root / "inorbit_connector" / "__init__.py"
+    text = init_py.read_text(encoding="utf-8")
+    match = re.search(r'^__version__\s*=\s*"([^"]+)"\s*$', text, re.MULTILINE)
+    if not match:
+        raise RuntimeError("Could not determine package version from __init__.py")
+    return match.group(1)
+
 
 project = "inorbit-connector"
 copyright = "2025, InOrbit, Inc."
 author = "InOrbit, Inc."
 
-release = __version__
-version = __version__
+release = _read_package_version()
+version = release
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -39,11 +47,18 @@ myst_enable_extensions = [
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+root_doc = "index"
+
+# The portable docs use explicit HTML anchors (e.g. <a id="..."></a>) for deep
+# linking compatibility across doc systems. MyST can't validate those anchors,
+# and will emit "xref_missing" warnings for links that include a fragment.
+suppress_warnings = ["myst.xref_missing"]
+
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-html_static_path = ["_static"]
+html_static_path = ["../contents/_static"]
 
 # Support both Markdown (MyST) and reStructuredText sources
 source_suffix = {
@@ -53,7 +68,7 @@ source_suffix = {
 
 
 def _read_static_svg(filename: str) -> str:
-    static_dir = Path(__file__).resolve().parent / "_static"
+    static_dir = Path(__file__).resolve().parents[1] / "contents" / "_static"
     return (static_dir / filename).read_text(encoding="utf-8")
 
 
@@ -63,7 +78,7 @@ html_theme_options = {
     "dark_logo": "inorbit-logo-white.svg",
     "source_repository": "https://github.com/inorbit-ai/inorbit-connector-python/",
     "source_branch": "main",
-    "source_directory": "docs/",
+    "source_directory": "docs/contents/",
     "top_of_page_buttons": ["view", "edit"],
     "footer_icons": [
         {
@@ -76,4 +91,4 @@ html_theme_options = {
 }
 
 # Favicon
-html_favicon = "_static/favicon.ico"
+html_favicon = "../contents/_static/favicon.ico"
