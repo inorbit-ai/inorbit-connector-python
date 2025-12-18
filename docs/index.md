@@ -36,6 +36,7 @@ Both connector types provide:
 :hidden:
 
 getting-started
+specification/index
 usage/index
 configuration
 publishing
@@ -44,6 +45,7 @@ publishing
 ## Documentation Sections
 
 - **Getting Started**: Installation, environment setup, and running a connector
+- **Specification**: Package-level specification of the connector API (what you can call and what you can override)
 - **Usage**: Detailed guides for implementing single-robot and fleet connectors
 - **Configuration**: Complete connector customization guide
 - **Publishing**: How to publish data to InOrbit
