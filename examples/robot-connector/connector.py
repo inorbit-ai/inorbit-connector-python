@@ -4,6 +4,7 @@
 
 # Standard
 import asyncio
+from pathlib import Path
 
 try:
     from typing import override
@@ -12,10 +13,14 @@ except ImportError:
 
 # InOrbit
 from inorbit_connector.connector import CommandResultCode, Connector
+from inorbit_connector.models import MapConfigTemp
 
 # Local
 from datatypes import ExampleBotConnectorConfig
 from robot import Robot, ExampleBotAPIWrapper
+
+# Path to the example map image
+EXAMPLE_MAP_PATH = Path(__file__).parent.parent / "example_map.png"
 
 """
 This file holds the main connector class. Overwrite methods as necessary to integrate
@@ -94,3 +99,34 @@ class ExampleBotConnector(Connector):
         await asyncio.sleep(1)
         self._logger.info(f"Command {command_name} executed")
         options["result_function"](CommandResultCode.SUCCESS)
+
+    @override
+    async def fetch_map(self, frame_id: str) -> MapConfigTemp | None:
+        """Fetch a map when not found in configuration.
+
+        This method is called automatically when publish_pose references a
+        frame_id that doesn't have a pre-configured map. Override this to fetch
+        maps dynamically from the robot.
+
+        Args:
+            frame_id (str): The frame ID of the map to fetch
+
+        Returns:
+            MapConfigTemp | None: Map configuration with image bytes, or None
+        """
+        self._logger.info(f"Fetching map '{frame_id}' from robot")
+
+        # In a real implementation, you would fetch the map from the robot:
+        # map_data = await self._robot.get_map(frame_id)
+
+        # For this example, we return the example map for any frame_id
+        if EXAMPLE_MAP_PATH.exists():
+            return MapConfigTemp(
+                image=EXAMPLE_MAP_PATH.read_bytes(),
+                map_id=frame_id,
+                origin_x=0.0,
+                origin_y=0.0,
+                resolution=0.05,
+            )
+
+        return None

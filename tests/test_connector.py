@@ -322,6 +322,181 @@ class TestFleetConnector:
         assert os.environ["FLEET_ENV_VAR"] == "fleet_value"
 
 
+class TestFleetConnectorMapFetching:
+    """Tests for FleetConnector map fetching functionality."""
+
+    @pytest.fixture
+    def base_model(self):
+        return {
+            "api_key": "valid_key",
+            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connector_type": "valid_connector",
+            "connector_config": DummyConfig(),
+        }
+
+    @pytest.fixture(autouse=True)
+    def make_fleet_connector_not_abstract(self):
+        FleetConnector.__abstractmethods__ = set()
+
+    @pytest.fixture
+    def fleet_connector(self, base_model):
+        return FleetConnector(
+            ConnectorConfig(
+                **base_model,
+                fleet=[RobotConfig(robot_id="TestRobot1")],
+            )
+        )
+
+    def test_fetch_robot_map_default_returns_none(self, fleet_connector):
+        """Test that default fetch_robot_map returns None."""
+        import asyncio
+
+        result = asyncio.get_event_loop().run_until_complete(
+            fleet_connector.fetch_robot_map("TestRobot1", "frame1")
+        )
+        assert result is None
+
+    def test_publish_robot_map_schedules_fetch_when_map_not_found(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that publish_robot_map schedules async fetch when map not in config."""
+        # Mock the event loop
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+        fleet_connector._FleetConnector__loop = mock_loop
+
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run:
+            fleet_connector.publish_robot_map("TestRobot1", "unknown_frame")
+
+            # Verify async fetch was scheduled
+            mock_run.assert_called_once()
+            # Verify the frame was added to pending fetches
+            assert "unknown_frame" in (
+                fleet_connector._FleetConnector__pending_map_fetches
+            )
+
+    def test_schedule_map_fetch_avoids_duplicates(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that duplicate map fetch requests are ignored."""
+        # Mock the event loop
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+        fleet_connector._FleetConnector__loop = mock_loop
+
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run:
+            # First request should schedule
+            fleet_connector._schedule_map_fetch("TestRobot1", "frame1", False)
+            assert mock_run.call_count == 1
+
+            # Second request for same frame should be ignored
+            fleet_connector._schedule_map_fetch("TestRobot1", "frame1", False)
+            assert mock_run.call_count == 1  # Still 1, not 2
+
+    def test_schedule_map_fetch_requires_running_loop(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that map fetch is not scheduled if loop is not running."""
+        # No loop set
+        fleet_connector._FleetConnector__loop = None
+
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run:
+            fleet_connector._schedule_map_fetch("TestRobot1", "frame1", False)
+            mock_run.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_fetch_and_publish_map_adds_to_config(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that fetched map is added to config and published."""
+        from inorbit_connector.models import MapConfigTemp
+
+        # Create a mock map response
+        test_image = b"\x89PNG\r\n\x1a\ntest_image_data"
+        mock_map = MapConfigTemp(
+            image=test_image,
+            map_id="fetched_map",
+            origin_x=0.0,
+            origin_y=0.0,
+            resolution=0.05,
+        )
+
+        # Mock fetch_robot_map to return the map
+        fleet_connector.fetch_robot_map = AsyncMock(return_value=mock_map)
+
+        # Add frame to pending (simulating it was scheduled)
+        fleet_connector._FleetConnector__pending_map_fetches.add("frame1")
+
+        # Run the fetch and publish
+        await fleet_connector._fetch_and_publish_map("TestRobot1", "frame1", False)
+
+        # Verify map was added to config
+        assert "frame1" in fleet_connector.config.maps
+        assert fleet_connector.config.maps["frame1"].map_id == "fetched_map"
+
+        # Verify frame was removed from pending
+        assert "frame1" not in fleet_connector._FleetConnector__pending_map_fetches
+
+    @pytest.mark.asyncio
+    async def test_fetch_and_publish_map_handles_none(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test graceful handling when fetch returns None."""
+        # Mock fetch_robot_map to return None
+        fleet_connector.fetch_robot_map = AsyncMock(return_value=None)
+
+        # Add frame to pending
+        fleet_connector._FleetConnector__pending_map_fetches.add("frame1")
+
+        # Run the fetch and publish
+        await fleet_connector._fetch_and_publish_map("TestRobot1", "frame1", False)
+
+        # Verify map was NOT added to config
+        assert "frame1" not in fleet_connector.config.maps
+
+        # Verify frame was removed from pending (cleanup still happens)
+        assert "frame1" not in fleet_connector._FleetConnector__pending_map_fetches
+
+    def test_temp_map_dir_created_lazily(self, fleet_connector):
+        """Test that temp directory is only created on first use."""
+        # Initially no temp dir
+        assert fleet_connector._FleetConnector__temp_map_dir is None
+
+        # Access the temp dir
+        temp_dir = fleet_connector._get_temp_map_dir()
+
+        # Now it should exist
+        assert fleet_connector._FleetConnector__temp_map_dir is not None
+        assert temp_dir.exists()
+
+        # Cleanup
+        fleet_connector._FleetConnector__temp_map_dir.cleanup()
+
+    @pytest.mark.asyncio
+    async def test_temp_map_dir_cleanup_on_disconnect(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that temp files are cleaned up on disconnect."""
+        # Create a temp dir by accessing it
+        temp_dir = fleet_connector._get_temp_map_dir()
+        assert temp_dir.exists()
+
+        # Write a test file
+        test_file = temp_dir / "test.png"
+        test_file.write_bytes(b"test")
+        assert test_file.exists()
+
+        # Mock _disconnect to avoid actual disconnection logic
+        fleet_connector._disconnect = AsyncMock()
+
+        # Call disconnect
+        await fleet_connector._FleetConnector__disconnect()
+
+        # Verify temp dir was cleaned up
+        assert fleet_connector._FleetConnector__temp_map_dir is None
+        assert not temp_dir.exists()
+
+
 # ==============================================================================
 # Connector Tests (Single Robot - Subclass of FleetConnector)
 # ==============================================================================
@@ -618,6 +793,34 @@ class TestConnector:
 
         connector.stop()
         assert not connector._FleetConnector__loop.is_running()
+
+    @pytest.mark.asyncio
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    async def test_fetch_map_default_returns_none(self, base_connector):
+        """Test that default fetch_map returns None."""
+        result = await base_connector.fetch_map("frame1")
+        assert result is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
+    async def test_fetch_robot_map_delegates_to_fetch_map(self, base_connector):
+        """Test that fetch_robot_map delegates to fetch_map."""
+        from inorbit_connector.models import MapConfigTemp
+
+        mock_map = MapConfigTemp(
+            image=b"test_image",
+            map_id="test_map",
+            origin_x=0.0,
+            origin_y=0.0,
+            resolution=0.05,
+        )
+        base_connector.fetch_map = AsyncMock(return_value=mock_map)
+
+        result = await base_connector.fetch_robot_map("TestRobot", "frame1")
+
+        # Verify fetch_map was called with just frame_id
+        base_connector.fetch_map.assert_awaited_once_with("frame1")
+        assert result == mock_map
 
 
 class TestConnectorCommandHandler:
