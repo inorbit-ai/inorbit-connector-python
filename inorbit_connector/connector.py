@@ -96,6 +96,7 @@ class FleetConnector(ABC):
         self.__last_published_frame_ids: dict[str, str] = {}
         # Track pending map fetches to avoid duplicate requests
         self.__pending_map_fetches: set[str] = set()
+        self.__pending_map_fetches_lock = threading.Lock()
         # Managed temp directory for fetched map files (lazily initialized)
         self.__temp_map_dir: tempfile.TemporaryDirectory | None = None
 
@@ -545,29 +546,30 @@ class FleetConnector(ABC):
     ) -> None:
         """Schedule an async map fetch on the connector's event loop.
 
-        This method is safe to call from any thread. If a fetch for this frame_id
-        is already in progress, the request will be ignored to avoid duplicates.
+        This method is thread-safe. If a fetch for this frame_id is already in
+        progress, the request will be ignored to avoid duplicates.
 
         Args:
             robot_id (str): The robot ID to fetch map for
             frame_id (str): The frame ID of the map to fetch
             is_update (bool): Whether this is an update to an existing map
         """
-        # Avoid duplicate fetch requests
-        if frame_id in self.__pending_map_fetches:
-            self._logger.debug(f"Map fetch for {frame_id} already in progress")
-            return
-
         if self.__loop is None or not self.__loop.is_running():
             self._logger.warning(
                 f"Cannot fetch map {frame_id}: event loop not available"
             )
             return
 
+        # Ensure atomic check-and-add for pending fetches
+        with self.__pending_map_fetches_lock:
+            if frame_id in self.__pending_map_fetches:
+                self._logger.debug(f"Map fetch for {frame_id} already in progress")
+                return
+            self.__pending_map_fetches.add(frame_id)
+
         self._logger.info(
             f"Map {frame_id} not in configuration, scheduling async fetch"
         )
-        self.__pending_map_fetches.add(frame_id)
 
         asyncio.run_coroutine_threadsafe(
             self._fetch_and_publish_map(robot_id, frame_id, is_update),
@@ -610,7 +612,8 @@ class FleetConnector(ABC):
         except Exception as e:
             self._logger.error(f"Failed to fetch map {frame_id}: {e}")
         finally:
-            self.__pending_map_fetches.discard(frame_id)
+            with self.__pending_map_fetches_lock:
+                self.__pending_map_fetches.discard(frame_id)
 
     async def fetch_robot_map(
         self, robot_id: str, frame_id: str
