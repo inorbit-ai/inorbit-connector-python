@@ -4,6 +4,7 @@
 
 # Standard
 import asyncio
+from pathlib import Path
 
 try:
     from typing import override
@@ -12,10 +13,14 @@ except ImportError:
 
 # InOrbit
 from inorbit_connector.connector import CommandResultCode, FleetConnector
+from inorbit_connector.models import MapConfigTemp
 
 # Local
 from datatypes import ExampleBotConnectorConfig
 from fleet_client import FleetManager, FleetManagerAPIWrapper
+
+# Path to the example map image
+EXAMPLE_MAP_PATH = Path(__file__).parent.parent / "example_map.png"
 
 """
 This file holds the main fleet connector class. It demonstrates how to use
@@ -68,8 +73,8 @@ class ExampleBotFleetConnector(FleetConnector):
         # `robots` will be added to the InOrbit fleet
 
         self._logger.info(
-            f"Connected to fleet manager API {self.api_version} for {len(self.robot_ids)} "
-            f"robots: {self.robot_ids}"
+            f"Connected to fleet manager API {self.api_version} for "
+            f"{len(self.robot_ids)} robots: {self.robot_ids}"
         )
 
     @override
@@ -158,3 +163,37 @@ class ExampleBotFleetConnector(FleetConnector):
 
         # Default to True if we don't have status data yet
         return True
+
+    @override
+    async def fetch_robot_map(
+        self, robot_id: str, frame_id: str
+    ) -> MapConfigTemp | None:
+        """Fetch a map for a specific robot when not found in configuration.
+
+        This method is called automatically when publish_robot_pose references a
+        frame_id that doesn't have a pre-configured map. Override this to fetch
+        maps dynamically from the fleet manager or robot.
+
+        Args:
+            robot_id (str): The robot ID requesting the map
+            frame_id (str): The frame ID of the map to fetch
+
+        Returns:
+            MapConfigTemp | None: Map configuration with image bytes, or None
+        """
+        self._logger.info(f"Fetching map '{frame_id}' for robot '{robot_id}'")
+
+        # In a real implementation, you would fetch the map from the fleet manager:
+        # map_data = await self._fleet_manager.get_robot_map(robot_id, frame_id)
+
+        # For this example, we return the example map for any frame_id
+        if EXAMPLE_MAP_PATH.exists():
+            return MapConfigTemp(
+                image=EXAMPLE_MAP_PATH.read_bytes(),
+                map_id=frame_id,
+                origin_x=0.0,
+                origin_y=0.0,
+                resolution=0.05,
+            )
+
+        return None

@@ -22,6 +22,9 @@ from pydantic import ValidationError, BaseModel
 from inorbit_connector.models import (
     InorbitConnectorConfig,
     ConnectorConfig,
+    MapConfig,
+    MapConfigBase,
+    MapConfigTemp,
     RobotConfig,
     LoggingConfig,
 )
@@ -436,3 +439,150 @@ class TestInorbitConnectorConfigToFleetConfig:
         fleet_config = model.to_fleet_config("test_robot")
         assert len(fleet_config.fleet[0].cameras) == 1
         assert str(fleet_config.fleet[0].cameras[0].video_url) == "https://test.com/"
+
+
+class TestMapConfigBase:
+    """Tests for the MapConfigBase model."""
+
+    def test_valid_map_config_base(self):
+        """Test creating a valid MapConfigBase instance."""
+        config = MapConfigBase(
+            map_id="test_map",
+            origin_x=1.0,
+            origin_y=2.0,
+            resolution=0.05,
+        )
+        assert config.map_id == "test_map"
+        assert config.map_label is None
+        assert config.origin_x == 1.0
+        assert config.origin_y == 2.0
+        assert config.resolution == 0.05
+        assert config.format_version == 2
+
+    def test_map_config_base_with_label(self):
+        """Test MapConfigBase with optional map_label."""
+        config = MapConfigBase(
+            map_id="test_map",
+            map_label="Test Map Label",
+            origin_x=0.0,
+            origin_y=0.0,
+            resolution=0.1,
+        )
+        assert config.map_label == "Test Map Label"
+
+    def test_map_config_base_format_version_validation(self):
+        """Test that format_version must be 1 or 2."""
+        with pytest.raises(ValidationError, match="format_version must be 1 or 2"):
+            MapConfigBase(
+                map_id="test_map",
+                origin_x=0.0,
+                origin_y=0.0,
+                resolution=0.1,
+                format_version=3,
+            )
+
+    def test_map_config_base_format_version_accepts_1(self):
+        """Test that format_version accepts value 1."""
+        config = MapConfigBase(
+            map_id="test_map",
+            origin_x=0.0,
+            origin_y=0.0,
+            resolution=0.1,
+            format_version=1,
+        )
+        assert config.format_version == 1
+
+
+class TestMapConfigTemp:
+    """Tests for the MapConfigTemp model."""
+
+    def test_valid_map_config_temp(self):
+        """Test creating a valid MapConfigTemp instance."""
+        image_bytes = b"\x89PNG\r\n\x1a\n"  # PNG magic bytes
+        config = MapConfigTemp(
+            image=image_bytes,
+            map_id="temp_map",
+            origin_x=0.0,
+            origin_y=0.0,
+            resolution=0.05,
+        )
+        assert config.image == image_bytes
+        assert config.map_id == "temp_map"
+        assert config.format_version == 2
+
+    def test_map_config_temp_inherits_from_base(self):
+        """Test that MapConfigTemp inherits from MapConfigBase."""
+        assert issubclass(MapConfigTemp, MapConfigBase)
+
+    def test_map_config_temp_has_no_file_field(self):
+        """Test that MapConfigTemp does not have a file field."""
+        config = MapConfigTemp(
+            image=b"test",
+            map_id="temp_map",
+            origin_x=0.0,
+            origin_y=0.0,
+            resolution=0.05,
+        )
+        assert not hasattr(config, "file") or "file" not in config.model_fields
+
+    def test_map_config_temp_model_dump(self):
+        """Test that model_dump works correctly for MapConfigTemp."""
+        image_bytes = b"test_image_data"
+        config = MapConfigTemp(
+            image=image_bytes,
+            map_id="temp_map",
+            map_label="Temp Label",
+            origin_x=1.0,
+            origin_y=2.0,
+            resolution=0.1,
+            format_version=1,
+        )
+        dumped = config.model_dump()
+        assert dumped["image"] == image_bytes
+        assert dumped["map_id"] == "temp_map"
+        assert dumped["map_label"] == "Temp Label"
+        assert dumped["origin_x"] == 1.0
+        assert dumped["origin_y"] == 2.0
+        assert dumped["resolution"] == 0.1
+        assert dumped["format_version"] == 1
+
+
+class TestMapConfig:
+    """Tests for the MapConfig model."""
+
+    def test_map_config_inherits_from_base(self):
+        """Test that MapConfig inherits from MapConfigBase."""
+        assert issubclass(MapConfig, MapConfigBase)
+
+    def test_map_config_requires_file(self):
+        """Test that MapConfig requires a file field."""
+        with pytest.raises(ValidationError):
+            MapConfig(
+                map_id="test_map",
+                origin_x=0.0,
+                origin_y=0.0,
+                resolution=0.1,
+            )
+
+    def test_map_config_validates_png_file(self):
+        """Test that MapConfig validates file is a PNG."""
+        with pytest.raises(ValidationError, match="The map file must be a PNG file"):
+            MapConfig(
+                file=f"{os.path.dirname(__file__)}/dir/not_a_map.txt",
+                map_id="test_map",
+                origin_x=0.0,
+                origin_y=0.0,
+                resolution=0.1,
+            )
+
+    def test_map_config_with_valid_png(self):
+        """Test MapConfig with a valid PNG file."""
+        config = MapConfig(
+            file=f"{os.path.dirname(__file__)}/dir/test_map.png",
+            map_id="test_map",
+            origin_x=0.0,
+            origin_y=0.0,
+            resolution=0.1,
+        )
+        assert config.map_id == "test_map"
+        assert config.format_version == 2

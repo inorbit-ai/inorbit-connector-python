@@ -8,6 +8,8 @@
 # Standard
 import os
 import logging
+from pathlib import Path
+import tempfile
 import warnings
 import asyncio
 import threading
@@ -44,6 +46,8 @@ from inorbit_connector.logging.logger import setup_logger
 from inorbit_connector.models import (
     ConnectorConfig,
     InorbitConnectorConfig,
+    MapConfig,
+    MapConfigTemp,
     RobotConfig,
 )
 
@@ -90,6 +94,10 @@ class FleetConnector(ABC):
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
+        # Track pending map fetches to avoid duplicate requests
+        self.__pending_map_fetches: set[str] = set()
+        # Managed temp directory for fetched map files (lazily initialized)
+        self.__temp_map_dir: tempfile.TemporaryDirectory | None = None
 
         # Private dictionary for fast internal access (use self._get_session(robot_id)
         # for thread-safe access) in tight loops. It should not be accessed directly
@@ -317,6 +325,11 @@ class FleetConnector(ABC):
         for session in self.__robot_sessions.values():
             session.disconnect()
 
+        # Clean up temporary map files
+        if self.__temp_map_dir is not None:
+            self.__temp_map_dir.cleanup()
+            self.__temp_map_dir = None
+
         # Call the user-implemented disconnection logic
         await self._disconnect()
 
@@ -484,6 +497,10 @@ class FleetConnector(ABC):
     ) -> None:
         """Publish the map metadata for a specific robot to InOrbit.
 
+        If the map is not found in the current configuration, an async fetch will be
+        scheduled to retrieve the map from the robot. Once fetched, the map will be
+        published automatically.
+
         Args:
             robot_id (str): The robot ID to publish map for
             frame_id (str): The frame ID of the map
@@ -505,10 +522,113 @@ class FleetConnector(ABC):
             )
             self.__last_published_frame_ids[robot_id] = frame_id
         else:
-            self._logger.error(
-                f"Map {frame_id} not found in the current configuration."
-                " Map message will not be sent."
+            # Map not in config - schedule async fetch if not already pending
+            self._schedule_map_fetch(robot_id, frame_id, is_update)
+
+    def _get_temp_map_dir(self) -> Path:
+        """Get the temporary directory for storing fetched map files.
+
+        The directory is lazily created on first access and will be automatically
+        cleaned up when the connector disconnects.
+
+        Returns:
+            Path: Path to the temporary map directory
+        """
+        if self.__temp_map_dir is None:
+            self.__temp_map_dir = tempfile.TemporaryDirectory(
+                prefix="inorbit-connector-maps-"
             )
+        return Path(self.__temp_map_dir.name)
+
+    def _schedule_map_fetch(
+        self, robot_id: str, frame_id: str, is_update: bool
+    ) -> None:
+        """Schedule an async map fetch on the connector's event loop.
+
+        This method is safe to call from any thread. If a fetch for this frame_id
+        is already in progress, the request will be ignored to avoid duplicates.
+
+        Args:
+            robot_id (str): The robot ID to fetch map for
+            frame_id (str): The frame ID of the map to fetch
+            is_update (bool): Whether this is an update to an existing map
+        """
+        # Avoid duplicate fetch requests
+        if frame_id in self.__pending_map_fetches:
+            self._logger.debug(f"Map fetch for {frame_id} already in progress")
+            return
+
+        if self.__loop is None or not self.__loop.is_running():
+            self._logger.warning(
+                f"Cannot fetch map {frame_id}: event loop not available"
+            )
+            return
+
+        self._logger.info(
+            f"Map {frame_id} not in configuration, scheduling async fetch"
+        )
+        self.__pending_map_fetches.add(frame_id)
+
+        asyncio.run_coroutine_threadsafe(
+            self._fetch_and_publish_map(robot_id, frame_id, is_update),
+            self.__loop,
+        )
+
+    async def _fetch_and_publish_map(
+        self, robot_id: str, frame_id: str, is_update: bool
+    ) -> None:
+        """Async task to fetch a map and publish it once available.
+
+        Args:
+            robot_id (str): The robot ID to fetch map for
+            frame_id (str): The frame ID of the map to fetch
+            is_update (bool): Whether this is an update to an existing map
+        """
+        try:
+            map_config = await self.fetch_robot_map(robot_id, frame_id)
+            if map_config is None:
+                self._logger.info(
+                    f"Map {frame_id} could not be fetched from robot {robot_id}"
+                )
+                return
+
+            # Write map image to managed temp directory
+            temp_dir = self._get_temp_map_dir()
+            temp_path = temp_dir / f"{frame_id}.png"
+            temp_path.write_bytes(map_config.image)
+            self._logger.debug(f"Created temporary map file: {temp_path}")
+
+            # Create a new map configuration
+            self.config.maps[frame_id] = MapConfig(
+                file=temp_path,
+                **map_config.model_dump(exclude={"image", "file"}),
+            )
+            self._logger.debug(f"Added map {frame_id} to configuration")
+
+            # Now that the map is in config, publish it synchronously
+            self.publish_robot_map(robot_id, frame_id, is_update)
+        except Exception as e:
+            self._logger.error(f"Failed to fetch map {frame_id}: {e}")
+        finally:
+            self.__pending_map_fetches.discard(frame_id)
+
+    async def fetch_robot_map(
+        self, robot_id: str, frame_id: str
+    ) -> MapConfigTemp | None:
+        """Fetch the map configuration for a specific robot and frame ID.
+
+        Override this method in subclasses to implement map fetching from the robot
+        or fleet management system.
+
+        Args:
+            robot_id (str): The robot ID to fetch the map for
+            frame_id (str): The frame ID of the map to fetch
+
+        Returns:
+            MapConfigTemp | None: The map configuration with image bytes, or None
+                if the map could not be fetched.
+        """
+        return None
 
     def publish_robot_odometry(self, robot_id: str, **kwargs) -> None:
         """Publish odometry for a specific robot to InOrbit.
@@ -701,6 +821,31 @@ class Connector(FleetConnector, ABC):
     @override
     def _is_fleet_robot_online(self, robot_id: str) -> bool:
         return self._is_robot_online()
+
+    async def fetch_map(self, frame_id: str) -> MapConfigTemp | None:
+        """Fetch the map configuration for a specific robot and frame ID.
+
+        Override this method in subclasses to implement map fetching from the current
+        robot.
+
+        Args:
+            frame_id (str): The frame ID of the map to fetch
+
+        Returns:
+            MapConfigTemp | None: The map configuration with image bytes, or None
+                if the map could not be fetched.
+        """
+        return None
+
+    @override
+    async def fetch_robot_map(
+        self, robot_id: str, frame_id: str
+    ) -> MapConfigTemp | None:
+        """
+        Convenience override of the fetch_robot_map method to use a method of
+        single-robot type.
+        """
+        return await self.fetch_map(frame_id)
 
     @abstractmethod
     async def _inorbit_command_handler(

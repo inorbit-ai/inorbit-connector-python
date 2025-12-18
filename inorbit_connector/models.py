@@ -32,11 +32,10 @@ from inorbit_connector.logging.logger import LogLevels
 warnings.filterwarnings("always", category=DeprecationWarning)
 
 
-class MapConfig(BaseModel):
-    """Class representing a map configuration.
+class MapConfigBase(BaseModel):
+    """Base class for map configuration with common metadata fields.
 
     Attributes:
-        file (FilePath): The path to the PNG map file
         map_id (str): The map id
         map_label (str, optional): The map label
         origin_x (float): The x origin of the map
@@ -46,13 +45,36 @@ class MapConfig(BaseModel):
             https://developer.inorbit.ai/docs#maps
     """
 
-    file: FilePath
     map_id: str
     map_label: Optional[str] = None
     origin_x: float
     origin_y: float
     resolution: float
     format_version: int = 2
+
+    @field_validator("format_version")
+    def validate_format_version(cls, v: int) -> int:
+        """Validate that the format version is 1 or 2.
+
+        Args:
+            v (int): The format version to be validated
+
+        Raises:
+            ValueError: If the format version is not 1 or 2
+        """
+        if v not in (1, 2):
+            raise ValueError("format_version must be 1 or 2")
+        return v
+
+
+class MapConfig(MapConfigBase):
+    """Map configuration with file path for stored maps.
+
+    Attributes:
+        file (FilePath): The path to the PNG map file
+    """
+
+    file: FilePath
 
     @field_validator("file")
     def validate_png_file(cls, file: FilePath) -> FilePath:
@@ -71,19 +93,17 @@ class MapConfig(BaseModel):
             raise ValueError("The map file must be a PNG file")
         return file
 
-    @field_validator("format_version")
-    def validate_format_version(cls, v: int) -> int:
-        """Validate that the format version is 1 or 2.
 
-        Args:
-            v (int): The format version to be validated
+class MapConfigTemp(MapConfigBase):
+    """Temporary map configuration with in-memory image bytes.
 
-        Raises:
-            ValueError: If the format version is not 1 or 2
-        """
-        if v not in (1, 2):
-            raise ValueError("format_version must be 1 or 2")
-        return v
+    Used for fetching maps from the robot before writing to a temporary file.
+
+    Attributes:
+        image (bytes): The map image data in memory
+    """
+
+    image: bytes
 
 
 class LoggingConfig(BaseModel):
