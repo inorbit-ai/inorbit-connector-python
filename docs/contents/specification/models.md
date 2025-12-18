@@ -55,7 +55,7 @@ Logging configuration used by the connector at startup:
 - `log_level`: optional override for the root logger level.
 - `defaults`: dictionary passed to the logging config (e.g. `log_file`).
 
-See [setup_logger()](/ground-control/robot-integration/connector-framework/specification/logging#spec-logging-setup-logger) for how it is applied.
+See [setup_logger()](logging.md#spec-logging-setup-logger) for how it is applied.
 
 ## Deprecated: `InorbitConnectorConfig`
 

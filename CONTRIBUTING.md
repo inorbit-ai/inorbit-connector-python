@@ -96,16 +96,11 @@ Open the result in your browser:
 ```bash
 # Linux
 xdg-open docs/sphinx/_build/html/index.html
-```
 
-**Note:** Internal links use absolute Mintlify-style paths (e.g., `/ground-control/robot-integration/connector-framework/...`) for compatibility with the main InOrbit docs site. To test link navigation locally, use the `serve` target:
-
-```bash
+# Or serve locally
 make -C docs/sphinx serve
-# Opens at http://localhost:8000/ground-control/robot-integration/connector-framework/
+# Opens at http://localhost:8000/
 ```
-
-This builds the docs, nests them under the correct path prefix, and starts a local server. In CI, the docs are automatically deployed with this path structure so all links resolve correctly.
 
 Clean build artifacts:
 

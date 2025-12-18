@@ -42,7 +42,7 @@ async def _connect(self) -> None:
 
 The main execution loop that runs periodically. This is where you fetch robot data and publish it to InOrbit.
 
-Refer to the [publishing guide](/ground-control/robot-integration/connector-framework/publishing) for more details on publishing data to InOrbit.
+Refer to the [publishing guide](../publishing) for more details on publishing data to InOrbit.
 
 With polling-based connectors, it is advisable to run polling loops concurrently with the execution loop to avoid long running `_execution_loop` calls. See the [robot-connector](https://github.com/inorbit-ai/inorbit-connector-python/blob/main/examples/robot-connector/connector.py) and [fleet-connector](https://github.com/inorbit-ai/inorbit-connector-python/blob/main/examples/simple-fleet-connector/connector.py) examples for more details.
 
@@ -77,7 +77,7 @@ async def _disconnect(self) -> None:
 ### `_inorbit_command_handler()`
 
 :::{hint}
-See the [Commands Handling](/ground-control/robot-integration/connector-framework/usage/commands-handling) chapter for more details.
+See the [Commands Handling](commands-handling) chapter for more details.
 :::
 
 Handle commands received from InOrbit. This method is automatically registered if `register_custom_command_handler` is True (default).
@@ -132,7 +132,7 @@ connector.stop()
 
 ## Publishing Methods
 
-See the [Publishing Guide](/ground-control/robot-integration/connector-framework/publishing) for detailed information on publishing methods.
+See the [Publishing Guide](../publishing) for detailed information on publishing methods.
 
 ## Advanced Methods
 

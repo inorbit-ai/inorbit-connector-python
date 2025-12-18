@@ -52,7 +52,7 @@ Contract:
 
 - `options["result_function"](...)` must be called to report success/failure, or you may raise `CommandFailure` for structured failure reporting.
 
-See [Commands Handling](/ground-control/robot-integration/connector-framework/usage/commands-handling) for the full command result contract.
+See [Commands Handling](../usage/commands-handling) for the full command result contract.
 
 <a id="spec-connector-fleetconnector-fetch-robot-map"></a>
 ### `fetch_robot_map(robot_id, frame_id) -> MapConfigTemp | None`

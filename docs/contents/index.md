@@ -30,8 +30,8 @@ Both connector types provide:
 
 ## Documentation Sections
 
-- **Getting Started**: Installation, environment setup, and running a connector ([Getting Started](/ground-control/robot-integration/connector-framework/getting-started))
-- **Specification**: Package-level specification of the connector API ([Specification](/ground-control/robot-integration/connector-framework/specification/index))
-- **Usage**: Detailed guides for implementing single-robot and fleet connectors ([Usage](/ground-control/robot-integration/connector-framework/usage/index))
-- **Configuration**: Connector configuration models and file formats ([Configuration](/ground-control/robot-integration/connector-framework/configuration))
-- **Publishing**: How to publish data to InOrbit ([Publishing](/ground-control/robot-integration/connector-framework/publishing))
+- **Getting Started**: Installation, environment setup, and running a connector ([Getting Started](getting-started))
+- **Specification**: Package-level specification of the connector API ([Specification](specification/index))
+- **Usage**: Detailed guides for implementing single-robot and fleet connectors ([Usage](usage/index))
+- **Configuration**: Connector configuration models and file formats ([Configuration](configuration))
+- **Publishing**: How to publish data to InOrbit ([Publishing](publishing))

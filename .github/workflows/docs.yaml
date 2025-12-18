@@ -47,20 +47,10 @@ jobs:
       - name: Build Sphinx site
         run: |
           sphinx-build -b html docs/sphinx docs/sphinx/_build/html
-      - name: Fix absolute Mintlify-style links
-        run: |
-          # MyST converts absolute paths to anchors; rewrite them to relative paths
-          python docs/sphinx/fix_links.py docs/sphinx/_build/html
-      - name: Nest output under Mintlify-compatible path
-        run: |
-          mkdir -p docs/sphinx/_build/site/ground-control/robot-integration/connector-framework
-          cp -r docs/sphinx/_build/html/* docs/sphinx/_build/site/ground-control/robot-integration/connector-framework/
-          # Add redirect from root to the nested path
-          echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=/ground-control/robot-integration/connector-framework/index.html"><title>Redirecting...</title></head><body><p>Redirecting to <a href="/ground-control/robot-integration/connector-framework/index.html">documentation</a>...</p></body></html>' > docs/sphinx/_build/site/index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/sphinx/_build/site
+          path: docs/sphinx/_build/html
 
   deploy:
     environment:

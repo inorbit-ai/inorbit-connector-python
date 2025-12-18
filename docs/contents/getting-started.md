@@ -77,7 +77,7 @@ python fleet-connector/main.py --config example.fleet.yaml
 
 ## Next Steps
 
-- Review the [Specification](/ground-control/robot-integration/connector-framework/specification/index) to understand the public API of the package
-- Read the [Usage Guide](/ground-control/robot-integration/connector-framework/usage/index) to learn how to implement your own connector
-- Review the [Configuration Guide](/ground-control/robot-integration/connector-framework/configuration) to understand connector configuration
-- Check the [Publishing Guide](/ground-control/robot-integration/connector-framework/publishing) to learn how to publish data to InOrbit
+- Review the [Specification](specification/index) to understand the public API of the package
+- Read the [Usage Guide](usage/index) to learn how to implement your own connector
+- Review the [Configuration Guide](configuration) to understand connector configuration
+- Check the [Publishing Guide](publishing) to learn how to publish data to InOrbit

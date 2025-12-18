@@ -43,7 +43,7 @@ These classes support type-safe parsing and validation of structured command par
 - `CommandModel` is a Pydantic `BaseModel` configured with `extra="forbid"`, and converts `ValidationError` into `CommandFailure`.
 - `ExcludeUnsetMixin` changes `model_dump()` default behavior to `exclude_unset=True` (useful when you want to emit only explicitly-provided fields).
 
-See [Commands Handling](/ground-control/robot-integration/connector-framework/usage/commands-handling) for end-to-end usage patterns.
+See [Commands Handling](../usage/commands-handling) for end-to-end usage patterns.
 
 ## Note: re-exports via `inorbit_connector.connector`
 

@@ -19,7 +19,7 @@ Behavior:
 
 Notes:
 
-- New configurations should follow the `ConnectorConfig` schema described in [Configuration](/ground-control/robot-integration/connector-framework/configuration).
+- New configurations should follow the `ConnectorConfig` schema described in [Configuration](../configuration).
 
 ## Constants
 
