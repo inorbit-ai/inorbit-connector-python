@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Logging
+---
+title: "Logging"
+description: "Logging configuration specification"
+---
 
 This page specifies logging-related helpers from `inorbit_connector.logging`.
 

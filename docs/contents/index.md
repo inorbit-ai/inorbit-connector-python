@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# inorbit-connector
+---
+title: "Connector Framework"
+description: "Python framework for developing InOrbit robot connectors"
+---
 
 A Python framework for developing *connectors* for the [InOrbit](https://inorbit.ai/) RobOps ecosystem.
 
@@ -33,8 +30,8 @@ Both connector types provide:
 
 ## Documentation Sections
 
-- **Getting Started**: Installation, environment setup, and running a connector ([Getting Started](getting-started.md))
-- **Specification**: Package-level specification of the connector API ([Specification](specification/index.md))
-- **Usage**: Detailed guides for implementing single-robot and fleet connectors ([Usage](usage/index.md))
-- **Configuration**: Connector configuration models and file formats ([Configuration](configuration.md))
-- **Publishing**: How to publish data to InOrbit ([Publishing](publishing.md))
+- **Getting Started**: Installation, environment setup, and running a connector ([Getting Started](/ground-control/robot-integration/connector-framework/getting-started))
+- **Specification**: Package-level specification of the connector API ([Specification](/ground-control/robot-integration/connector-framework/specification/index))
+- **Usage**: Detailed guides for implementing single-robot and fleet connectors ([Usage](/ground-control/robot-integration/connector-framework/usage/index))
+- **Configuration**: Connector configuration models and file formats ([Configuration](/ground-control/robot-integration/connector-framework/configuration))
+- **Publishing**: How to publish data to InOrbit ([Publishing](/ground-control/robot-integration/connector-framework/publishing))

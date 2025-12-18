@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Models (configuration)
+---
+title: "Models"
+description: "Configuration models specification"
+--- (configuration)
 
 This page specifies the configuration models defined by `inorbit_connector.models`.
 
@@ -58,7 +55,7 @@ Logging configuration used by the connector at startup:
 - `log_level`: optional override for the root logger level.
 - `defaults`: dictionary passed to the logging config (e.g. `log_file`).
 
-See {ref}`spec-logging-setup-logger` for how it is applied.
+See [setup_logger()](/ground-control/robot-integration/connector-framework/specification/logging#spec-logging-setup-logger) for how it is applied.
 
 ## Deprecated: `InorbitConnectorConfig`
 

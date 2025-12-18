@@ -1,4 +1,8 @@
+# Specification
+
 ```{include} ../../contents/specification/index.md
+:start-line: 5
+:end-before: "## Pages"
 ```
 
 ```{toctree}
@@ -11,5 +15,3 @@ commands
 utils
 logging
 ```
-
-

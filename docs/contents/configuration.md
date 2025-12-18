@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Configuration
+---
+title: "Configuration"
+description: "Configuration models and file formats for connectors"
+---
 
 The `inorbit-connector` framework uses Pydantic models for configuration, providing validation and type safety.
 
@@ -12,7 +9,7 @@ The `inorbit-connector` framework uses Pydantic models for configuration, provid
 
 The main configuration class is `ConnectorConfig`, which contains all settings for your connector. It includes a `fleet` field containing a list of `RobotConfig` entries.
 
-Connectors should subclass `inorbit_connector.models.ConnectorConfig` and define a `connector_config` field that contains the configuration for the connector. For more details see the {ref}`creating-a-custom-configuration` section below.
+Connectors should subclass `inorbit_connector.models.ConnectorConfig` and define a `connector_config` field that contains the configuration for the connector. For more details see the [Creating a Custom Configuration](#creating-a-custom-configuration) section below.
 
 ### Key Fields
 

@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Fleet Connector
+---
+title: "Fleet Connector"
+description: "Guide for implementing a fleet connector"
+---
 
 Subclass `inorbit_connector.connector.FleetConnector` to manage multiple robots simultaneously.
 
@@ -30,7 +27,7 @@ Subclasses must implement the same abstract methods as single-robot connectors, 
 ### `_inorbit_robot_command_handler()`
 
 :::{hint}
-See the [Commands Handling](commands-handling) chapter for more details.
+See the [Commands Handling](/ground-control/robot-integration/connector-framework/usage/commands-handling) chapter for more details.
 :::
 
 Handle commands for a specific robot. This method is automatically registered if `register_custom_command_handler` is True (default).
@@ -93,7 +90,7 @@ The `update_fleet()` method updates the fleet configuration and initializes sess
 
 ## Publishing Methods
 
-All publishing methods require a `robot_id` parameter. See the [Publishing Guide](../publishing) for detailed information.
+All publishing methods require a `robot_id` parameter. See the [Publishing Guide](/ground-control/robot-integration/connector-framework/publishing) for detailed information.
 
 - `publish_robot_pose(robot_id, x, y, yaw, frame_id)`: Publish pose for a specific robot
 - `publish_robot_odometry(robot_id, **kwargs)`: Publish odometry for a specific robot

@@ -1,11 +1,6 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
+# Usage
 
-SPDX-License-Identifier: MIT
--->
-
-```{include} ../../contents/usage/index.md
-```
+Guides for implementing connectors.
 
 ```{toctree}
 :maxdepth: 2
@@ -15,5 +10,3 @@ single-robot
 fleet
 commands-handling
 ```
-
-

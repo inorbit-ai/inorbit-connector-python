@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Publishing Data
+---
+title: "Publishing Data"
+description: "How to publish robot data to InOrbit"
+---
 
 The connector framework provides methods to publish various types of data to InOrbit. Both single-robot (`Connector`) and fleet (`FleetConnector`) connectors support publishing, with fleet connectors using methods prefixed with `publish_robot_*` that require a `robot_id` parameter.
 

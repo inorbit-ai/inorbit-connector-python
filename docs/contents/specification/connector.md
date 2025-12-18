@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Connector API
+---
+title: "Connector API"
+description: "Connector and FleetConnector class specifications"
+---
 
 This page specifies the connector base classes you subclass to build connectors.
 
@@ -55,7 +52,7 @@ Contract:
 
 - `options["result_function"](...)` must be called to report success/failure, or you may raise `CommandFailure` for structured failure reporting.
 
-See [Commands Handling](../usage/commands-handling.md) for the full command result contract.
+See [Commands Handling](/ground-control/robot-integration/connector-framework/usage/commands-handling) for the full command result contract.
 
 <a id="spec-connector-fleetconnector-fetch-robot-map"></a>
 ### `fetch_robot_map(robot_id, frame_id) -> MapConfigTemp | None`
