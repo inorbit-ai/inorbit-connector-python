@@ -24,10 +24,10 @@ For detailed documentation, including installation guides, usage examples, confi
 To build the documentation locally:
 
 ```bash
-make -C docs html
+make -C docs/sphinx html
 ```
 
-The documentation will be available in `docs/_build/html/index.html`.
+The documentation will be available in `docs/sphinx/_build/html/index.html` and can be served locally with `make -C docs/sphinx serve`.
 
 ## Requirements
 
