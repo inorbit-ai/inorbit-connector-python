@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Single-Robot Connector
+---
+title: "Single-Robot Connector"
+description: "Guide for implementing a single-robot connector"
+---
 
 Subclass `inorbit_connector.connector.Connector` to create a connector for a single robot.
 

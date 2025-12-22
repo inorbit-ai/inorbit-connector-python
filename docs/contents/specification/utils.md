@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Utilities
+---
+title: "Utilities"
+description: "Utility functions specification"
+---
 
 This page specifies utilities from `inorbit_connector.utils`.
 
@@ -22,7 +19,7 @@ Behavior:
 
 Notes:
 
-- New configurations should follow the `ConnectorConfig` schema described in {doc}`../configuration`.
+- New configurations should follow the `ConnectorConfig` schema described in [Configuration](../configuration).
 
 ## Constants
 

@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Commands Handling
+---
+title: "Commands Handling"
+description: "How to handle commands from InOrbit"
+---
 
 Commands from InOrbit are automatically routed to your `_inorbit_robot_command_handler()` method in the case of a fleet connector, or to your `_inorbit_command_handler()` method in the case of a single-robot connector.
 
@@ -145,7 +142,7 @@ async def _inorbit_robot_command_handler(
         )
 ```
 
-It is recommended to complement its use with the `CommandModel` class (see {ref}`using-commandmodel-for-type-safe-argument-parsing`) for safe type validation and parsing.
+It is recommended to complement its use with the `CommandModel` class (see [Using CommandModel for Type-Safe Argument Parsing](#using-commandmodel-for-type-safe-argument-parsing)) for safe type validation and parsing.
 
 (using-commandmodel-for-type-safe-argument-parsing)=
 ## Using `CommandModel` for Type-Safe Argument Parsing
@@ -228,7 +225,7 @@ command = CommandQueueMission(**script_args)
 ```
 
 The exception is automatically handled by the connector's command execution framework, so you don't need to catch `ValidationError` exceptions.
-See the {ref}`reporting-failure` section for more details.
+See the [Reporting Failure](#reporting-failure) section for more details.
 
 ### Excluding Unset Fields
 

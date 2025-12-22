@@ -45,3 +45,32 @@ path = "**/*.ico"
 SPDX-FileCopyrightText = "2025 InOrbit, Inc."
 SPDX-License-Identifier = "MIT"
 SPDX-FileComment = "ICO assets"
+
+# Documentation content files (portable between Sphinx and Mintlify)
+# These use YAML frontmatter instead of HTML comments for Mintlify compatibility
+[[annotations]]
+path = "docs/contents/**/*.md"
+SPDX-FileCopyrightText = "2025 InOrbit, Inc."
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Documentation content (Mintlify-compatible)"
+
+# Documentation JSON config
+[[annotations]]
+path = "docs/contents/docs.json"
+SPDX-FileCopyrightText = "2025 InOrbit, Inc."
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Mintlify navigation configuration"
+
+# Mintlify build Makefile (has SPDX header but adding for completeness)
+[[annotations]]
+path = "docs/mintlify/Makefile"
+SPDX-FileCopyrightText = "2025 InOrbit, Inc."
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Mintlify build configuration"
+
+# Sphinx wrapper files (use {include} directives, minimal content)
+[[annotations]]
+path = "docs/sphinx/**/*.md"
+SPDX-FileCopyrightText = "2025 InOrbit, Inc."
+SPDX-License-Identifier = "MIT"
+SPDX-FileComment = "Sphinx documentation wrappers"

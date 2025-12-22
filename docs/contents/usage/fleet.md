@@ -1,10 +1,7 @@
-<!--
-SPDX-FileCopyrightText: 2025 InOrbit, Inc.
-
-SPDX-License-Identifier: MIT
--->
-
-# Fleet Connector
+---
+title: "Fleet Connector"
+description: "Guide for implementing a fleet connector"
+---
 
 Subclass `inorbit_connector.connector.FleetConnector` to manage multiple robots simultaneously.
 
