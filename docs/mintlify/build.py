@@ -111,13 +111,23 @@ def main():
         total_links += links
         total_files += 1
 
-    # Copy non-markdown files (images, etc.)
+    # Copy non-markdown files (images, etc.) but skip _static/
+    # The _static/ folder contains branding assets that the main docs repo
+    # already has - we don't need to copy them
     for src_file in content_dir.rglob("*"):
         if src_file.is_file() and src_file.suffix != ".md":
             rel_path = src_file.relative_to(content_dir)
+            if rel_path.parts[0] == "_static":
+                continue
             dst_file = output_dir / rel_path
             dst_file.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_file, dst_file)
+
+    # Copy navigation.json (Mintlify-specific, lives in mintlify/ folder)
+    script_dir = Path(__file__).parent
+    nav_src = script_dir / "navigation.json"
+    if nav_src.exists():
+        shutil.copy2(nav_src, output_dir / "navigation.json")
 
     print(f"\nTotal: {total_files} files, {total_links} links converted")
     print(f"Output: {output_dir}")
