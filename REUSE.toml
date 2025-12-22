@@ -56,7 +56,7 @@ SPDX-FileComment = "Documentation content (Mintlify-compatible)"
 
 # Documentation JSON config
 [[annotations]]
-path = "docs/contents/docs.json"
+path = "docs/mintlify/navigation.json"
 SPDX-FileCopyrightText = "2025 InOrbit, Inc."
 SPDX-License-Identifier = "MIT"
 SPDX-FileComment = "Mintlify navigation configuration"
