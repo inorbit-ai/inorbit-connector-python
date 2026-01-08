@@ -273,7 +273,7 @@ class TestFleetConnector:
         """Test that publish_robot_system_stats stores stats instead of publishing."""
         robot_id = "TestRobot1"
         base_fleet_connector.publish_robot_system_stats(
-            robot_id, cpu_load_percentage=50.0
+            robot_id, cpu_load_percentage=0.5
         )
         # Stats should be stored, not published immediately
         session = base_fleet_connector._get_robot_session(robot_id)
@@ -281,7 +281,7 @@ class TestFleetConnector:
         # Verify stats were stored
         pending_stats = base_fleet_connector._FleetConnector__pending_system_stats
         assert robot_id in pending_stats
-        assert pending_stats[robot_id]["cpu_load_percentage"] == 50.0
+        assert pending_stats[robot_id]["cpu_load_percentage"] == 0.5
 
     def test_is_fleet_robot_online_default(self, base_fleet_connector):
         """Test that _is_fleet_robot_online returns True by default."""
@@ -927,7 +927,7 @@ class TestConnector:
         self, base_connector, mock_robot_session_pool
     ):
         """Test publish_system_stats stores stats for deferred publishing."""
-        base_connector.publish_system_stats(cpu_load_percentage=50.0)
+        base_connector.publish_system_stats(cpu_load_percentage=0.5)
 
         # Stats should be stored, not published immediately
         session = base_connector._get_session()
@@ -936,7 +936,7 @@ class TestConnector:
         # Verify stats were stored
         pending_stats = base_connector._FleetConnector__pending_system_stats
         assert base_connector.robot_id in pending_stats
-        assert pending_stats[base_connector.robot_id]["cpu_load_percentage"] == 50.0
+        assert pending_stats[base_connector.robot_id]["cpu_load_percentage"] == 0.5
 
     @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_is_robot_online_default_implementation(self, base_connector):
