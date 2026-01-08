@@ -95,7 +95,7 @@ All publishing methods require a `robot_id` parameter. See the [Publishing Guide
 - `publish_robot_pose(robot_id, x, y, yaw, frame_id)`: Publish pose for a specific robot
 - `publish_robot_odometry(robot_id, **kwargs)`: Publish odometry for a specific robot
 - `publish_robot_key_values(robot_id, **kwargs)`: Publish key-values for a specific robot
-- `publish_robot_system_stats(robot_id, **kwargs)`: Publish system stats for a specific robot
+- `publish_robot_system_stats(robot_id, **kwargs)`: Defer publishing of system stats for a specific robot; defaults are published if not called
 - `publish_robot_map(robot_id, frame_id, is_update=False)`: Publish map for a specific robot
 
 ## Advanced Methods

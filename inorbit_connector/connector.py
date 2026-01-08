@@ -94,6 +94,8 @@ class FleetConnector(ABC):
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
+        # Store system stats per robot until end of the execution loop
+        self.__pending_system_stats: dict[str, dict] = {}
         # Track pending map fetches to avoid duplicate requests
         self.__pending_map_fetches: set[str] = set()
         self.__pending_map_fetches_lock = threading.Lock()
@@ -390,6 +392,8 @@ class FleetConnector(ABC):
                     self._execution_loop(),
                     asyncio.sleep(1.0 / self.config.update_freq),
                 )
+                # Publish stored system stats or defaults for all robots
+                self.__publish_pending_system_stats()
             except Exception as e:
                 self._logger.error(f"Error in execution loop: {e}")
                 self._logger.error(f"Traceback: {traceback.format_exc()}")
@@ -654,14 +658,48 @@ class FleetConnector(ABC):
         session.publish_key_values(kwargs)
 
     def publish_robot_system_stats(self, robot_id: str, **kwargs) -> None:
-        """Publish system stats for a specific robot to InOrbit.
+        """Store system stats for a specific robot to be published at the end of the
+        execution loop.
+
+        System stats are stored and published after the execution loop completes. If no
+        stats are stored for a robot, default zeroed values are published instead.
+
+        Note:
+            If immediate publishing is required, use `_get_robot_session(robot_id)` to
+            access the underlying RobotSession and call `publish_system_stats()` directly.
 
         Args:
-            robot_id (str): The robot ID to publish system stats for
-            **kwargs: System stats data
+            robot_id (str): The robot ID to store system stats for
+            **kwargs: System stats data (cpu_load_percentage, ram_usage_percentage,
+                hdd_usage_percentage, ts)
         """
-        session = self._get_robot_session(robot_id)
-        session.publish_system_stats(**kwargs)
+        self.__pending_system_stats[robot_id] = kwargs
+
+    def __publish_pending_system_stats(self) -> None:
+        """Publish stored system stats for all robots, or defaults if none stored.
+
+        This method is called automatically at the end of each execution loop iteration.
+        For each robot in the fleet:
+        - If system stats were stored via publish_robot_system_stats(), those are published
+        - Otherwise, default zeroed values are published
+
+        The reason publishing system stats is deferred is to ensure at least one system stats
+        message is published for each robot, even if the connector does not explicitly provide
+        values. This ensures stability of the online status of the robot in the UI, as it forces
+        state requests if the robot was to appear offline.
+        """
+        for robot_id in self.robot_ids:
+            session = self._get_robot_session(robot_id)
+            if robot_id in self.__pending_system_stats:
+                session.publish_system_stats(**self.__pending_system_stats[robot_id])
+            else:
+                session.publish_system_stats(
+                    cpu_load_percentage=0.0,
+                    ram_usage_percentage=0.0,
+                    hdd_usage_percentage=0.0,
+                )
+        # Clear stored stats for next iteration
+        self.__pending_system_stats.clear()
 
     # Methods meant to be extended by subclasses
     @abstractmethod
@@ -929,9 +967,17 @@ class Connector(FleetConnector, ABC):
         super().publish_robot_key_values(self.robot_id, **kwargs)
 
     def publish_system_stats(self, **kwargs) -> None:
-        """Publish system stats for a specific robot to InOrbit.
+        """Store system stats to be published at the end of the execution loop.
+
+        System stats are stored and published after the execution loop completes. If no
+        stats are stored, default zeroed values are published instead.
+
+        Note:
+            If immediate publishing is required, use `_get_session()` to access the
+            underlying RobotSession and call `publish_system_stats()` directly.
 
         Args:
-            **kwargs: System stats data
+            **kwargs: System stats data (cpu_load_percentage, ram_usage_percentage,
+                hdd_usage_percentage, ts)
         """
         super().publish_robot_system_stats(self.robot_id, **kwargs)

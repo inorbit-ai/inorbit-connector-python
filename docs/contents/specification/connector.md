@@ -121,7 +121,11 @@ Publishes pose for one robot. If the `frame_id` differs from the last published 
 <a id="spec-connector-fleetconnector-publish-robot-system-stats"></a>
 ### `publish_robot_system_stats(robot_id, **kwargs)`
 
-**Callable.** Publishes system stats for one robot.
+**Callable.** Stores system stats for one robot to be published at the end of the execution loop.
+
+If no stats are stored for a robot during the loop iteration, default zeroed values (`cpu_load_percentage=0.0`, `ram_usage_percentage=0.0`, `hdd_usage_percentage=0.0`) are published automatically.
+
+If immediate publishing is required, use `_get_robot_session(robot_id)` to access the underlying `RobotSession` and call `publish_system_stats()` directly.
 
 <a id="spec-connector-fleetconnector-get-robot-session"></a>
 ### `_get_robot_session(robot_id) -> RobotSession`
