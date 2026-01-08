@@ -267,16 +267,21 @@ class TestFleetConnector:
         session = base_fleet_connector._get_robot_session(robot_id)
         session.publish_key_values.assert_called()
 
-    def test_publish_robot_system_stats(
+    def test_publish_robot_system_stats_stores_stats(
         self, base_fleet_connector, mock_robot_session_pool
     ):
-        """Test publishing system stats for a specific robot."""
+        """Test that publish_robot_system_stats stores stats instead of publishing."""
         robot_id = "TestRobot1"
         base_fleet_connector.publish_robot_system_stats(
             robot_id, cpu_load_percentage=50.0
         )
+        # Stats should be stored, not published immediately
         session = base_fleet_connector._get_robot_session(robot_id)
-        session.publish_system_stats.assert_called()
+        session.publish_system_stats.assert_not_called()
+        # Verify stats were stored
+        pending_stats = base_fleet_connector._FleetConnector__pending_system_stats
+        assert robot_id in pending_stats
+        assert pending_stats[robot_id]["cpu_load_percentage"] == 50.0
 
     def test_is_fleet_robot_online_default(self, base_fleet_connector):
         """Test that _is_fleet_robot_online returns True by default."""
@@ -495,6 +500,207 @@ class TestFleetConnectorMapFetching:
         # Verify temp dir was cleaned up
         assert fleet_connector._FleetConnector__temp_map_dir is None
         assert not temp_dir.exists()
+
+
+class TestFleetConnectorDeferredSystemStats:
+    """Tests for FleetConnector deferred system stats publishing."""
+
+    @pytest.fixture
+    def base_model(self):
+        return {
+            "api_key": "valid_key",
+            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connector_type": "valid_connector",
+            "connector_config": DummyConfig(),
+        }
+
+    @pytest.fixture(autouse=True)
+    def make_fleet_connector_not_abstract(self):
+        FleetConnector.__abstractmethods__ = set()
+
+    @pytest.fixture
+    def fleet_connector(self, base_model):
+        return FleetConnector(
+            ConnectorConfig(
+                **base_model,
+                fleet=[
+                    RobotConfig(robot_id="TestRobot1"),
+                    RobotConfig(robot_id="TestRobot2"),
+                ],
+            )
+        )
+
+    def test_publish_pending_system_stats_publishes_stored_stats(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that stored stats are published for robots that provided them."""
+        # Store stats for TestRobot1
+        fleet_connector.publish_robot_system_stats(
+            "TestRobot1",
+            cpu_load_percentage=0.5,
+            ram_usage_percentage=0.6,
+            hdd_usage_percentage=0.7,
+        )
+
+        # Call the publish method
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+        # Verify stored stats were published for TestRobot1
+        session1 = fleet_connector._get_robot_session("TestRobot1")
+        session1.publish_system_stats.assert_called_once_with(
+            cpu_load_percentage=0.5,
+            ram_usage_percentage=0.6,
+            hdd_usage_percentage=0.7,
+        )
+
+    def test_publish_pending_system_stats_publishes_zeroed_defaults(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that zeroed defaults are published for robots without stored stats."""
+        # Don't store any stats, just call publish
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+        # Verify zeroed defaults were published for both robots
+        session1 = fleet_connector._get_robot_session("TestRobot1")
+        session2 = fleet_connector._get_robot_session("TestRobot2")
+
+        session1.publish_system_stats.assert_called_once_with(
+            cpu_load_percentage=0.0,
+            ram_usage_percentage=0.0,
+            hdd_usage_percentage=0.0,
+        )
+        session2.publish_system_stats.assert_called_once_with(
+            cpu_load_percentage=0.0,
+            ram_usage_percentage=0.0,
+            hdd_usage_percentage=0.0,
+        )
+
+    def test_publish_pending_system_stats_clears_stored_stats(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that stored stats are cleared after publishing."""
+        fleet_connector.publish_robot_system_stats(
+            "TestRobot1", cpu_load_percentage=0.5
+        )
+        assert "TestRobot1" in fleet_connector._FleetConnector__pending_system_stats
+
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+        # Verify stats were cleared
+        assert len(fleet_connector._FleetConnector__pending_system_stats) == 0
+
+    def test_publish_pending_system_stats_mixed_stored_and_default(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that stored stats are used for some robots, defaults for others."""
+        # Store stats only for TestRobot1
+        fleet_connector.publish_robot_system_stats(
+            "TestRobot1",
+            cpu_load_percentage=0.8,
+            ram_usage_percentage=0.9,
+            hdd_usage_percentage=0.1,
+        )
+
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+        # TestRobot1 should have stored stats
+        session1 = fleet_connector._get_robot_session("TestRobot1")
+        session1.publish_system_stats.assert_called_once_with(
+            cpu_load_percentage=0.8,
+            ram_usage_percentage=0.9,
+            hdd_usage_percentage=0.1,
+        )
+
+        # TestRobot2 should have zeroed defaults
+        session2 = fleet_connector._get_robot_session("TestRobot2")
+        session2.publish_system_stats.assert_called_once_with(
+            cpu_load_percentage=0.0,
+            ram_usage_percentage=0.0,
+            hdd_usage_percentage=0.0,
+        )
+
+    def test_publish_connector_system_stats_uses_psutil(
+        self, base_model, mock_robot_session_pool
+    ):
+        """Test that connector host stats are used when enabled and psutil available."""
+        with patch("inorbit_connector.connector.PSUTIL_AVAILABLE", True):
+            with patch("inorbit_connector.connector.psutil") as mock_psutil:
+                # Mock psutil functions
+                mock_psutil.cpu_percent.return_value = 50.0
+                mock_psutil.virtual_memory.return_value.percent = 60.0
+                mock_psutil.disk_usage.return_value.percent = 70.0
+
+                connector = FleetConnector(
+                    ConnectorConfig(
+                        **base_model,
+                        fleet=[RobotConfig(robot_id="TestRobot1")],
+                    ),
+                    publish_connector_system_stats=True,
+                )
+
+                connector._FleetConnector__publish_pending_system_stats()
+
+                session = connector._get_robot_session("TestRobot1")
+                session.publish_system_stats.assert_called_once_with(
+                    cpu_load_percentage=0.5,  # 50.0 / 100.0
+                    ram_usage_percentage=0.6,  # 60.0 / 100.0
+                    hdd_usage_percentage=0.7,  # 70.0 / 100.0
+                )
+
+    def test_publish_connector_system_stats_fallback_without_psutil(
+        self, base_model, mock_robot_session_pool
+    ):
+        """Test fallback to zeroed defaults when psutil not available."""
+        with patch("inorbit_connector.connector.PSUTIL_AVAILABLE", False):
+            connector = FleetConnector(
+                ConnectorConfig(
+                    **base_model,
+                    fleet=[RobotConfig(robot_id="TestRobot1")],
+                ),
+                publish_connector_system_stats=True,
+            )
+
+            # Should have fallen back to False
+            assert connector._FleetConnector__publish_connector_system_stats is False
+
+            connector._FleetConnector__publish_pending_system_stats()
+
+            # Should use zeroed defaults
+            session = connector._get_robot_session("TestRobot1")
+            session.publish_system_stats.assert_called_once_with(
+                cpu_load_percentage=0.0,
+                ram_usage_percentage=0.0,
+                hdd_usage_percentage=0.0,
+            )
+
+    def test_publish_connector_system_stats_logs_warning_without_psutil(
+        self, base_model, mock_robot_session_pool
+    ):
+        """Test that warning is logged when psutil not available but feature enabled."""
+        with patch("inorbit_connector.connector.PSUTIL_AVAILABLE", False):
+            with patch("inorbit_connector.connector.logging") as mock_logging:
+                mock_logger = MagicMock()
+                mock_logging.getLogger.return_value = mock_logger
+
+                FleetConnector(
+                    ConnectorConfig(
+                        **base_model,
+                        fleet=[RobotConfig(robot_id="TestRobot1")],
+                    ),
+                    publish_connector_system_stats=True,
+                )
+
+                # Verify warning was logged
+                mock_logger.warning.assert_called()
+                warning_msg = mock_logger.warning.call_args[0][0]
+                assert "psutil" in warning_msg
+                assert "inorbit-connector[system-stats]" in warning_msg
+
+    def test_publish_connector_system_stats_disabled_by_default(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that connector system stats are disabled by default."""
+        assert fleet_connector._FleetConnector__publish_connector_system_stats is False
 
 
 # ==============================================================================
@@ -717,12 +923,20 @@ class TestConnector:
         session.publish_key_values.assert_called()
 
     @pytest.mark.filterwarnings("ignore::DeprecationWarning")
-    def test_publish_system_stats(self, base_connector, mock_robot_session_pool):
-        """Test publish_system_stats delegates correctly."""
+    def test_publish_system_stats_stores_stats(
+        self, base_connector, mock_robot_session_pool
+    ):
+        """Test publish_system_stats stores stats for deferred publishing."""
         base_connector.publish_system_stats(cpu_load_percentage=50.0)
 
+        # Stats should be stored, not published immediately
         session = base_connector._get_session()
-        session.publish_system_stats.assert_called()
+        session.publish_system_stats.assert_not_called()
+
+        # Verify stats were stored
+        pending_stats = base_connector._FleetConnector__pending_system_stats
+        assert base_connector.robot_id in pending_stats
+        assert pending_stats[base_connector.robot_id]["cpu_load_percentage"] == 50.0
 
     @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_is_robot_online_default_implementation(self, base_connector):

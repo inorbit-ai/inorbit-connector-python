@@ -59,14 +59,14 @@ The table below lists package-defined symbols meant for direct use (call) or ext
 | Call | `FleetConnector.publish_robot_map()` | Publish map metadata/image from configured maps (or after fetch). | [Details](connector.md#spec-connector-fleetconnector-publish-robot-map) |
 | Call | `FleetConnector.publish_robot_odometry()` | Publish odometry. | [Details](connector.md#spec-connector-fleetconnector-publish-robot-odometry) |
 | Call | `FleetConnector.publish_robot_key_values()` | Publish key-value telemetry. | [Details](connector.md#spec-connector-fleetconnector-publish-robot-key-values) |
-| Call | `FleetConnector.publish_robot_system_stats()` | Publish system stats telemetry. | [Details](connector.md#spec-connector-fleetconnector-publish-robot-system-stats) |
+| Call | `FleetConnector.publish_robot_system_stats()` | Defer publishing of system stats for a specific robot; defaults are published if not called. | [Details](connector.md#spec-connector-fleetconnector-publish-robot-system-stats) |
 | Call (advanced) | `FleetConnector._get_robot_session()` | Access the underlying Edge SDK `RobotSession` for a specific robot. | [Details](connector.md#spec-connector-fleetconnector-get-robot-session) |
 | Override | `Connector._connect()` / `_execution_loop()` / `_disconnect()` | Same lifecycle hooks as fleet, for a single robot. | [Details](connector.md#spec-connector-connector-lifecycle-hooks) |
 | Override | `Connector._inorbit_command_handler()` | Handle commands for the single robot. | [Details](connector.md#spec-connector-connector-command-handler) |
 | Override (optional) | `Connector.fetch_map()` | Fetch a missing map for the current robot when pose references an unknown `frame_id`. | [Details](connector.md#spec-connector-connector-fetch-map) |
 | Override (optional) | `Connector._is_robot_online()` | Provide online status for the current robot. | [Details](connector.md#spec-connector-connector-is-online) |
 | Call | `Connector.publish_pose()` / `publish_map()` | Publish pose/map for the current robot (map handling included). | [Details](connector.md#spec-connector-connector-publishing) |
-| Call | `Connector.publish_odometry()` / `publish_key_values()` / `publish_system_stats()` | Publish telemetry for the current robot. | [Details](connector.md#spec-connector-connector-publishing) |
+| Call | `Connector.publish_odometry()` / `publish_key_values()` / `publish_system_stats()` | Publish telemetry for the current robot. `publish_system_stats()` defers publishing; defaults published if not called. | [Details](connector.md#spec-connector-connector-publishing) |
 | Call (advanced) | `Connector._get_session()` | Access the underlying Edge SDK `RobotSession` for the current robot. | [Details](connector.md#spec-connector-connector-get-session) |
 | Type | `ConnectorConfig` | Base configuration model for connectors. | [Details](models.md#spec-models-connectorconfig) |
 | Type | `RobotConfig` | Per-robot configuration (robot_id + cameras). | [Details](models.md#spec-models-robotconfig) |

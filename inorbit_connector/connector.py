@@ -34,6 +34,15 @@ from inorbit_edge.models import RobotSessionModel
 from inorbit_edge.robot import RobotSession, RobotSessionPool, RobotSessionFactory
 from inorbit_edge.video import OpenCVCamera
 
+# Optional dependency for connector system stats
+try:
+    import psutil
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
+
 # InOrbit
 from inorbit_connector.commands import (  # noqa: F401
     # Re-export command-related functionality for backwards compatibility
@@ -80,6 +89,12 @@ class FleetConnector(ABC):
                 Default is False
             register_custom_command_handler (bool): Register custom command handler.
                 Default is True
+            publish_connector_system_stats (bool): When True, publish the connector
+                host's system stats (CPU, RAM, HDD) as default values in cases where the
+                implementation doesn't provide their own stats.
+                Requires psutil to be installed with
+                    `pip install inorbit-connector[system-stats]`.
+                Default is False (zeroed defaults)
         """
 
         # Common information
@@ -94,6 +109,8 @@ class FleetConnector(ABC):
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
+        # Store system stats per robot until end of the execution loop
+        self.__pending_system_stats: dict[str, dict] = {}
         # Track pending map fetches to avoid duplicate requests
         self.__pending_map_fetches: set[str] = set()
         self.__pending_map_fetches_lock = threading.Lock()
@@ -127,6 +144,18 @@ class FleetConnector(ABC):
         # Logging information
         setup_logger(config.logging)
         self._logger = logging.getLogger(__name__)
+
+        # System stats default behavior
+        self.__publish_connector_system_stats = kwargs.get(
+            "publish_connector_system_stats", False
+        )
+        if self.__publish_connector_system_stats and not PSUTIL_AVAILABLE:
+            self._logger.warning(
+                "publish_connector_system_stats requires psutil. "
+                "Install with: pip install inorbit-connector[system-stats]. "
+                "Falling back to zeroed defaults."
+            )
+            self.__publish_connector_system_stats = False
 
         # Set up environment variables
         for env_var_name, env_var_value in config.env_vars.items():
@@ -390,9 +419,12 @@ class FleetConnector(ABC):
                     self._execution_loop(),
                     asyncio.sleep(1.0 / self.config.update_freq),
                 )
+                # Publish stored system stats or defaults for all robots
+                self.__publish_pending_system_stats()
             except Exception as e:
                 self._logger.error(f"Error in execution loop: {e}")
                 self._logger.error(f"Traceback: {traceback.format_exc()}")
+                self.__pending_system_stats.clear()
                 # Continue execution after a brief pause to avoid tight error loops
                 await asyncio.sleep(1.0)
 
@@ -654,14 +686,71 @@ class FleetConnector(ABC):
         session.publish_key_values(kwargs)
 
     def publish_robot_system_stats(self, robot_id: str, **kwargs) -> None:
-        """Publish system stats for a specific robot to InOrbit.
+        """Store system stats for a specific robot to be published at the end of the
+        execution loop.
+
+        System stats are stored and published after the execution loop completes. If no
+        stats are stored for a robot, default zeroed values are published instead.
+
+        Note:
+            If immediate publishing is required, use `_get_robot_session(robot_id)` to
+            access the underlying RobotSession and call `publish_system_stats()`
+            directly.
 
         Args:
-            robot_id (str): The robot ID to publish system stats for
-            **kwargs: System stats data
+            robot_id (str): The robot ID to store system stats for
+            **kwargs: System stats data (cpu_load_percentage, ram_usage_percentage,
+                hdd_usage_percentage, ts)
         """
-        session = self._get_robot_session(robot_id)
-        session.publish_system_stats(**kwargs)
+        self.__pending_system_stats[robot_id] = kwargs
+
+    def __get_connector_system_stats(self) -> dict:
+        """Get system stats from the connector's host environment.
+
+        Returns:
+            dict: System stats with cpu_load_percentage, ram_usage_percentage,
+                and hdd_usage_percentage as floats between 0.0 and 1.0.
+        """
+        return {
+            "cpu_load_percentage": psutil.cpu_percent() / 100.0,
+            "ram_usage_percentage": psutil.virtual_memory().percent / 100.0,
+            "hdd_usage_percentage": psutil.disk_usage("/").percent / 100.0,
+        }
+
+    def __publish_pending_system_stats(self) -> None:
+        """Publish stored system stats for all robots, or defaults if none stored.
+
+        This method is called automatically at the end of each execution loop iteration.
+        For each robot in the fleet:
+        - If system stats were stored via publish_robot_system_stats(), those are
+        published
+        - Otherwise, default values are published (connector host stats if
+          publish_connector_system_stats is enabled, zeroed values otherwise).
+
+        The reason publishing system stats is deferred is to ensure at least one system
+        stats message is published for each robot, even if the connector does not
+        explicitly provide values. This ensures stability of the online status of the
+        robot in the UI, as it forces state requests if the robot was to appear offline.
+        """
+        default_values = (
+            self.__get_connector_system_stats()
+            if self.__publish_connector_system_stats
+            else {
+                "cpu_load_percentage": 0.0,
+                "ram_usage_percentage": 0.0,
+                "hdd_usage_percentage": 0.0,
+            }
+        )
+
+        for robot_id in self.robot_ids:
+            session = self._get_robot_session(robot_id)
+            if pending_status := self.__pending_system_stats.get(robot_id):
+                session.publish_system_stats(**pending_status)
+            else:
+                session.publish_system_stats(**default_values)
+
+        # Clear stored stats for next iteration
+        self.__pending_system_stats.clear()
 
     # Methods meant to be extended by subclasses
     @abstractmethod
@@ -929,9 +1018,17 @@ class Connector(FleetConnector, ABC):
         super().publish_robot_key_values(self.robot_id, **kwargs)
 
     def publish_system_stats(self, **kwargs) -> None:
-        """Publish system stats for a specific robot to InOrbit.
+        """Store system stats to be published at the end of the execution loop.
+
+        System stats are stored and published after the execution loop completes. If no
+        stats are stored, default zeroed values are published instead.
+
+        Note:
+            If immediate publishing is required, use `_get_session()` to access the
+            underlying RobotSession and call `publish_system_stats()` directly.
 
         Args:
-            **kwargs: System stats data
+            **kwargs: System stats data (cpu_load_percentage, ram_usage_percentage,
+                hdd_usage_percentage, ts)
         """
         super().publish_robot_system_stats(self.robot_id, **kwargs)
