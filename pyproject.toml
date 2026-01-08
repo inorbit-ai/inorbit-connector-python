@@ -63,6 +63,9 @@ docs = [
 colorlog = [
     "colorlog==6.9.0",
 ]
+system-stats = [
+    "psutil>=7",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

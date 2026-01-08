@@ -9,6 +9,17 @@ This page specifies the connector base classes you subclass to build connectors.
 
 `inorbit_connector.connector.FleetConnector` is the base class for connectors that manage multiple robots.
 
+<a id="spec-connector-fleetconnector-constructor"></a>
+### Constructor kwargs
+
+The following keyword arguments can be passed to `FleetConnector.__init__()`:
+
+- `register_user_scripts` (bool): Register user scripts automatically. Default: `False`
+- `default_user_scripts_dir` (str): Default user scripts directory path. Default: `~/.inorbit_connectors/connector-{class_name}/local/`
+- `create_user_scripts_dir` (bool): Create user scripts directory if it doesn't exist. Default: `False`
+- `register_custom_command_handler` (bool): Register custom command handler. Default: `True`
+- `publish_connector_system_stats` (bool): When `True`, publish the connector host's system stats (CPU, RAM, HDD) as default values for robots that don't provide their own stats. Requires `psutil` to be installed (`pip install inorbit-connector[system-stats]`). If `psutil` is not available, falls back to zeroed defaults with a warning. Default: `False`
+
 <a id="spec-connector-fleetconnector-connect"></a>
 ### `_connect()`
 
@@ -123,7 +134,7 @@ Publishes pose for one robot. If the `frame_id` differs from the last published 
 
 **Callable.** Stores system stats for one robot to be published at the end of the execution loop.
 
-If no stats are stored for a robot during the loop iteration, default zeroed values (`cpu_load_percentage=0.0`, `ram_usage_percentage=0.0`, `hdd_usage_percentage=0.0`) are published automatically.
+If no stats are stored for a robot during the loop iteration, default values are published automatically. By default, zeroed values are used. To use the connector host's actual system stats as defaults, set `publish_connector_system_stats=True` in the [constructor](#spec-connector-fleetconnector-constructor).
 
 If immediate publishing is required, use `_get_robot_session(robot_id)` to access the underlying `RobotSession` and call `publish_system_stats()` directly.
 

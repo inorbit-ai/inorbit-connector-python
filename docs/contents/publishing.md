@@ -104,9 +104,11 @@ publish_system_stats(**kwargs) -> None
 publish_robot_system_stats(robot_id: str, **kwargs) -> None
 ```
 
-Stores system stats (CPU, RAM, disk usage) to be published at the end of the execution loop. If no stats are stored for a robot during the loop iteration, default zeroed values are published automatically.
+Stores system stats (CPU, RAM, disk usage) to be published at the end of the execution loop. If no stats are stored for a robot during the loop iteration, default values are published automatically.
 
 This ensures that system stats are always published for all robots in the fleet, even if the connector does not explicitly provide values. This is to ensure stability of the online status of the robot in the UI, as it forces state requests if the robot was to appear offline.
+
+By default, zeroed values are used. To use the connector host's actual system stats as defaults, set `publish_connector_system_stats=True` when initializing the connector. See [FleetConnector constructor](specification/connector#spec-connector-fleetconnector-constructor) for details.
 
 **Example:**
 ```python
