@@ -424,6 +424,7 @@ class FleetConnector(ABC):
             except Exception as e:
                 self._logger.error(f"Error in execution loop: {e}")
                 self._logger.error(f"Traceback: {traceback.format_exc()}")
+                self.__pending_system_stats.clear()
                 # Continue execution after a brief pause to avoid tight error loops
                 await asyncio.sleep(1.0)
 
