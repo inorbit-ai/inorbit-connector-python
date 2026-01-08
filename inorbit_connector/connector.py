@@ -92,7 +92,8 @@ class FleetConnector(ABC):
             publish_connector_system_stats (bool): When True, publish the connector
                 host's system stats (CPU, RAM, HDD) as default values in cases where the
                 implementation doesn't provide their own stats.
-                Requires psutil to be installed (pip install inorbit-connector[system-stats]).
+                Requires psutil to be installed with
+                    `pip install inorbit-connector[system-stats]`.
                 Default is False (zeroed defaults)
         """
 
@@ -692,7 +693,8 @@ class FleetConnector(ABC):
 
         Note:
             If immediate publishing is required, use `_get_robot_session(robot_id)` to
-            access the underlying RobotSession and call `publish_system_stats()` directly.
+            access the underlying RobotSession and call `publish_system_stats()`
+            directly.
 
         Args:
             robot_id (str): The robot ID to store system stats for
@@ -719,14 +721,15 @@ class FleetConnector(ABC):
 
         This method is called automatically at the end of each execution loop iteration.
         For each robot in the fleet:
-        - If system stats were stored via publish_robot_system_stats(), those are published
+        - If system stats were stored via publish_robot_system_stats(), those are
+        published
         - Otherwise, default values are published (connector host stats if
           publish_connector_system_stats is enabled, zeroed values otherwise).
 
-        The reason publishing system stats is deferred is to ensure at least one system stats
-        message is published for each robot, even if the connector does not explicitly provide
-        values. This ensures stability of the online status of the robot in the UI, as it forces
-        state requests if the robot was to appear offline.
+        The reason publishing system stats is deferred is to ensure at least one system
+        stats message is published for each robot, even if the connector does not
+        explicitly provide values. This ensures stability of the online status of the
+        robot in the UI, as it forces state requests if the robot was to appear offline.
         """
         default_values = (
             self.__get_connector_system_stats()
