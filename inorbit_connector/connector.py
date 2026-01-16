@@ -15,7 +15,7 @@ import asyncio
 import threading
 import traceback
 from abc import ABC, abstractmethod
-from typing import Coroutine
+from typing import Coroutine, Optional
 
 # Python 3.12+ compatibility for override decorator
 try:
@@ -59,6 +59,12 @@ from inorbit_connector.models import (
     MapConfigTemp,
     RobotConfig,
 )
+from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
+from inorbit_connector.waypoint_sync.interfaces import (
+    AnnotationConverter,
+    ExternalAnnotationProvider,
+)
+from inorbit_connector.waypoint_sync.manager import WaypointSyncManager
 
 
 class FleetConnector(ABC):
@@ -183,6 +189,15 @@ class FleetConnector(ABC):
         # Create RobotSessionPool
         self.__session_pool = RobotSessionPool(self.__session_factory)
 
+        # Annotation sync (initialized when implementations are registered)
+        self.__annotation_provider: Optional[ExternalAnnotationProvider] = None
+        self.__annotation_converter: Optional[AnnotationConverter] = None
+        # Per-frame sync managers: frame_id -> WaypointSyncManager
+        self.__annotation_sync_managers: dict[str, WaypointSyncManager] = {}
+        self.__annotation_sync_client: Optional[InOrbitConfigClient] = None
+        # Flag indicating annotation sync is configured and ready
+        self.__annotation_sync_enabled: bool = False
+
     @property
     def robot_ids(self) -> list[str]:
         """Get the list of robot IDs in the fleet."""
@@ -203,6 +218,100 @@ class FleetConnector(ABC):
         self.config.fleet = fleet
         # Update robot ID cache
         self.__robot_ids = [robot.robot_id for robot in self.config.fleet]
+
+    def register_annotation_sync(
+        self,
+        position_provider: ExternalAnnotationProvider,
+        annotation_converter: AnnotationConverter,
+    ) -> None:
+        """Register annotation sync implementations.
+
+        The connector must provide an ExternalAnnotationProvider and an
+        AnnotationConverter. If waypoint sync is enabled in the configuration,
+        the framework will initialize and manage annotation synchronization
+        automatically during connect/disconnect.
+        """
+        self.__annotation_provider = position_provider
+        self.__annotation_converter = annotation_converter
+
+    def __initialize_annotation_sync(self) -> None:
+        """Initialize annotation synchronization client if enabled and registered.
+
+        This only initializes the Config API client. Per-frame sync managers
+        are created lazily when poses are published for new frame_ids.
+        """
+        sync_config = self.config.waypoint_sync
+        if not sync_config or not sync_config.enabled:
+            return
+
+        if self.__annotation_provider is None or self.__annotation_converter is None:
+            self._logger.warning(
+                "Annotation sync is enabled but no provider/converter registered. "
+                "Annotation sync will be disabled."
+            )
+            return
+
+        if not self.config.api_key:
+            self._logger.warning(
+                "Annotation sync is enabled but api_key is not set. "
+                "Robot keys are not supported for Config API access. "
+                "Annotation sync will be disabled."
+            )
+            return
+        if not self.config.account_id:
+            self._logger.warning(
+                "Annotation sync is enabled but account_id is not set. "
+                "Annotation sync will be disabled."
+            )
+            return
+
+        self.__annotation_sync_client = InOrbitConfigClient(
+            base_url=str(self.config.rest_api_url),
+            api_key=self.config.api_key,
+        )
+        self.__annotation_sync_enabled = True
+        self._logger.info(
+            f"Annotation sync configured: mode={sync_config.mode.value}, "
+            f"interval={sync_config.sync_interval_seconds}s. "
+            "Sync will start when poses are published for each frame_id."
+        )
+
+    def __start_annotation_sync_for_frame(self, frame_id: str) -> None:
+        """Start annotation sync for a specific frame_id.
+
+        Creates and starts a WaypointSyncManager for the given frame_id if one
+        doesn't already exist. Called when a pose is published for a new frame_id.
+
+        Args:
+            frame_id: The frame/map ID to start sync for
+        """
+        if not self.__annotation_sync_enabled:
+            return
+
+        if frame_id in self.__annotation_sync_managers:
+            return
+
+        sync_config = self.config.waypoint_sync
+        if (
+            sync_config is None
+            or self.__annotation_sync_client is None
+            or self.__annotation_provider is None
+            or self.__annotation_converter is None
+        ):
+            return
+
+        self._logger.info(f"Starting annotation sync for frame_id '{frame_id}'")
+        manager = WaypointSyncManager(
+            config=sync_config,
+            inorbit_config_client=self.__annotation_sync_client,
+            position_provider=self.__annotation_provider,
+            annotation_converter=self.__annotation_converter,
+            account_id=self.config.account_id,
+            frame_id=frame_id,
+            signature_value=self.config.connector_type,
+        )
+        self.__annotation_sync_managers[frame_id] = manager
+        manager.start()
 
     def _handle_command_exception(
         self,
@@ -348,8 +457,22 @@ class FleetConnector(ABC):
         # Connect to InOrbit
         self.__initialize_sessions()
 
+        # Initialize annotation sync client (managers started lazily per frame_id)
+        self.__initialize_annotation_sync()
+
     async def __disconnect(self) -> None:
         """Disconnect external services and disconnect from InOrbit."""
+
+        # Stop all annotation sync managers
+        for frame_id, manager in self.__annotation_sync_managers.items():
+            self._logger.debug(f"Stopping annotation sync for frame_id '{frame_id}'")
+            await manager.stop()
+        self.__annotation_sync_managers.clear()
+
+        if self.__annotation_sync_client is not None:
+            await self.__annotation_sync_client.close()
+            self.__annotation_sync_client = None
+        self.__annotation_sync_enabled = False
 
         # Disconnect from InOrbit
         for session in self.__robot_sessions.values():
@@ -507,6 +630,7 @@ class FleetConnector(ABC):
     ) -> None:
         """Publish a pose for a specific robot to InOrbit.
         If the frame_id has changed from the last published, the map will be updated.
+        If annotation sync is enabled and this is a new frame_id, sync will be started.
 
         Args:
             robot_id (str): The robot ID to publish pose for
@@ -523,6 +647,9 @@ class FleetConnector(ABC):
                 f"Updating map {frame_id} with new pose for robot {robot_id}."
             )
             self.publish_robot_map(robot_id, frame_id, is_update=True)
+            # Start annotation sync for this frame_id if not already running
+            if frame_id is not None:
+                self.__start_annotation_sync_for_frame(frame_id)
         session.publish_pose(x, y, yaw, frame_id, **kwargs)
 
     def publish_robot_map(

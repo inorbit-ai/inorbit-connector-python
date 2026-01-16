@@ -18,6 +18,11 @@ from inorbit_connector.models import MapConfigTemp
 # Local
 from datatypes import ExampleBotConnectorConfig
 from fleet_client import FleetManager, FleetManagerAPIWrapper
+from waypoint_sync import (
+    MockAnnotationConverter,
+    MockPositionProvider,
+    build_mock_positions,
+)
 
 # Path to the example map image
 EXAMPLE_MAP_PATH = Path(__file__).parent.parent / "example_map.png"
@@ -58,6 +63,19 @@ class ExampleBotFleetConnector(FleetConnector):
             ),
             default_update_freq=config.update_freq,
         )
+
+        if config.waypoint_sync:
+            provider = MockPositionProvider(build_mock_positions())
+            converter = MockAnnotationConverter(
+                signature_value=config.connector_type,
+                company_id=config.account_id or "",
+                location_id=config.waypoint_sync.location_id or "",
+                map_ref="mock-map",
+            )
+            self.register_annotation_sync(provider, converter)
+            self._logger.info(
+                f"Mock waypoint sync registered (mode={config.waypoint_sync.mode if config.waypoint_sync else 'disabled'})"
+            )
 
     @override
     async def _connect(self) -> None:

@@ -13,7 +13,10 @@ from typing import List, Optional
 # Third-party
 import pytz
 from inorbit_edge.models import CameraConfig
-from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
+from inorbit_edge.robot import (
+    INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL,
+    INORBIT_REST_API_URL,
+)
 from pydantic import (
     BaseModel,
     field_validator,
@@ -27,6 +30,7 @@ from pydantic import (
 # InOrbit
 from inorbit_connector.utils import DEFAULT_TIMEZONE, DEFAULT_LOGGING_CONFIG
 from inorbit_connector.logging.logger import LogLevels
+from inorbit_connector.waypoint_sync.models import WaypointSyncConfig
 
 # Ensure deprecation warnings are shown
 warnings.filterwarnings("always", category=DeprecationWarning)
@@ -150,6 +154,8 @@ class ConnectorConfig(BaseModel):
     * INORBIT_API_KEY (required): The InOrbit API key
     * INORBIT_API_URL: The URL of the API endpoint or inorbit_edge's
                        INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
+    * INORBIT_REST_API_URL: The URL of the InOrbit REST API or inorbit_edge's
+                            INORBIT_REST_API_URL by default
 
     in addition to those read by the Edge SDK during connector initialization.
 
@@ -157,6 +163,8 @@ class ConnectorConfig(BaseModel):
         api_key (str | None, optional): The InOrbit API key
         api_url (HttpUrl, optional): The URL of the API or inorbit_edge's
                                      INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
+        rest_api_url (HttpUrl, optional): The URL of the InOrbit REST API or
+                                          inorbit_edge's INORBIT_REST_API_URL by default
         connector_type (str): The type of connector (see Class comment above)
         connector_config (BaseModel): The configuration for the connector
         update_freq (float, optional): Update frequency or 1 Hz by default
@@ -173,10 +181,15 @@ class ConnectorConfig(BaseModel):
             connector or user scripts. The key is the environment variable name and the
             value is the value to set.
         fleet (list[RobotConfig]): The list of robot configurations.
+        waypoint_sync (WaypointSyncConfig | None, optional): Configuration for waypoint
+            synchronization between external fleet managers and InOrbit. Defaults to None
+            (disabled). Connectors may extend WaypointSyncConfig to add implementation-
+            specific fields.
     """
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
     api_url: HttpUrl = os.getenv("INORBIT_API_URL", INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL)
+    rest_api_url: HttpUrl = os.getenv("INORBIT_REST_API_URL", INORBIT_REST_API_URL)
     connector_type: str
     connector_config: BaseModel
     update_freq: float = 1.0
@@ -187,6 +200,9 @@ class ConnectorConfig(BaseModel):
     inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
+    # Waypoint synchronization (framework-level feature)
+    # Defaults to None, which means disabled
+    waypoint_sync: Optional[WaypointSyncConfig] = None
     # Kept for backwards compatibility. Deprecated in version 1.1.0
     # Use logging.log_level instead
     log_level: LogLevels | None = Field(default=None, exclude=True)
