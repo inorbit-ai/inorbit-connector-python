@@ -5,10 +5,9 @@
 """Annotation synchronization manager.
 
 This module provides the WaypointSyncManager class that implements
-the core sync logic for all three modes:
+the core sync logic for two modes:
 - external_to_inorbit: External system is source of truth
 - inorbit_to_external: InOrbit is source of truth
-- bidirectional: Two-way sync with conflict resolution
 
 Terminology:
     - Annotation: InOrbit SpatialAnnotation (kind: SpatialAnnotation)
@@ -26,8 +25,9 @@ from typing import Generic, Optional
 from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
 from inorbit_connector.waypoint_sync.models import (
     ANNOTATION_SYNC_ORIGIN_PROPERTY,
-    ConflictResolutionStrategy,
+    ConfigObjectMetadata,
     SpatialAnnotation,
+    SpatialAnnotationData,
     WaypointSyncConfig,
     WaypointSyncMode,
 )
@@ -50,8 +50,7 @@ class WaypointSyncManager(Generic[TExternalPosition]):
 
     The manager handles:
     - Periodic sync execution
-    - All three sync modes (external→InOrbit, InOrbit→external, bidirectional)
-    - Conflict resolution for bidirectional sync
+    - Two sync modes (external→InOrbit, InOrbit→external)
     - Signature-based ownership filtering
     - Error handling and logging
 
@@ -118,21 +117,69 @@ class WaypointSyncManager(Generic[TExternalPosition]):
             )
         return f"tag/{self._account_id}/{self.config.location_id}"
 
-    def _get_ownership_filter(self):
-        """Create filter function for annotations owned by this sync.
+    def _data_to_annotation(
+        self, data: SpatialAnnotationData, scope: str
+    ) -> SpatialAnnotation:
+        """Convert SpatialAnnotationData to full SpatialAnnotation.
+
+        Constructs a complete SpatialAnnotation with metadata, apiVersion,
+        and kind from the minimal SpatialAnnotationData. Injects the sync
+        signature into spec.properties to mark annotations as managed by
+        this sync process.
+
+        Args:
+            data: SpatialAnnotationData with id and spec
+            scope: Scope string for the annotation
 
         Returns:
-            Filter function that returns True for owned annotations
+            Complete SpatialAnnotation object with signature injected
         """
+        # Copy spec and inject signature
+        properties = dict(data.spec.properties)
+        properties[ANNOTATION_SYNC_ORIGIN_PROPERTY] = self._signature_value
+        spec_with_signature = data.spec.model_copy(update={"properties": properties})
 
-        def filter_fn(annotation: SpatialAnnotation) -> bool:
-            return self._converter.has_sync_signature(
-                annotation,
-                ANNOTATION_SYNC_ORIGIN_PROPERTY,
-                self._signature_value,
-            )
+        return SpatialAnnotation(
+            metadata=ConfigObjectMetadata(id=data.id, scope=scope),
+            spec=spec_with_signature,
+        )
 
-        return filter_fn
+    def _annotation_to_data(
+        self, annotation: SpatialAnnotation
+    ) -> SpatialAnnotationData:
+        """Convert SpatialAnnotation to SpatialAnnotationData.
+
+        Extracts the essential data (id and spec) from a full
+        SpatialAnnotation for use with the converter interface.
+
+        Args:
+            annotation: Full SpatialAnnotation object
+
+        Returns:
+            SpatialAnnotationData with id and spec
+        """
+        return SpatialAnnotationData(
+            id=annotation.metadata.id,
+            spec=annotation.spec,
+        )
+
+    def _has_sync_signature(self, annotation: SpatialAnnotation) -> bool:
+        """Check if an annotation has the sync ownership signature.
+
+        The signature identifies annotations that were created/managed
+        by this sync process. This prevents modification of other annotations
+        during synchronization.
+
+        Args:
+            annotation: SpatialAnnotation to check
+
+        Returns:
+            True if annotation has matching signature
+        """
+        return (
+            annotation.spec.properties.get(ANNOTATION_SYNC_ORIGIN_PROPERTY)
+            == self._signature_value
+        )
 
     async def sync_external_to_inorbit(self) -> dict:
         """Sync positions from external system to InOrbit annotations.
@@ -157,21 +204,27 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         # Fetch positions from external system for this frame
         positions = await self._position_provider.list_positions(self._frame_id)
         self._logger.debug(
-            f"Fetched {len(positions)} positions from external system for frame '{self._frame_id}'"
+            f"Fetched {len(positions)} positions from external system "
+            f"for frame '{self._frame_id}'"
         )
 
-        # Convert to InOrbit waypoint annotations
-        annotations = [
+        # Convert to SpatialAnnotationData
+        annotation_data_list = [
             self._converter.position_to_annotation(pos, self._frame_id)
             for pos in positions
         ]
 
-        # Synchronize with InOrbit
+        # Convert to full SpatialAnnotation objects with scope
         scope = self._get_scope()
+        annotations = [
+            self._data_to_annotation(data, scope) for data in annotation_data_list
+        ]
+
+        # Synchronize with InOrbit
         stats = await self._inorbit_client.synchronize_annotations(
             scope=scope,
             annotations=annotations,
-            filter_fn=self._get_ownership_filter(),
+            filter_fn=self._has_sync_signature,
         )
 
         self._logger.info(
@@ -208,13 +261,9 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         owned_annotations = [
             ann
             for ann in annotations
-            if ann.spec.type == "waypoint"
-            and self._converter.has_sync_signature(
-                ann,
-                ANNOTATION_SYNC_ORIGIN_PROPERTY,
-                self._signature_value,
-            )
+            if ann.spec.type == "waypoint" and self._has_sync_signature(ann)
         ]
+
         self._logger.debug(
             f"Fetched {len(owned_annotations)} owned annotations from InOrbit"
         )
@@ -231,7 +280,8 @@ class WaypointSyncManager(Generic[TExternalPosition]):
 
         # Process annotations
         for ann in owned_annotations:
-            position = self._converter.annotation_to_position(ann)
+            annotation_data = self._annotation_to_data(ann)
+            position = self._converter.annotation_to_position(annotation_data)
             position_id = ann.metadata.id
 
             if position_id not in positions_by_id:
@@ -264,7 +314,9 @@ class WaypointSyncManager(Generic[TExternalPosition]):
             "deleted": deleted,
         }
 
-    def _needs_update(self, existing: TExternalPosition, new: TExternalPosition) -> bool:
+    def _needs_update(
+        self, existing: TExternalPosition, new: TExternalPosition
+    ) -> bool:
         """Check if position needs update.
 
         Override for custom comparison logic. Default compares
@@ -279,145 +331,6 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         """
         return existing.model_dump() != new.model_dump()
 
-    async def sync_bidirectional(self) -> dict:
-        """Bidirectional sync with conflict resolution.
-
-        Fetches data from both systems and syncs:
-        - Positions only in external → create annotation in InOrbit
-        - Annotations only in InOrbit → create position in external
-        - Exists in both → apply conflict resolution strategy
-
-        Returns:
-            Combined sync statistics dict with keys:
-            - external_created, external_updated, external_deleted
-            - inorbit_created, inorbit_updated
-            - conflicts_resolved
-        """
-        self._logger.info(
-            f"Starting bidirectional annotation sync for frame '{self._frame_id}'"
-        )
-
-        # Fetch from both systems
-        positions = await self._position_provider.list_positions(self._frame_id)
-        scope = self._get_scope()
-        annotations = await self._inorbit_client.list_annotations(scope)
-
-        # Filter owned waypoint annotations
-        owned_annotations = [
-            ann
-            for ann in annotations
-            if ann.spec.type == "waypoint"
-            and self._converter.has_sync_signature(
-                ann,
-                ANNOTATION_SYNC_ORIGIN_PROPERTY,
-                self._signature_value,
-            )
-        ]
-
-        # Build ID mappings
-        positions_by_id = {
-            self._converter.get_position_id(pos): pos for pos in positions
-        }
-        annotations_by_id = {ann.metadata.id: ann for ann in owned_annotations}
-
-        # Combine all IDs
-        all_ids = set(positions_by_id.keys()) | set(annotations_by_id.keys())
-
-        stats = {
-            "external_created": 0,
-            "external_updated": 0,
-            "external_deleted": 0,
-            "inorbit_created": 0,
-            "inorbit_updated": 0,
-            "conflicts_resolved": 0,
-        }
-
-        for item_id in all_ids:
-            has_position = item_id in positions_by_id
-            has_annotation = item_id in annotations_by_id
-
-            if has_position and not has_annotation:
-                # Exists only in external → sync to InOrbit
-                position = positions_by_id[item_id]
-                annotation = self._converter.position_to_annotation(
-                    position, self._frame_id
-                )
-                await self._inorbit_client.apply_annotation(annotation)
-                stats["inorbit_created"] += 1
-
-            elif has_annotation and not has_position:
-                # Exists only in InOrbit → sync to external
-                annotation = annotations_by_id[item_id]
-                position = self._converter.annotation_to_position(annotation)
-                await self._position_provider.create_position(position)
-                stats["external_created"] += 1
-
-            else:
-                # Exists in both → resolve conflict
-                position = positions_by_id[item_id]
-                annotation = annotations_by_id[item_id]
-
-                # Apply conflict resolution strategy
-                winner = self._resolve_conflict(position, annotation)
-
-                if winner == "external":
-                    # Update InOrbit with external version
-                    new_annotation = self._converter.position_to_annotation(
-                        position, self._frame_id
-                    )
-                    await self._inorbit_client.apply_annotation(new_annotation)
-                    stats["inorbit_updated"] += 1
-                elif winner == "inorbit":
-                    # Update external with InOrbit version
-                    new_position = self._converter.annotation_to_position(annotation)
-                    await self._position_provider.update_position(
-                        item_id, new_position
-                    )
-                    stats["external_updated"] += 1
-
-                stats["conflicts_resolved"] += 1
-
-        self._logger.info(
-            f"Bidirectional sync complete: "
-            f"InOrbit {stats['inorbit_created']}c/{stats['inorbit_updated']}u, "
-            f"External {stats['external_created']}c/{stats['external_updated']}u, "
-            f"{stats['conflicts_resolved']} conflicts resolved"
-        )
-        return stats
-
-    def _resolve_conflict(
-        self, position: TExternalPosition, annotation: SpatialAnnotation
-    ) -> str:
-        """Resolve conflict between position and annotation.
-
-        Uses the configured conflict resolution strategy.
-
-        Args:
-            position: External position
-            annotation: InOrbit annotation
-
-        Returns:
-            "external" or "inorbit" indicating which version wins
-        """
-        strategy = self.config.conflict_strategy
-
-        if strategy == ConflictResolutionStrategy.EXTERNAL_WINS:
-            return "external"
-        elif strategy == ConflictResolutionStrategy.INORBIT_WINS:
-            return "inorbit"
-        elif strategy == ConflictResolutionStrategy.NEWEST_WINS:
-            # Compare timestamps (if available in properties)
-            pos_data = position.model_dump()
-            pos_timestamp = pos_data.get("properties", {}).get("last_sync")
-            ann_timestamp = annotation.spec.properties.get("last_sync")
-
-            if pos_timestamp and ann_timestamp:
-                return "external" if pos_timestamp > ann_timestamp else "inorbit"
-            # Fallback to external wins if timestamps not available
-            return "external"
-
-        return "external"
-
     async def sync_once(self) -> dict:
         """Execute single sync based on configured mode.
 
@@ -431,8 +344,6 @@ class WaypointSyncManager(Generic[TExternalPosition]):
             return await self.sync_external_to_inorbit()
         elif self.config.mode == WaypointSyncMode.INORBIT_TO_EXTERNAL:
             return await self.sync_inorbit_to_external()
-        elif self.config.mode == WaypointSyncMode.BIDIRECTIONAL:
-            return await self.sync_bidirectional()
         elif self.config.mode == WaypointSyncMode.DISABLED:
             self._logger.debug("Sync mode is DISABLED, skipping")
             return {}

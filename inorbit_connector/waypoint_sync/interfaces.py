@@ -26,7 +26,7 @@ from typing import Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel
 
-from inorbit_connector.waypoint_sync.models import SpatialAnnotation
+from inorbit_connector.waypoint_sync.models import SpatialAnnotationData
 
 # Generic type for external system positions (must be a Pydantic BaseModel)
 TExternalPosition = TypeVar("TExternalPosition", bound=BaseModel)
@@ -67,14 +67,11 @@ class ExternalAnnotationProvider(Protocol[TExternalPosition]):
         """
         ...
 
-    async def create_position(self, position: TExternalPosition) -> TExternalPosition:
+    async def create_position(self, position: TExternalPosition) -> None:
         """Create a new position in the external system.
 
         Args:
             position: Position data in the external system's format
-
-        Returns:
-            Created position with any server-assigned fields (e.g., ID)
 
         Raises:
             Exception: If creation fails (implementation-specific)
@@ -83,15 +80,12 @@ class ExternalAnnotationProvider(Protocol[TExternalPosition]):
 
     async def update_position(
         self, position_id: str, position: TExternalPosition
-    ) -> TExternalPosition:
+    ) -> None:
         """Update an existing position in the external system.
 
         Args:
             position_id: Unique identifier of the position to update
             position: Updated position data
-
-        Returns:
-            Updated position from the external system
 
         Raises:
             Exception: If update fails (implementation-specific)
@@ -115,48 +109,50 @@ class AnnotationConverter(Protocol[TExternalPosition]):
     """Protocol for converting between positions and waypoint annotations.
 
     Connectors implement this to convert between their external system's
-    position format and InOrbit SpatialAnnotation objects (type: waypoint).
+    position format and SpatialAnnotationData (id + spec only).
 
     The converter handles:
-        - Converting external positions to InOrbit waypoint annotations
-        - Converting InOrbit waypoint annotations back to external positions
+        - Converting external positions to SpatialAnnotationData
+        - Converting SpatialAnnotationData back to external positions
         - Extracting position IDs for matching/comparison
-        - Checking sync ownership signatures on annotations
 
     Note:
-        Currently, this converter works with waypoint annotations
-        (SpatialAnnotation with spec.type == "waypoint"). Future
-        converters may handle other annotation types (zones, routes).
+        The converter works with SpatialAnnotationData which contains only
+        id and spec. The manager handles constructing full SpatialAnnotation
+        objects with metadata, apiVersion, kind, and sync signatures.
     """
 
     def position_to_annotation(
         self, position: TExternalPosition, frame_id: str
-    ) -> SpatialAnnotation:
-        """Convert an external position to an InOrbit waypoint annotation.
+    ) -> SpatialAnnotationData:
+        """Convert an external position to SpatialAnnotationData.
 
-        The resulting annotation should have:
+        The resulting data should have:
+            - id: Position identifier
             - spec.type == "waypoint"
-            - Appropriate metadata (id, scope)
             - Position data (x, y, theta) in spec.data
             - spec.frameId set to the provided frame_id
-            - Sync ownership signature in spec.properties
+
+        Note:
+            The manager will inject sync signatures automatically.
+            Do not add sync-related properties to spec.properties.
 
         Args:
             position: Position from the external system
             frame_id: The frame/map ID for this annotation
 
         Returns:
-            SpatialAnnotation with type="waypoint" representing the position
+            SpatialAnnotationData with type="waypoint" representing the position
         """
         ...
 
     def annotation_to_position(
-        self, annotation: SpatialAnnotation
+        self, annotation_data: SpatialAnnotationData
     ) -> TExternalPosition:
-        """Convert an InOrbit waypoint annotation to an external position.
+        """Convert SpatialAnnotationData to an external position.
 
         Args:
-            annotation: SpatialAnnotation with type="waypoint"
+            annotation_data: SpatialAnnotationData with type="waypoint"
 
         Returns:
             Position in the external system's format
@@ -173,27 +169,5 @@ class AnnotationConverter(Protocol[TExternalPosition]):
 
         Returns:
             Unique identifier string
-        """
-        ...
-
-    def has_sync_signature(
-        self,
-        annotation: SpatialAnnotation,
-        signature_property: str,
-        signature_value: str,
-    ) -> bool:
-        """Check if an annotation has the sync ownership signature.
-
-        The signature identifies annotations that were created/managed
-        by this sync process. This prevents deletion of manually created
-        annotations during synchronization.
-
-        Args:
-            annotation: SpatialAnnotation to check
-            signature_property: Property name in spec.properties (constant)
-            signature_value: Expected property value (connector_type)
-
-        Returns:
-            True if annotation has matching signature
         """
         ...

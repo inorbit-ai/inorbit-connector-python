@@ -14,8 +14,8 @@ from inorbit_connector.models import ConnectorConfig, RobotConfig
 from inorbit_connector.waypoint_sync.models import (
     ANNOTATION_SYNC_ORIGIN_PROPERTY,
     ConfigObjectMetadata,
-    ConflictResolutionStrategy,
     SpatialAnnotation,
+    SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,
     WaypointSyncConfig,
@@ -34,8 +34,6 @@ class TestWaypointSyncConfig:
         assert config.enabled is False
         assert config.mode == WaypointSyncMode.DISABLED
         assert config.sync_interval_seconds == 300
-        # frame_id is no longer in config; it's dynamic per-sync
-        assert config.conflict_strategy == ConflictResolutionStrategy.EXTERNAL_WINS
 
     def test_custom_values(self):
         """Test configuration with custom values."""
@@ -828,15 +826,13 @@ class MockPositionProvider:
         """Return all positions (no filtering in mock)."""
         return self.positions
 
-    async def create_position(self, position: MockPosition) -> MockPosition:
+    async def create_position(self, position: MockPosition) -> None:
         self.created.append(position)
-        return position
 
     async def update_position(
         self, position_id: str, position: MockPosition
-    ) -> MockPosition:
+    ) -> None:
         self.updated.append((position_id, position))
-        return position
 
     async def delete_position(self, position_id: str) -> None:
         self.deleted.append(position_id)
@@ -845,42 +841,33 @@ class MockPositionProvider:
 class MockAnnotationConverter:
     """Mock implementation of AnnotationConverter."""
 
-    def __init__(self, signature_value=SIGNATURE_VALUE):
-        self._signature_value = signature_value
-
     def position_to_annotation(
         self, position: MockPosition, frame_id: str
-    ) -> SpatialAnnotation:
+    ) -> SpatialAnnotationData:
         """Convert position to annotation using provided frame_id."""
-        return SpatialAnnotation(
-            metadata=ConfigObjectMetadata(id=position.id),
+        return SpatialAnnotationData(
+            id=position.id,
             spec=WaypointAnnotationSpec(
                 data=WaypointData(x=position.x, y=position.y, theta=position.theta),
                 label=position.name,
                 frameId=frame_id,
-                properties={ANNOTATION_SYNC_ORIGIN_PROPERTY: self._signature_value},
+                properties={},
             ),
         )
 
-    def annotation_to_position(self, annotation: SpatialAnnotation) -> MockPosition:
+    def annotation_to_position(
+        self, annotation_data: SpatialAnnotationData
+    ) -> MockPosition:
         return MockPosition(
-            id=annotation.metadata.id,
-            name=annotation.spec.label,
-            x=annotation.spec.data.x,
-            y=annotation.spec.data.y,
-            theta=annotation.spec.data.theta,
+            id=annotation_data.id,
+            name=annotation_data.spec.label,
+            x=annotation_data.spec.data.x,
+            y=annotation_data.spec.data.y,
+            theta=annotation_data.spec.data.theta,
         )
 
     def get_position_id(self, position: MockPosition) -> str:
         return position.id
-
-    def has_sync_signature(
-        self,
-        annotation: SpatialAnnotation,
-        signature_property: str,
-        signature_value: str,
-    ) -> bool:
-        return annotation.spec.properties.get(signature_property) == signature_value
 
 
 class ConcreteWaypointSyncManager(WaypointSyncManager[MockPosition]):
@@ -1087,8 +1074,8 @@ class TestWaypointSyncManager:
         """Test that frame_id is passed to converter's position_to_annotation."""
         converter = MagicMock()
         converter.position_to_annotation = MagicMock(
-            return_value=SpatialAnnotation(
-                metadata=ConfigObjectMetadata(id="test"),
+            return_value=SpatialAnnotationData(
+                id="test",
                 spec=WaypointAnnotationSpec(
                     data=WaypointData(x=1.0, y=2.0, theta=0.0),
                     label="Test",

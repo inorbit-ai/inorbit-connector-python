@@ -56,7 +56,8 @@ class InOrbitConfigClient:
         self._timeout = timeout
         self._logger = logging.getLogger(self.__class__.__name__)
         self._logger.info(
-            f"Initializing InOrbit Config API client with base URL: {self._base_url}, API key: {api_key}, timeout: {timeout}"
+            f"Initializing InOrbit Config API client with base URL: "
+            f"{self._base_url}, API key: {api_key}, timeout: {timeout}"
         )
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
@@ -118,11 +119,6 @@ class InOrbitConfigClient:
             "/configuration/apply",
             json=annotation.model_dump(mode="json"),
         )
-        # self._logger.debug(f"Applying annotation: {annotation.model_dump(mode='json')}")
-        # import yaml
-
-        # print(yaml.dump(annotation.model_dump(mode="json")))
-
         response.raise_for_status()
         return annotation
 

@@ -42,30 +42,12 @@ class WaypointSyncMode(str, Enum):
             (external system is source of truth)
         INORBIT_TO_EXTERNAL: Sync from InOrbit to external system
             (InOrbit is source of truth)
-        BIDIRECTIONAL: Two-way sync with conflict resolution
         DISABLED: Synchronization is disabled
     """
 
     EXTERNAL_TO_INORBIT = "external_to_inorbit"
     INORBIT_TO_EXTERNAL = "inorbit_to_external"
-    BIDIRECTIONAL = "bidirectional"
     DISABLED = "disabled"
-
-
-class ConflictResolutionStrategy(str, Enum):
-    """Conflict resolution strategies for bidirectional sync.
-
-    Used when the same annotation exists in both systems with different values.
-
-    Attributes:
-        EXTERNAL_WINS: External system version takes precedence
-        INORBIT_WINS: InOrbit version takes precedence
-        NEWEST_WINS: Most recently modified version takes precedence
-    """
-
-    EXTERNAL_WINS = "external_wins"
-    INORBIT_WINS = "inorbit_wins"
-    NEWEST_WINS = "newest_wins"
 
 
 class WaypointSyncConfig(BaseModel):
@@ -88,7 +70,6 @@ class WaypointSyncConfig(BaseModel):
         mode: Synchronization mode (default: DISABLED)
         sync_interval_seconds: Interval between syncs in seconds
         location_id: Location/tag ID for annotation scope in InOrbit
-        conflict_strategy: Strategy for resolving conflicts in bidirectional mode
     """
 
     enabled: bool = False
@@ -97,9 +78,6 @@ class WaypointSyncConfig(BaseModel):
 
     # InOrbit Config API settings
     location_id: Optional[str] = None
-
-    # Conflict resolution (used in bidirectional mode)
-    conflict_strategy: ConflictResolutionStrategy = ConflictResolutionStrategy.EXTERNAL_WINS
 
 
 # =============================================================================
@@ -187,6 +165,22 @@ class WaypointAnnotationSpec(BaseModel):
     label: str
     properties: dict = Field(default_factory=dict)
     data: WaypointData
+
+
+class SpatialAnnotationData(BaseModel):
+    """Minimal annotation data for converter interface.
+
+    Contains only the essential fields (id and spec) that converters
+    need to work with. The manager handles constructing the full
+    SpatialAnnotation with metadata, apiVersion, and kind.
+
+    Attributes:
+        id: Annotation identifier
+        spec: Waypoint annotation specification
+    """
+
+    id: str
+    spec: WaypointAnnotationSpec
 
 
 class SpatialAnnotation(ConfigObject):

@@ -169,10 +169,10 @@ class FleetConnector(ABC):
             os.environ[env_var_name] = env_var_value
 
         # Create RobotSessionFactory with common configuration
-        # HACK: Using RobotSessionModel preserves backwards compatibility with
-        # automatically loaded environment variables Robot-specific values (robot_id,
-        # robot_name) have to be ommited after initalization before passing the config
-        # to the factory.
+        # HACK: Using RobotSessionModel allows automatically loading environment
+        # variables as defined by the inorbit-edge package.
+        # Robot-specific values (robot_id, robot_name) have to be ommited after
+        # initalization before passing the config to the factory.
         robot_session_config = RobotSessionModel(
             api_key=config.api_key,
             endpoint=config.api_url,

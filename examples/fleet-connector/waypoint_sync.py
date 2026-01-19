@@ -2,15 +2,12 @@
 #
 # SPDX-License-Identifier: MIT
 
-from datetime import datetime, timezone
 from typing import Dict, List
 
 from pydantic import BaseModel, Field
 
 from inorbit_connector.waypoint_sync.models import (
-    ANNOTATION_SYNC_ORIGIN_PROPERTY,
-    ConfigObjectMetadata,
-    SpatialAnnotation,
+    SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,
 )
@@ -24,7 +21,7 @@ class MockPose(BaseModel):
     heading: float
 
 
-class MockExternalPosition(BaseModel):
+class ExternalPosition(BaseModel):
     """Custom position format returned by the mock external system."""
 
     external_id: str
@@ -34,40 +31,36 @@ class MockExternalPosition(BaseModel):
     properties: Dict[str, str] = Field(default_factory=dict)
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def build_mock_positions() -> List[MockExternalPosition]:
+def build_mock_positions() -> List[ExternalPosition]:
     """Seed positions for the mock external system."""
     return [
-        MockExternalPosition(
+        ExternalPosition(
             external_id="mock-pos-1",
             label="Loading Dock",
             pose=MockPose(x=1.2, y=3.4, heading=0.1),
             map_ref="frameIdA",
-            properties={"last_sync": "2025-01-12T00:00:00+00:00", "source": "mock"},
+            properties={"createdBy": "user1"},
         ),
-        MockExternalPosition(
+        ExternalPosition(
             external_id="mock-pos-2",
             label="Storage A",
             pose=MockPose(x=5.6, y=7.8, heading=-0.5),
             map_ref="frameIdA",
-            properties={"last_sync": "2025-01-12T00:00:00+00:00", "source": "mock"},
+            properties={"createdBy": "user2"},
         ),
-        MockExternalPosition(
+        ExternalPosition(
             external_id="mock-pos-3",
             label="Floor 2 Lobby",
             pose=MockPose(x=2.4, y=6.1, heading=1.2),
             map_ref="frameIdB",
-            properties={"last_sync": "2025-01-12T00:00:00+00:00", "source": "mock"},
+            properties={"type": "staging-position"},
         ),
-        MockExternalPosition(
+        ExternalPosition(
             external_id="mock-pos-4",
             label="Charging Bay",
             pose=MockPose(x=-3.2, y=1.8, heading=2.8),
             map_ref="frameIdB",
-            properties={"last_sync": "2025-01-12T00:00:00+00:00", "source": "mock"},
+            properties={"type": "parking"},
         ),
     ]
 
@@ -75,70 +68,43 @@ def build_mock_positions() -> List[MockExternalPosition]:
 class MockPositionProvider:
     """In-memory provider for mock external positions."""
 
-    def __init__(self, seed_positions: List[MockExternalPosition]) -> None:
-        self._positions: Dict[str, MockExternalPosition] = {
+    def __init__(self, seed_positions: List[ExternalPosition]) -> None:
+        self._positions: Dict[str, ExternalPosition] = {
             position.external_id: position for position in seed_positions
         }
 
-    async def list_positions(self, frame_id: str) -> List[MockExternalPosition]:
+    async def list_positions(self, frame_id: str) -> List[ExternalPosition]:
         """Return positions filtered by frame_id (matched against map_ref)."""
         return [pos for pos in self._positions.values() if pos.map_ref == frame_id]
 
     async def create_position(
-        self, position: MockExternalPosition
-    ) -> MockExternalPosition:
-        created = self._touch(position)
-        self._positions[created.external_id] = created
-        return created
+        self, position: ExternalPosition
+    ) -> None:
+        self._positions[position.external_id] = position
 
     async def update_position(
-        self, position_id: str, position: MockExternalPosition
-    ) -> MockExternalPosition:
-        updated = self._touch(position, position_id=position_id)
-        self._positions[position_id] = updated
-        return updated
+        self, position_id: str, position: ExternalPosition
+    ) -> None:
+        self._positions[position_id] = position
 
     async def delete_position(self, position_id: str) -> None:
         self._positions.pop(position_id, None)
 
-    def _touch(
-        self, position: MockExternalPosition, position_id: str | None = None
-    ) -> MockExternalPosition:
-        properties = dict(position.properties)
-        properties["last_sync"] = _now_iso()
-        updates = {"properties": properties}
-        if position_id is not None and position.external_id != position_id:
-            updates["external_id"] = position_id
-        return position.model_copy(update=updates)
-
 
 class MockAnnotationConverter:
-    """Convert between mock positions and InOrbit waypoint annotations."""
-
-    def __init__(
-        self,
-        signature_value: str,
-        company_id: str,
-        location_id: str,
-        map_ref: str,
-    ) -> None:
-        self._signature_value = signature_value
-        self._scope = f"tag/{company_id}/{location_id}"
-        self._map_ref = map_ref
+    """Convert between mock positions and SpatialAnnotationData."""
 
     def position_to_annotation(
-        self, position: MockExternalPosition, frame_id: str
-    ) -> SpatialAnnotation:
-        """Convert a position to an InOrbit waypoint annotation.
+        self, position: ExternalPosition, frame_id: str
+    ) -> SpatialAnnotationData:
+        """Convert a position to SpatialAnnotationData.
 
         Args:
             position: The external position to convert
             frame_id: The frame/map ID for this annotation
         """
-        properties = dict(position.properties)
-        properties[ANNOTATION_SYNC_ORIGIN_PROPERTY] = self._signature_value
-        return SpatialAnnotation(
-            metadata=ConfigObjectMetadata(id=position.external_id, scope=self._scope),
+        return SpatialAnnotationData(
+            id=position.external_id,
             spec=WaypointAnnotationSpec(
                 frameId=frame_id,
                 label=position.label,
@@ -147,33 +113,25 @@ class MockAnnotationConverter:
                     y=position.pose.y,
                     theta=position.pose.heading,
                 ),
-                properties=properties,
+                properties=dict(position.properties),
             ),
         )
 
     def annotation_to_position(
-        self, annotation: SpatialAnnotation
-    ) -> MockExternalPosition:
-        properties = dict(annotation.spec.properties)
-        return MockExternalPosition(
-            external_id=annotation.metadata.id,
-            label=annotation.spec.label,
+        self, annotation_data: SpatialAnnotationData
+    ) -> ExternalPosition:
+        properties = dict(annotation_data.spec.properties)
+        return ExternalPosition(
+            external_id=annotation_data.id,
+            label=annotation_data.spec.label,
             pose=MockPose(
-                x=annotation.spec.data.x,
-                y=annotation.spec.data.y,
-                heading=annotation.spec.data.theta,
+                x=annotation_data.spec.data.x,
+                y=annotation_data.spec.data.y,
+                heading=annotation_data.spec.data.theta,
             ),
-            map_ref=self._map_ref,
+            map_ref=annotation_data.spec.frameId,
             properties=properties,
         )
 
-    def get_position_id(self, position: MockExternalPosition) -> str:
+    def get_position_id(self, position: ExternalPosition) -> str:
         return position.external_id
-
-    def has_sync_signature(
-        self,
-        annotation: SpatialAnnotation,
-        signature_property: str,
-        signature_value: str,
-    ) -> bool:
-        return annotation.spec.properties.get(signature_property) == signature_value

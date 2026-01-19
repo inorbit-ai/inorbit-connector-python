@@ -181,10 +181,10 @@ class ConnectorConfig(BaseModel):
             connector or user scripts. The key is the environment variable name and the
             value is the value to set.
         fleet (list[RobotConfig]): The list of robot configurations.
-        waypoint_sync (WaypointSyncConfig | None, optional): Configuration for waypoint
-            synchronization between external fleet managers and InOrbit. Defaults to None
-            (disabled). Connectors may extend WaypointSyncConfig to add implementation-
-            specific fields.
+        waypoint_sync (WaypointSyncConfig | None, optional): Configuration for
+            waypoint synchronization between external fleet managers and InOrbit.
+            Defaults to None (disabled). Connectors may extend WaypointSyncConfig
+            to add implementation-specific fields.
     """
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")

@@ -33,8 +33,8 @@ Example:
 from inorbit_connector.waypoint_sync.models import (
     ConfigObject,
     ConfigObjectMetadata,
-    ConflictResolutionStrategy,
     SpatialAnnotation,
+    SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,
     WaypointSyncConfig,
@@ -52,12 +52,12 @@ __all__ = [
     # Configuration
     "WaypointSyncConfig",
     "WaypointSyncMode",
-    "ConflictResolutionStrategy",
     # Config API base models
     "ConfigObject",
     "ConfigObjectMetadata",
     # SpatialAnnotation models
     "SpatialAnnotation",
+    "SpatialAnnotationData",
     "WaypointAnnotationSpec",
     "WaypointData",
     # Interfaces
