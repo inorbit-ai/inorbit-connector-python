@@ -52,14 +52,14 @@ def build_mock_positions() -> List[ExternalPosition]:
             external_id="mock-pos-3",
             label="Floor 2 Lobby",
             pose=MockPose(x=2.4, y=6.1, heading=1.2),
-            map_ref="frameIdB",
+            map_ref="map",
             properties={"type": "staging-position"},
         ),
         ExternalPosition(
             external_id="mock-pos-4",
             label="Charging Bay",
             pose=MockPose(x=-3.2, y=1.8, heading=2.8),
-            map_ref="frameIdB",
+            map_ref="map",
             properties={"type": "parking"},
         ),
     ]
@@ -103,6 +103,7 @@ class MockAnnotationConverter:
             position: The external position to convert
             frame_id: The frame/map ID for this annotation
         """
+        print("position_to_annotation", position, frame_id)
         return SpatialAnnotationData(
             id=position.external_id,
             spec=WaypointAnnotationSpec(

@@ -8,3 +8,4 @@ description: "Guides for implementing connectors"
 - [Single-Robot Connector](single-robot)
 - [Fleet Connector](fleet)
 - [Commands Handling](commands-handling)
+- [Annotation Synchronization](annotation-sync)

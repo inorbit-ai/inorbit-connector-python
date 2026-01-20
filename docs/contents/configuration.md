@@ -15,6 +15,7 @@ Connectors should subclass `inorbit_connector.models.ConnectorConfig` and define
 
 - **`api_key`** (str | None): The InOrbit API key. Can be set via environment variable `INORBIT_API_KEY`
 - **`api_url`** (HttpUrl): The URL of the InOrbit API endpoint. Defaults to InOrbit Cloud SDK URL. Can be set via environment variable `INORBIT_API_URL`
+- **`rest_api_url`** (HttpUrl): The URL of the InOrbit REST API endpoint. Defaults to the `inorbit_edge.robot.INORBIT_REST_API_URL` from the `inorbit-edge` package. Can be set via environment variable `INORBIT_REST_API_URL`.
 - **`connector_type`** (str): A string identifier for your connector type (e.g., "example_bot")
 - **`connector_config`** (BaseModel): Your custom configuration model that inherits from Pydantic's `BaseModel`. This is where you define connector-specific fields
 - **`update_freq`** (float): Update frequency in Hz for the execution loop. Default is 1.0
@@ -33,6 +34,7 @@ The following environment variables are automatically read during configuration:
 
 - **`INORBIT_API_KEY`** (required): The InOrbit API key
 - **`INORBIT_API_URL`** (optional): The InOrbit API endpoint URL
+- **`INORBIT_REST_API_URL`** (optional): The InOrbit REST API endpoint URL
 
 ## RobotConfig
 

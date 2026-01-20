@@ -64,7 +64,7 @@ from inorbit_connector.waypoint_sync.interfaces import (
     AnnotationConverter,
     ExternalAnnotationProvider,
 )
-from inorbit_connector.waypoint_sync.manager import WaypointSyncManager
+from inorbit_connector.waypoint_sync.manager import AnnotationSyncManager
 
 
 class FleetConnector(ABC):
@@ -192,8 +192,8 @@ class FleetConnector(ABC):
         # Annotation sync (initialized when implementations are registered)
         self.__annotation_provider: Optional[ExternalAnnotationProvider] = None
         self.__annotation_converter: Optional[AnnotationConverter] = None
-        # Per-frame sync managers: frame_id -> WaypointSyncManager
-        self.__annotation_sync_managers: dict[str, WaypointSyncManager] = {}
+        # Per-frame sync managers: frame_id -> AnnotationSyncManager
+        self.__annotation_sync_managers: dict[str, AnnotationSyncManager] = {}
         self.__annotation_sync_client: Optional[InOrbitConfigClient] = None
         # Flag indicating annotation sync is configured and ready
         self.__annotation_sync_enabled: bool = False
@@ -227,7 +227,7 @@ class FleetConnector(ABC):
         """Register annotation sync implementations.
 
         The connector must provide an ExternalAnnotationProvider and an
-        AnnotationConverter. If waypoint sync is enabled in the configuration,
+        AnnotationConverter. If annotation sync is enabled in the configuration,
         the framework will initialize and manage annotation synchronization
         automatically during connect/disconnect.
         """
@@ -240,7 +240,7 @@ class FleetConnector(ABC):
         This only initializes the Config API client. Per-frame sync managers
         are created lazily when poses are published for new frame_ids.
         """
-        sync_config = self.config.waypoint_sync
+        sync_config = self.config.annotation_sync
         if not sync_config or not sync_config.enabled:
             return
 
@@ -279,7 +279,7 @@ class FleetConnector(ABC):
     def __start_annotation_sync_for_frame(self, frame_id: str) -> None:
         """Start annotation sync for a specific frame_id.
 
-        Creates and starts a WaypointSyncManager for the given frame_id if one
+        Creates and starts an AnnotationSyncManager for the given frame_id if one
         doesn't already exist. Called when a pose is published for a new frame_id.
 
         Args:
@@ -291,7 +291,7 @@ class FleetConnector(ABC):
         if frame_id in self.__annotation_sync_managers:
             return
 
-        sync_config = self.config.waypoint_sync
+        sync_config = self.config.annotation_sync
         if (
             sync_config is None
             or self.__annotation_sync_client is None
@@ -301,7 +301,7 @@ class FleetConnector(ABC):
             return
 
         self._logger.info(f"Starting annotation sync for frame_id '{frame_id}'")
-        manager = WaypointSyncManager(
+        manager = AnnotationSyncManager(
             config=sync_config,
             inorbit_config_client=self.__annotation_sync_client,
             position_provider=self.__annotation_provider,

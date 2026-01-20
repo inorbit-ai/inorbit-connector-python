@@ -34,8 +34,8 @@ from pydantic import BaseModel, Field
 ANNOTATION_SYNC_ORIGIN_PROPERTY = "syncOrigin"
 
 
-class WaypointSyncMode(str, Enum):
-    """Synchronization modes for waypoint annotations.
+class AnnotationSyncMode(str, Enum):
+    """Synchronization modes for annotation synchronization.
 
     Attributes:
         EXTERNAL_TO_INORBIT: Sync from external system to InOrbit
@@ -50,8 +50,8 @@ class WaypointSyncMode(str, Enum):
     DISABLED = "disabled"
 
 
-class WaypointSyncConfig(BaseModel):
-    """Configuration for waypoint annotation synchronization.
+class AnnotationSyncConfig(BaseModel):
+    """Configuration for annotation synchronization.
 
     This is a framework-level configuration that works with any connector
     implementing the ExternalAnnotationProvider and AnnotationConverter
@@ -73,7 +73,7 @@ class WaypointSyncConfig(BaseModel):
     """
 
     enabled: bool = False
-    mode: WaypointSyncMode = WaypointSyncMode.DISABLED
+    mode: AnnotationSyncMode = AnnotationSyncMode.DISABLED
     sync_interval_seconds: int = Field(default=300, gt=0)
 
     # InOrbit Config API settings

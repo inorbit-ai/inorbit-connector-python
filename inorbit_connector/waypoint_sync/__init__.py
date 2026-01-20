@@ -14,16 +14,16 @@ Terminology:
 
 Modules:
     config_client: InOrbit Config API client for managing annotations
-    models: Configuration and data models (WaypointSyncConfig, SpatialAnnotation)
+    models: Configuration and data models (AnnotationSyncConfig, SpatialAnnotation)
     interfaces: Provider and converter protocols
     manager: Sync manager with all sync modes
 
 Example:
     from inorbit_connector.waypoint_sync import (
-        WaypointSyncConfig,
-        WaypointSyncMode,
+        AnnotationSyncConfig,
+        AnnotationSyncMode,
         InOrbitConfigClient,
-        WaypointSyncManager,
+        AnnotationSyncManager,
         ExternalAnnotationProvider,
         AnnotationConverter,
         SpatialAnnotation,
@@ -31,14 +31,14 @@ Example:
 """
 
 from inorbit_connector.waypoint_sync.models import (
+    AnnotationSyncConfig,
+    AnnotationSyncMode,
     ConfigObject,
     ConfigObjectMetadata,
     SpatialAnnotation,
     SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,
-    WaypointSyncConfig,
-    WaypointSyncMode,
 )
 from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
 from inorbit_connector.waypoint_sync.interfaces import (
@@ -46,12 +46,12 @@ from inorbit_connector.waypoint_sync.interfaces import (
     ExternalAnnotationProvider,
     TExternalPosition,
 )
-from inorbit_connector.waypoint_sync.manager import WaypointSyncManager
+from inorbit_connector.waypoint_sync.manager import AnnotationSyncManager
 
 __all__ = [
     # Configuration
-    "WaypointSyncConfig",
-    "WaypointSyncMode",
+    "AnnotationSyncConfig",
+    "AnnotationSyncMode",
     # Config API base models
     "ConfigObject",
     "ConfigObjectMetadata",
@@ -66,5 +66,5 @@ __all__ = [
     "TExternalPosition",
     # Client and Manager
     "InOrbitConfigClient",
-    "WaypointSyncManager",
+    "AnnotationSyncManager",
 ]

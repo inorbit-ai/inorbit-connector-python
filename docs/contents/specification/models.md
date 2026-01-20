@@ -13,7 +13,7 @@ Base configuration model for connectors.
 Key points:
 
 - You typically **subclass** this to define your connector-specific `connector_config` model.
-- The base model reads `INORBIT_API_KEY` and `INORBIT_API_URL` from environment variables by default.
+- The base model reads `INORBIT_API_KEY`, `INORBIT_API_URL`, and `INORBIT_REST_API_URL` from environment variables by default.
 - `fleet` must contain at least one `RobotConfig`, and robot IDs must be unique.
 
 ### `to_singular_config(robot_id) -> ConnectorConfig`

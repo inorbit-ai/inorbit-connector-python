@@ -107,7 +107,7 @@ This directory contains a more comprehensive example of a **fleet connector** th
 + A connector class that publishes data for all robots in the fleet to InOrbit
 + Proper separation of concerns with datatypes, fleet client, and connector modules
 + Robot-specific command handling for each robot in the fleet
-+ A mock waypoint synchronization setup that translates a custom position format into InOrbit waypoint annotations
++ A mock annotation synchronization setup that translates a custom position format into InOrbit annotations
 
 Configuration file structure (`example.fleet.yaml`):
 ```yaml

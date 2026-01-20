@@ -30,7 +30,7 @@ from pydantic import (
 # InOrbit
 from inorbit_connector.utils import DEFAULT_TIMEZONE, DEFAULT_LOGGING_CONFIG
 from inorbit_connector.logging.logger import LogLevels
-from inorbit_connector.waypoint_sync.models import WaypointSyncConfig
+from inorbit_connector.waypoint_sync.models import AnnotationSyncConfig
 
 # Ensure deprecation warnings are shown
 warnings.filterwarnings("always", category=DeprecationWarning)
@@ -181,9 +181,9 @@ class ConnectorConfig(BaseModel):
             connector or user scripts. The key is the environment variable name and the
             value is the value to set.
         fleet (list[RobotConfig]): The list of robot configurations.
-        waypoint_sync (WaypointSyncConfig | None, optional): Configuration for
-            waypoint synchronization between external fleet managers and InOrbit.
-            Defaults to None (disabled). Connectors may extend WaypointSyncConfig
+        annotation_sync (AnnotationSyncConfig | None, optional): Configuration for
+            annotation synchronization between external fleet managers and InOrbit.
+            Defaults to None (disabled). Connectors may extend AnnotationSyncConfig
             to add implementation-specific fields.
     """
 
@@ -200,9 +200,9 @@ class ConnectorConfig(BaseModel):
     inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
-    # Waypoint synchronization (framework-level feature)
+    # Annotation synchronization (framework-level feature)
     # Defaults to None, which means disabled
-    waypoint_sync: Optional[WaypointSyncConfig] = None
+    annotation_sync: Optional[AnnotationSyncConfig] = None
     # Kept for backwards compatibility. Deprecated in version 1.1.0
     # Use logging.log_level instead
     log_level: LogLevels | None = Field(default=None, exclude=True)

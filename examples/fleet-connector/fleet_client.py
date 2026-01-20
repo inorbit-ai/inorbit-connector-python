@@ -47,7 +47,7 @@ class FleetManagerAPIWrapper:
                     "x": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
                     "y": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
                     "yaw": random.uniform(-3.14, 3.14),
-                    "frame_id": "frameIdA",
+                    "frame_id": "map",
                 },
             }
 

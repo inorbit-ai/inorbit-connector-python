@@ -4,7 +4,7 @@
 
 """Annotation synchronization manager.
 
-This module provides the WaypointSyncManager class that implements
+This module provides the AnnotationSyncManager class that implements
 the core sync logic for two modes:
 - external_to_inorbit: External system is source of truth
 - inorbit_to_external: InOrbit is source of truth
@@ -25,11 +25,11 @@ from typing import Generic, Optional
 from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
 from inorbit_connector.waypoint_sync.models import (
     ANNOTATION_SYNC_ORIGIN_PROPERTY,
+    AnnotationSyncConfig,
+    AnnotationSyncMode,
     ConfigObjectMetadata,
     SpatialAnnotation,
     SpatialAnnotationData,
-    WaypointSyncConfig,
-    WaypointSyncMode,
 )
 from inorbit_connector.waypoint_sync.interfaces import (
     AnnotationConverter,
@@ -38,8 +38,8 @@ from inorbit_connector.waypoint_sync.interfaces import (
 )
 
 
-class WaypointSyncManager(Generic[TExternalPosition]):
-    """Waypoint annotation synchronization manager.
+class AnnotationSyncManager(Generic[TExternalPosition]):
+    """Annotation synchronization manager.
 
     Provides the core sync logic for synchronizing positions between
     an external system and InOrbit annotations.
@@ -58,7 +58,7 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         TExternalPosition: The external system's position type (Pydantic model)
 
     Attributes:
-        config: Waypoint sync configuration
+        config: Annotation sync configuration
         _inorbit_client: InOrbit Config API client
         _position_provider: External annotation provider
         _converter: Position ↔ annotation converter
@@ -69,7 +69,7 @@ class WaypointSyncManager(Generic[TExternalPosition]):
 
     def __init__(
         self,
-        config: WaypointSyncConfig,
+        config: AnnotationSyncConfig,
         inorbit_config_client: InOrbitConfigClient,
         position_provider: ExternalAnnotationProvider[TExternalPosition],
         annotation_converter: AnnotationConverter[TExternalPosition],
@@ -77,10 +77,10 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         frame_id: str,
         signature_value: str,
     ):
-        """Initialize waypoint sync manager.
+        """Initialize annotation sync manager.
 
         Args:
-            config: Waypoint sync configuration
+            config: Annotation sync configuration
             inorbit_config_client: InOrbit Config API client
             position_provider: External annotation provider for position CRUD
             annotation_converter: Converter between positions and annotations
@@ -185,7 +185,7 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         """Sync positions from external system to InOrbit annotations.
 
         Fetches all positions from the external system, converts them
-        to waypoint annotations, and synchronizes with InOrbit Config API.
+        to annotations, and synchronizes with InOrbit Config API.
 
         Only annotations with the sync signature are considered for
         update/delete operations to avoid affecting manually created annotations.
@@ -257,7 +257,7 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         scope = self._get_scope()
         annotations = await self._inorbit_client.list_annotations(scope)
 
-        # Filter for owned waypoint annotations only
+        # Filter for owned annotations only
         owned_annotations = [
             ann
             for ann in annotations
@@ -340,11 +340,11 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         Raises:
             ValueError: If mode is not implemented
         """
-        if self.config.mode == WaypointSyncMode.EXTERNAL_TO_INORBIT:
+        if self.config.mode == AnnotationSyncMode.EXTERNAL_TO_INORBIT:
             return await self.sync_external_to_inorbit()
-        elif self.config.mode == WaypointSyncMode.INORBIT_TO_EXTERNAL:
+        elif self.config.mode == AnnotationSyncMode.INORBIT_TO_EXTERNAL:
             return await self.sync_inorbit_to_external()
-        elif self.config.mode == WaypointSyncMode.DISABLED:
+        elif self.config.mode == AnnotationSyncMode.DISABLED:
             self._logger.debug("Sync mode is DISABLED, skipping")
             return {}
         else:
@@ -378,7 +378,7 @@ class WaypointSyncManager(Generic[TExternalPosition]):
         Creates a background task that runs sync at configured intervals.
         Does nothing if sync mode is DISABLED or already running.
         """
-        if self.config.mode == WaypointSyncMode.DISABLED:
+        if self.config.mode == AnnotationSyncMode.DISABLED:
             self._logger.info("Annotation sync is disabled")
             return
 

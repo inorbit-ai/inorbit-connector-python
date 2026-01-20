@@ -106,7 +106,7 @@ class ExternalAnnotationProvider(Protocol[TExternalPosition]):
 
 @runtime_checkable
 class AnnotationConverter(Protocol[TExternalPosition]):
-    """Protocol for converting between positions and waypoint annotations.
+    """Protocol for converting between positions and annotations.
 
     Connectors implement this to convert between their external system's
     position format and SpatialAnnotationData (id + spec only).

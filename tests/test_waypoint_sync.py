@@ -13,47 +13,47 @@ from inorbit_connector.connector import FleetConnector
 from inorbit_connector.models import ConnectorConfig, RobotConfig
 from inorbit_connector.waypoint_sync.models import (
     ANNOTATION_SYNC_ORIGIN_PROPERTY,
+    AnnotationSyncConfig,
+    AnnotationSyncMode,
     ConfigObjectMetadata,
     SpatialAnnotation,
     SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,
-    WaypointSyncConfig,
-    WaypointSyncMode,
 )
 from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
-from inorbit_connector.waypoint_sync.manager import WaypointSyncManager
+from inorbit_connector.waypoint_sync.manager import AnnotationSyncManager
 
 
-class TestWaypointSyncConfig:
-    """Tests for WaypointSyncConfig model."""
+class TestAnnotationSyncConfig:
+    """Tests for AnnotationSyncConfig model."""
 
     def test_default_values(self):
         """Test that default values are set correctly."""
-        config = WaypointSyncConfig()
+        config = AnnotationSyncConfig()
         assert config.enabled is False
-        assert config.mode == WaypointSyncMode.DISABLED
+        assert config.mode == AnnotationSyncMode.DISABLED
         assert config.sync_interval_seconds == 300
 
     def test_custom_values(self):
         """Test configuration with custom values."""
-        config = WaypointSyncConfig(
+        config = AnnotationSyncConfig(
             enabled=True,
-            mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+            mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
             sync_interval_seconds=60,
             location_id="test-location",
         )
         assert config.enabled is True
-        assert config.mode == WaypointSyncMode.EXTERNAL_TO_INORBIT
+        assert config.mode == AnnotationSyncMode.EXTERNAL_TO_INORBIT
         assert config.sync_interval_seconds == 60
         assert config.location_id == "test-location"
 
     def test_sync_interval_must_be_positive(self):
         """Test that sync_interval_seconds must be positive."""
         with pytest.raises(ValueError):
-            WaypointSyncConfig(sync_interval_seconds=0)
+            AnnotationSyncConfig(sync_interval_seconds=0)
         with pytest.raises(ValueError):
-            WaypointSyncConfig(sync_interval_seconds=-1)
+            AnnotationSyncConfig(sync_interval_seconds=-1)
 
 
 class TestSpatialAnnotation:
@@ -271,9 +271,9 @@ class TestAnnotationSyncLifecycle:
             connector_type="test",
             connector_config=connector_config,
             fleet=[RobotConfig(robot_id="robot-1")],
-            waypoint_sync=WaypointSyncConfig(
+            annotation_sync=AnnotationSyncConfig(
                 enabled=True,
-                mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+                mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
                 location_id="location",
             ),
             account_id="company",
@@ -294,9 +294,9 @@ class TestAnnotationSyncLifecycle:
                 RobotConfig(robot_id="robot-2"),
                 RobotConfig(robot_id="robot-3"),
             ],
-            waypoint_sync=WaypointSyncConfig(
+            annotation_sync=AnnotationSyncConfig(
                 enabled=True,
-                mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+                mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
                 location_id="location",
             ),
             account_id="company",
@@ -318,7 +318,7 @@ class TestAnnotationSyncLifecycle:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ) as client_cls, patch(
-            "inorbit_connector.connector.WaypointSyncManager",
+            "inorbit_connector.connector.AnnotationSyncManager",
             return_value=manager_instance,
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
@@ -351,7 +351,7 @@ class TestAnnotationSyncLifecycle:
         with patch(
             "inorbit_connector.connector.InOrbitConfigClient"
         ) as client_cls, patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ):
@@ -369,7 +369,7 @@ class TestAnnotationSyncLifecycle:
         with patch(
             "inorbit_connector.connector.InOrbitConfigClient"
         ) as client_cls, patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ):
@@ -387,7 +387,7 @@ class TestAnnotationSyncLifecycle:
         with patch(
             "inorbit_connector.connector.InOrbitConfigClient"
         ) as client_cls, patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ):
@@ -400,9 +400,9 @@ class TestAnnotationSyncLifecycle:
         """Test sync is not initialized when enabled=False."""
         config = base_config.model_copy(
             update={
-                "waypoint_sync": WaypointSyncConfig(
+                "annotation_sync": AnnotationSyncConfig(
                     enabled=False,
-                    mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+                    mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
                     location_id="location",
                 )
             }
@@ -413,7 +413,7 @@ class TestAnnotationSyncLifecycle:
         with patch(
             "inorbit_connector.connector.InOrbitConfigClient"
         ) as client_cls, patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ):
@@ -422,16 +422,16 @@ class TestAnnotationSyncLifecycle:
             manager_cls.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_no_waypoint_sync_config(self, base_config):
-        """Test sync is not initialized when waypoint_sync config is None."""
-        config = base_config.model_copy(update={"waypoint_sync": None})
+    async def test_no_annotation_sync_config(self, base_config):
+        """Test sync is not initialized when annotation_sync config is None."""
+        config = base_config.model_copy(update={"annotation_sync": None})
         connector = DummyConnector(config)
         connector.register_annotation_sync(MagicMock(), MagicMock())
 
         with patch(
             "inorbit_connector.connector.InOrbitConfigClient"
         ) as client_cls, patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ):
@@ -453,7 +453,7 @@ class TestAnnotationSyncLifecycle:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ), patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ), patch.object(
@@ -485,9 +485,9 @@ class TestPerFrameSyncManager:
                 RobotConfig(robot_id="robot-3"),
                 RobotConfig(robot_id="robot-4"),
             ],
-            waypoint_sync=WaypointSyncConfig(
+            annotation_sync=AnnotationSyncConfig(
                 enabled=True,
-                mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+                mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
                 location_id="location",
             ),
             account_id="company",
@@ -515,7 +515,7 @@ class TestPerFrameSyncManager:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ), patch(
-            "inorbit_connector.connector.WaypointSyncManager",
+            "inorbit_connector.connector.AnnotationSyncManager",
             side_effect=create_manager,
         ), patch.object(
             connector, "_FleetConnector__initialize_sessions"
@@ -569,7 +569,7 @@ class TestPerFrameSyncManager:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ), patch(
-            "inorbit_connector.connector.WaypointSyncManager",
+            "inorbit_connector.connector.AnnotationSyncManager",
             side_effect=create_manager,
         ), patch.object(
             connector, "_FleetConnector__initialize_sessions"
@@ -621,7 +621,7 @@ class TestPerFrameSyncManager:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ), patch(
-            "inorbit_connector.connector.WaypointSyncManager",
+            "inorbit_connector.connector.AnnotationSyncManager",
             side_effect=create_manager,
         ), patch.object(
             connector, "_FleetConnector__initialize_sessions"
@@ -674,7 +674,7 @@ class TestPerFrameSyncManager:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ), patch(
-            "inorbit_connector.connector.WaypointSyncManager",
+            "inorbit_connector.connector.AnnotationSyncManager",
             side_effect=create_manager,
         ), patch.object(
             connector, "_FleetConnector__initialize_sessions"
@@ -718,7 +718,7 @@ class TestPerFrameSyncManager:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ), patch(
-            "inorbit_connector.connector.WaypointSyncManager",
+            "inorbit_connector.connector.AnnotationSyncManager",
             side_effect=create_manager,
         ), patch.object(
             connector, "_FleetConnector__initialize_sessions"
@@ -741,9 +741,9 @@ class TestPerFrameSyncManager:
         """Test no managers created when sync not enabled even with pose publishing."""
         config = fleet_config.model_copy(
             update={
-                "waypoint_sync": WaypointSyncConfig(
+                "annotation_sync": AnnotationSyncConfig(
                     enabled=False,
-                    mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+                    mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
                     location_id="location",
                 )
             }
@@ -755,7 +755,7 @@ class TestPerFrameSyncManager:
         with patch(
             "inorbit_connector.connector.InOrbitConfigClient"
         ) as client_cls, patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ), patch.object(
@@ -785,7 +785,7 @@ class TestPerFrameSyncManager:
             "inorbit_connector.connector.InOrbitConfigClient",
             return_value=client_instance,
         ), patch(
-            "inorbit_connector.connector.WaypointSyncManager"
+            "inorbit_connector.connector.AnnotationSyncManager"
         ) as manager_cls, patch.object(
             connector, "_FleetConnector__initialize_sessions"
         ):
@@ -870,21 +870,21 @@ class MockAnnotationConverter:
         return position.id
 
 
-class ConcreteWaypointSyncManager(WaypointSyncManager[MockPosition]):
+class ConcreteAnnotationSyncManager(AnnotationSyncManager[MockPosition]):
     """Concrete implementation for testing."""
 
     pass
 
 
-class TestWaypointSyncManager:
-    """Tests for WaypointSyncManager."""
+class TestAnnotationSyncManager:
+    """Tests for AnnotationSyncManager."""
 
     @pytest.fixture
     def config(self):
         """Create test config."""
-        return WaypointSyncConfig(
+        return AnnotationSyncConfig(
             enabled=True,
-            mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+            mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
             location_id="test-location",
         )
 
@@ -918,7 +918,7 @@ class TestWaypointSyncManager:
     @pytest.fixture
     def manager(self, config, inorbit_client, position_provider, converter):
         """Create test manager."""
-        return ConcreteWaypointSyncManager(
+        return ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,
@@ -937,12 +937,12 @@ class TestWaypointSyncManager:
         self, inorbit_client, position_provider, converter
     ):
         """Test scope generation fails without account ID."""
-        config = WaypointSyncConfig(
+        config = AnnotationSyncConfig(
             enabled=True,
-            mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+            mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
             location_id="test-location",
         )
-        manager = ConcreteWaypointSyncManager(
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,
@@ -979,8 +979,8 @@ class TestWaypointSyncManager:
         self, config, inorbit_client, position_provider, converter
     ):
         """Test InOrbit to external sync."""
-        config.mode = WaypointSyncMode.INORBIT_TO_EXTERNAL
-        manager = ConcreteWaypointSyncManager(
+        config.mode = AnnotationSyncMode.INORBIT_TO_EXTERNAL
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,
@@ -1014,8 +1014,8 @@ class TestWaypointSyncManager:
         self, config, inorbit_client, position_provider, converter
     ):
         """Test sync_once with disabled mode."""
-        config.mode = WaypointSyncMode.DISABLED
-        manager = ConcreteWaypointSyncManager(
+        config.mode = AnnotationSyncMode.DISABLED
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,
@@ -1030,8 +1030,8 @@ class TestWaypointSyncManager:
 
     def test_start_disabled(self, config, inorbit_client, position_provider, converter):
         """Test start with disabled mode."""
-        config.mode = WaypointSyncMode.DISABLED
-        manager = ConcreteWaypointSyncManager(
+        config.mode = AnnotationSyncMode.DISABLED
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,
@@ -1052,7 +1052,7 @@ class TestWaypointSyncManager:
         provider = MagicMock()
         provider.list_positions = AsyncMock(return_value=[])
 
-        manager = ConcreteWaypointSyncManager(
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=provider,
@@ -1088,7 +1088,7 @@ class TestWaypointSyncManager:
             MockPosition(id="pos-1", name="Position 1", x=1.0, y=2.0),
         ]
 
-        manager = ConcreteWaypointSyncManager(
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,
@@ -1118,7 +1118,7 @@ class TestWaypointSyncManager:
 
         converter = MockAnnotationConverter()
 
-        manager1 = ConcreteWaypointSyncManager(
+        manager1 = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=provider1,
@@ -1128,7 +1128,7 @@ class TestWaypointSyncManager:
             signature_value=SIGNATURE_VALUE,
         )
 
-        manager2 = ConcreteWaypointSyncManager(
+        manager2 = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=provider2,
@@ -1146,12 +1146,12 @@ class TestWaypointSyncManager:
 
     def test_get_scope_missing_location_id(self, inorbit_client, position_provider, converter):
         """Test scope generation fails without location_id."""
-        config = WaypointSyncConfig(
+        config = AnnotationSyncConfig(
             enabled=True,
-            mode=WaypointSyncMode.EXTERNAL_TO_INORBIT,
+            mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
             location_id=None,  # Missing location_id
         )
-        manager = ConcreteWaypointSyncManager(
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,
@@ -1167,7 +1167,7 @@ class TestWaypointSyncManager:
         self, config, inorbit_client, position_provider, converter
     ):
         """Test that manager logger name includes frame_id for debugging."""
-        manager = ConcreteWaypointSyncManager(
+        manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
             position_provider=position_provider,

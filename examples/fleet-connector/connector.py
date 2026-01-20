@@ -64,14 +64,14 @@ class ExampleBotFleetConnector(FleetConnector):
             default_update_freq=config.update_freq,
         )
 
-        if config.waypoint_sync:
+        if config.annotation_sync:
             provider = MockPositionProvider(build_mock_positions())
             converter = MockAnnotationConverter()
             self.register_annotation_sync(provider, converter)
             mode_str = (
-                config.waypoint_sync.mode if config.waypoint_sync else "disabled"
+                config.annotation_sync.mode if config.annotation_sync else "disabled"
             )
-            self._logger.info(f"Mock waypoint sync registered (mode={mode_str})")
+            self._logger.info(f"Mock annotation sync registered (mode={mode_str})")
 
     @override
     async def _connect(self) -> None:
