@@ -40,6 +40,7 @@ For narrative guides, see:
 - Commands: [Commands Handling](../usage/commands-handling)
 - Publishing: [Publishing Data](../publishing)
 - Configuration: [Configuration](../configuration)
+- Annotation Synchronization: [Annotation Synchronization](annotation-sync)
 
 ## API surface (callable + overridable)
 

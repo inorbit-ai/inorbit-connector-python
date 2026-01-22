@@ -6,7 +6,7 @@ from typing import Dict, List
 
 from pydantic import BaseModel, Field
 
-from inorbit_connector.waypoint_sync.models import (
+from inorbit_connector.annotation_sync.models import (
     SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,

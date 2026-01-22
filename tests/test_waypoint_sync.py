@@ -11,7 +11,7 @@ from pydantic import BaseModel, HttpUrl
 
 from inorbit_connector.connector import FleetConnector
 from inorbit_connector.models import ConnectorConfig, RobotConfig
-from inorbit_connector.waypoint_sync.models import (
+from inorbit_connector.annotation_sync.models import (
     ANNOTATION_SYNC_ORIGIN_PROPERTY,
     AnnotationSyncConfig,
     AnnotationSyncMode,
@@ -21,8 +21,8 @@ from inorbit_connector.waypoint_sync.models import (
     WaypointAnnotationSpec,
     WaypointData,
 )
-from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
-from inorbit_connector.waypoint_sync.manager import AnnotationSyncManager
+from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
+from inorbit_connector.annotation_sync.manager import AnnotationSyncManager
 
 
 class TestAnnotationSyncConfig:

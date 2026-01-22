@@ -63,6 +63,16 @@ Configuration for logging:
 - **`log_level`** (LogLevels | None): Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Overrides the level set in the config file
 - **`defaults`** (dict[str, str]): Default values to pass to the logging configuration file (e.g., log file path)
 
+## AnnotationSyncConfig
+
+Configuration for annotation synchronization:
+- **`enabled`** (bool): Enable annotation synchronization
+- **`mode`** (AnnotationSyncMode): Synchronization mode
+- **`sync_interval_seconds`** (int): Interval between syncs in seconds
+- **`location_id`** (str): Location/tag ID for annotation scope in InOrbit
+
+See [Annotation Synchronization](usage/annotation-sync) for more information.
+
 (creating-a-custom-configuration)=
 ## Creating a Custom Configuration
 

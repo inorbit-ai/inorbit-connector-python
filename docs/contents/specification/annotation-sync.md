@@ -3,15 +3,13 @@ title: "Annotation Synchronization"
 description: "API specification for synchronizing annotations between external systems and InOrbit"
 ---
 
-# Annotation Synchronization API
-
-The annotation synchronization framework enables connectors to synchronize annotations (currently waypoints) between external systems and InOrbit's Config API.
+The annotation synchronization API enables connectors to synchronize annotations between external systems and InOrbit's Config API. Currently only waypoint annotations are supported.
 
 ## Terminology
 
-- **Annotation**: An InOrbit `SpatialAnnotation` object (kind: `SpatialAnnotation`). Currently, we support waypoint annotations (`spec.type == "waypoint"`).
+- **Annotation**: An InOrbit `SpatialAnnotation` object (kind: `SpatialAnnotation`). Currently, the framework only supports waypoint annotations (`spec.type == "waypoint"`).
 - **Position**: A relevant position in the external system. This is the external system's representation that maps to a waypoint annotation in InOrbit.
-- **External system**: The software the connector interacts with, such as a fleet manager (MiR Fleet, Bluebotics) or native robot software.
+- **External system**: The software the connector interacts with, such as a fleet manager or native robot software.
 
 ## Overview
 
@@ -22,17 +20,13 @@ The framework provides:
 - **Interfaces**: `ExternalAnnotationProvider` and `AnnotationConverter` for connector implementations
 - **Models**: Configuration and data models (`AnnotationSyncConfig`, `SpatialAnnotation`)
 
-The framework instantiates `InOrbitConfigClient` using `ConnectorConfig.rest_api_url`
-(environment variable `INORBIT_REST_API_URL`). This REST API base URL is distinct
-from the robot session endpoint configured in `ConnectorConfig.api_url`.
-
 ## Module Structure
 
-All annotation sync components are under `inorbit_connector/waypoint_sync/`:
+All annotation sync components are under `inorbit_connector/annotation_sync/`:
 
 ```
 inorbit_connector/
-└── waypoint_sync/
+└── annotation_sync/
     ├── __init__.py         # Exports main classes
     ├── config_client.py    # InOrbit Config API client
     ├── interfaces.py       # Provider and converter protocols
@@ -58,6 +52,8 @@ class ConfigObject(BaseModel):
     kind: str
     metadata: ConfigObjectMetadata
 ```
+
+Visit the InOrbit developer documentation for more information: https://developer.inorbit.ai/docs#configuration-management
 
 ## SpatialAnnotation Models {#spec-annotation-sync-spatial-annotation}
 
@@ -91,7 +87,7 @@ class SpatialAnnotation(ConfigObject):
 ```
 
 **Note**: Converters work with `SpatialAnnotationData` (id + spec only). The manager
-constructs full `SpatialAnnotation` objects with metadata, apiVersion, kind, and
+constructs full `SpatialAnnotation` objects with full metadata (scope + id), apiVersion, kind, and
 ownership signatures.
 
 Use Pydantic's built-in methods for serialization:
@@ -102,7 +98,8 @@ Use Pydantic's built-in methods for serialization:
 
 ## InOrbitConfigClient {#spec-annotation-sync-config-client}
 
-Client for InOrbit's Configuration API.
+Client for InOrbit's Configuration API. Used internally by the (`AnnotationSyncManager`)[#spec-annotation-sync-manager] class, but
+it can also be accessed by clients looking to implement other InOrbit configuration functionality.
 
 ### Constructor
 
@@ -272,8 +269,8 @@ AnnotationSyncManager(
     position_provider: ExternalAnnotationProvider[TExternalPosition],
     annotation_converter: AnnotationConverter[TExternalPosition],
     account_id: Optional[str],
-    frame_id: str,  # The frame/map ID this manager syncs for
-    signature_value: str,  # Connector type used for ownership signature
+    frame_id: str,
+    signature_value: str,
 )
 ```
 
@@ -352,7 +349,7 @@ class MyPositionProvider:
 ### 3. Implement AnnotationConverter
 
 ```python
-from inorbit_connector.waypoint_sync.models import (
+from inorbit_connector.annotation_sync.models import (
     SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,

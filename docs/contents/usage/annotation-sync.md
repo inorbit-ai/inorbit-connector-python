@@ -3,8 +3,6 @@ title: "Annotation Synchronization"
 description: "Guide for implementing annotation synchronization in connectors"
 ---
 
-# Annotation Synchronization Guide
-
 This guide explains how to enable and configure annotation synchronization between your external system and InOrbit.
 
 ## Terminology
@@ -109,7 +107,7 @@ The sync uses **signature properties** to identify annotations it manages:
 The ownership signature uses a fixed property name (`syncOrigin`) and the connector type as value:
 
 ```yaml
-connector_type: mir-fleet-connector
+connector_type: my-connector
 ```
 
 This adds a property to each synced annotation:
@@ -118,7 +116,7 @@ This adds a property to each synced annotation:
 {
   "spec": {
     "properties": {
-                    "syncOrigin": "mir-fleet-connector"
+        "syncOrigin": "my-connector"
     }
   }
 }
@@ -191,7 +189,7 @@ class MyPositionProvider:
 Converts between positions and waypoint annotations:
 
 ```python
-from inorbit_connector.waypoint_sync.models import (
+from inorbit_connector.annotation_sync.models import (
     SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,

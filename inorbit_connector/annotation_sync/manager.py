@@ -22,8 +22,8 @@ import asyncio
 import logging
 from typing import Generic, Optional
 
-from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
-from inorbit_connector.waypoint_sync.models import (
+from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
+from inorbit_connector.annotation_sync.models import (
     ANNOTATION_SYNC_ORIGIN_PROPERTY,
     AnnotationSyncConfig,
     AnnotationSyncMode,
@@ -31,7 +31,7 @@ from inorbit_connector.waypoint_sync.models import (
     SpatialAnnotation,
     SpatialAnnotationData,
 )
-from inorbit_connector.waypoint_sync.interfaces import (
+from inorbit_connector.annotation_sync.interfaces import (
     AnnotationConverter,
     ExternalAnnotationProvider,
     TExternalPosition,

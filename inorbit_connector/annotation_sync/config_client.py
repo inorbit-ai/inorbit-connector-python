@@ -21,7 +21,7 @@ from typing import Callable, Optional
 
 import httpx
 
-from inorbit_connector.waypoint_sync.models import SpatialAnnotation
+from inorbit_connector.annotation_sync.models import SpatialAnnotation
 
 
 class InOrbitConfigClient:

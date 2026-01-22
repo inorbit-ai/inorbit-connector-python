@@ -59,12 +59,12 @@ from inorbit_connector.models import (
     MapConfigTemp,
     RobotConfig,
 )
-from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
-from inorbit_connector.waypoint_sync.interfaces import (
+from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
+from inorbit_connector.annotation_sync.interfaces import (
     AnnotationConverter,
     ExternalAnnotationProvider,
 )
-from inorbit_connector.waypoint_sync.manager import AnnotationSyncManager
+from inorbit_connector.annotation_sync.manager import AnnotationSyncManager
 
 
 class FleetConnector(ABC):

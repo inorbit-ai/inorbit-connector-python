@@ -26,7 +26,7 @@ from typing import Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel
 
-from inorbit_connector.waypoint_sync.models import SpatialAnnotationData
+from inorbit_connector.annotation_sync.models import SpatialAnnotationData
 
 # Generic type for external system positions (must be a Pydantic BaseModel)
 TExternalPosition = TypeVar("TExternalPosition", bound=BaseModel)

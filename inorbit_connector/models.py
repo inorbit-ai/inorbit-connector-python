@@ -30,7 +30,7 @@ from pydantic import (
 # InOrbit
 from inorbit_connector.utils import DEFAULT_TIMEZONE, DEFAULT_LOGGING_CONFIG
 from inorbit_connector.logging.logger import LogLevels
-from inorbit_connector.waypoint_sync.models import AnnotationSyncConfig
+from inorbit_connector.annotation_sync.models import AnnotationSyncConfig
 
 # Ensure deprecation warnings are shown
 warnings.filterwarnings("always", category=DeprecationWarning)

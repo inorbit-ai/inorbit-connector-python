@@ -30,7 +30,7 @@ Example:
     )
 """
 
-from inorbit_connector.waypoint_sync.models import (
+from inorbit_connector.annotation_sync.models import (
     AnnotationSyncConfig,
     AnnotationSyncMode,
     ConfigObject,
@@ -40,13 +40,13 @@ from inorbit_connector.waypoint_sync.models import (
     WaypointAnnotationSpec,
     WaypointData,
 )
-from inorbit_connector.waypoint_sync.config_client import InOrbitConfigClient
-from inorbit_connector.waypoint_sync.interfaces import (
+from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
+from inorbit_connector.annotation_sync.interfaces import (
     AnnotationConverter,
     ExternalAnnotationProvider,
     TExternalPosition,
 )
-from inorbit_connector.waypoint_sync.manager import AnnotationSyncManager
+from inorbit_connector.annotation_sync.manager import AnnotationSyncManager
 
 __all__ = [
     # Configuration

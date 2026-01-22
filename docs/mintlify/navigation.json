@@ -9,7 +9,8 @@
         "ground-control/robot-integration/connector-framework/usage/index",
         "ground-control/robot-integration/connector-framework/usage/single-robot",
         "ground-control/robot-integration/connector-framework/usage/fleet",
-        "ground-control/robot-integration/connector-framework/usage/commands-handling"
+        "ground-control/robot-integration/connector-framework/usage/commands-handling",
+        "ground-control/robot-integration/connector-framework/usage/annotation-sync"
       ]
     },
     "ground-control/robot-integration/connector-framework/configuration",
@@ -22,7 +23,8 @@
         "ground-control/robot-integration/connector-framework/specification/models",
         "ground-control/robot-integration/connector-framework/specification/commands",
         "ground-control/robot-integration/connector-framework/specification/utils",
-        "ground-control/robot-integration/connector-framework/specification/logging"
+        "ground-control/robot-integration/connector-framework/specification/logging",
+        "ground-control/robot-integration/connector-framework/specification/annotation-sync"
       ]
     }
   ]

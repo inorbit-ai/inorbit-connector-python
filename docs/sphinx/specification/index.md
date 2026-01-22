@@ -14,4 +14,5 @@ models
 commands
 utils
 logging
+annotation-sync
 ```
