@@ -3,6 +3,8 @@ title: "Annotation Synchronization"
 description: "API specification for synchronizing annotations between external systems and InOrbit"
 ---
 
+> **Note:** Annotation synchronization is currently an experimental feature with partial support in the InOrbit platform.
+
 The annotation synchronization API enables connectors to synchronize annotations between external systems and InOrbit's Config API. Currently only waypoint annotations are supported.
 
 ## Terminology

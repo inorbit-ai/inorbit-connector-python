@@ -55,10 +55,6 @@ class InOrbitConfigClient:
         self._api_key = api_key
         self._timeout = timeout
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._logger.info(
-            f"Initializing InOrbit Config API client with base URL: "
-            f"{self._base_url}, API key: {api_key}, timeout: {timeout}"
-        )
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             headers={

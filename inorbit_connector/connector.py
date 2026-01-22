@@ -270,6 +270,12 @@ class FleetConnector(ABC):
             api_key=self.config.api_key,
         )
         self.__annotation_sync_enabled = True
+        # Emit experimental feature warning
+        warnings.warn(
+            "Annotation synchronization is an experimental feature with partial support "
+            "in the InOrbit platform.",
+            FutureWarning
+        )
         self._logger.info(
             f"Annotation sync configured: mode={sync_config.mode.value}, "
             f"interval={sync_config.sync_interval_seconds}s. "

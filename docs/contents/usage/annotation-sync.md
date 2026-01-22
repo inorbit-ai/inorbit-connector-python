@@ -3,6 +3,8 @@ title: "Annotation Synchronization"
 description: "Guide for implementing annotation synchronization in connectors"
 ---
 
+> **Note:** Annotation synchronization is currently an experimental feature with partial support in the InOrbit platform.
+
 This guide explains how to enable and configure annotation synchronization between your external system and InOrbit.
 
 ## Terminology
