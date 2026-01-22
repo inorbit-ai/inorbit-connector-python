@@ -42,12 +42,10 @@ class AnnotationSyncMode(str, Enum):
             (external system is source of truth)
         INORBIT_TO_EXTERNAL: Sync from InOrbit to external system
             (InOrbit is source of truth)
-        DISABLED: Synchronization is disabled
     """
 
     EXTERNAL_TO_INORBIT = "external_to_inorbit"
     INORBIT_TO_EXTERNAL = "inorbit_to_external"
-    DISABLED = "disabled"
 
 
 class AnnotationSyncConfig(BaseModel):
@@ -67,13 +65,13 @@ class AnnotationSyncConfig(BaseModel):
 
     Attributes:
         enabled: Enable annotation synchronization
-        mode: Synchronization mode (default: DISABLED)
+        mode: Synchronization mode (default: EXTERNAL_TO_INORBIT)
         sync_interval_seconds: Interval between syncs in seconds
         location_id: Location/tag ID for annotation scope in InOrbit
     """
 
     enabled: bool = False
-    mode: AnnotationSyncMode = AnnotationSyncMode.DISABLED
+    mode: AnnotationSyncMode = AnnotationSyncMode.EXTERNAL_TO_INORBIT
     sync_interval_seconds: int = Field(default=300, gt=0)
 
     # InOrbit Config API settings

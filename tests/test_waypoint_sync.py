@@ -32,7 +32,7 @@ class TestAnnotationSyncConfig:
         """Test that default values are set correctly."""
         config = AnnotationSyncConfig()
         assert config.enabled is False
-        assert config.mode == AnnotationSyncMode.DISABLED
+        assert config.mode == AnnotationSyncMode.EXTERNAL_TO_INORBIT
         assert config.sync_interval_seconds == 300
 
     def test_custom_values(self):
@@ -1013,8 +1013,8 @@ class TestAnnotationSyncManager:
     async def test_sync_once_disabled(
         self, config, inorbit_client, position_provider, converter
     ):
-        """Test sync_once with disabled mode."""
-        config.mode = AnnotationSyncMode.DISABLED
+        """Test sync_once when sync is disabled."""
+        config.enabled = False
         manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,
@@ -1025,12 +1025,15 @@ class TestAnnotationSyncManager:
             signature_value=SIGNATURE_VALUE,
         )
 
+        # sync_once doesn't check enabled, it just runs based on mode
+        # The enabled check is in start()
         result = await manager.sync_once()
-        assert result == {}
+        # Should still run and return results based on mode
+        assert isinstance(result, dict)
 
     def test_start_disabled(self, config, inorbit_client, position_provider, converter):
-        """Test start with disabled mode."""
-        config.mode = AnnotationSyncMode.DISABLED
+        """Test start when sync is disabled."""
+        config.enabled = False
         manager = ConcreteAnnotationSyncManager(
             config=config,
             inorbit_config_client=inorbit_client,

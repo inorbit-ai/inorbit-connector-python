@@ -64,7 +64,7 @@ the edge SDK's REST API base URL and can be overridden with `INORBIT_REST_API_UR
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `enabled` | No | `false` | Enable annotation sync |
-| `mode` | No | `disabled` | Sync mode |
+| `mode` | No | `external_to_inorbit` | Sync mode |
 | `sync_interval_seconds` | No | `300` | Interval between syncs |
 | `location_id` | Yes* | - | Location tag ID for scoping |
 

@@ -170,7 +170,7 @@ automatically injects this signature into annotations.
 ```python
 class AnnotationSyncConfig(BaseModel):
     enabled: bool = False
-    mode: AnnotationSyncMode = AnnotationSyncMode.DISABLED
+    mode: AnnotationSyncMode = AnnotationSyncMode.EXTERNAL_TO_INORBIT
     sync_interval_seconds: int = 300
     location_id: Optional[str] = None
 ```
@@ -181,7 +181,6 @@ class AnnotationSyncConfig(BaseModel):
 class AnnotationSyncMode(str, Enum):
     EXTERNAL_TO_INORBIT = "external_to_inorbit"  # External → InOrbit
     INORBIT_TO_EXTERNAL = "inorbit_to_external"  # InOrbit → External
-    DISABLED = "disabled"                         # Sync disabled
 ```
 
 ---

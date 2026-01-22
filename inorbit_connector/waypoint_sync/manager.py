@@ -344,9 +344,6 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
             return await self.sync_external_to_inorbit()
         elif self.config.mode == AnnotationSyncMode.INORBIT_TO_EXTERNAL:
             return await self.sync_inorbit_to_external()
-        elif self.config.mode == AnnotationSyncMode.DISABLED:
-            self._logger.debug("Sync mode is DISABLED, skipping")
-            return {}
         else:
             self._logger.warning(f"Sync mode {self.config.mode} not implemented")
             return {}
@@ -376,9 +373,9 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
         """Start periodic annotation synchronization.
 
         Creates a background task that runs sync at configured intervals.
-        Does nothing if sync mode is DISABLED or already running.
+        Does nothing if sync is disabled (enabled=False) or already running.
         """
-        if self.config.mode == AnnotationSyncMode.DISABLED:
+        if not self.config.enabled:
             self._logger.info("Annotation sync is disabled")
             return
 

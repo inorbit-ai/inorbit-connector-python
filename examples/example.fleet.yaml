@@ -27,7 +27,7 @@ annotation_sync:
   enabled: false
   # sync_interval_seconds: # Default is 300 seconds
   location_id: # Set this to the InOrbit location tag ID of your robots
-  mode: external_to_inorbit # external_to_inorbit | inorbit_to_external
+  mode: external_to_inorbit # external_to_inorbit | inorbit_to_external (default: external_to_inorbit)
 # The ID of the InOrbit account that owns the robots. Optional, required for use of footprints and
 # annotation synchronization.
 account_id:
