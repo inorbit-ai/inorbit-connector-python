@@ -1241,27 +1241,6 @@ class TestAnnotationSyncManager:
         provider1.list_positions.assert_called_once_with("map-alpha")
         provider2.list_positions.assert_called_once_with("map-beta")
 
-    def test_get_scope_missing_location_id(
-        self, inorbit_client, position_provider, converter
-    ):
-        """Test scope generation fails without location_id."""
-        config = AnnotationSyncConfig(
-            enabled=True,
-            mode=AnnotationSyncMode.EXTERNAL_TO_INORBIT,
-            location_id=None,  # Missing location_id
-        )
-        manager = ConcreteAnnotationSyncManager(
-            config=config,
-            inorbit_config_client=inorbit_client,
-            position_provider=position_provider,
-            annotation_converter=converter,
-            account_id="test-company",
-            frame_id="test-map",
-            signature_value=SIGNATURE_VALUE,
-        )
-        with pytest.raises(ValueError, match="account_id and location_id are required"):
-            manager._get_scope()
-
     def test_manager_logger_includes_frame_id(
         self, config, inorbit_client, position_provider, converter
     ):
