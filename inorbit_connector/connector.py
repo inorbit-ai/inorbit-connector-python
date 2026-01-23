@@ -171,7 +171,7 @@ class FleetConnector(ABC):
         # Create RobotSessionFactory with common configuration
         # HACK: Using RobotSessionModel allows automatically loading environment
         # variables as defined by the inorbit-edge package.
-        # Robot-specific values (robot_id, robot_name) have to be ommited after
+        # Robot-specific values (robot_id, robot_name) have to be omitted after
         # initalization before passing the config to the factory.
         robot_session_config = RobotSessionModel(
             api_key=config.api_key,

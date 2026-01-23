@@ -101,7 +101,6 @@ class MockAnnotationConverter:
             position: The external position to convert
             frame_id: The frame/map ID for this annotation
         """
-        print("position_to_annotation", position, frame_id)
         return SpatialAnnotationData(
             id=position.external_id,
             spec=WaypointAnnotationSpec(

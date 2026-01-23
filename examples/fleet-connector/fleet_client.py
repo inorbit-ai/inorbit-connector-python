@@ -9,6 +9,7 @@ multiple robots at once.
 
 import asyncio
 import random
+import logging
 
 
 class FleetManagerAPIWrapper:
@@ -128,6 +129,7 @@ class FleetManager:
         self._robot_status: dict[str, dict] = {}
         self._default_update_freq = default_update_freq
         self._running_tasks: list[asyncio.Task] = []
+        self._logger = logging.getLogger(__name__)
 
     def start(self) -> None:
         """Start the tasks that fetch data from the fleet manager."""
@@ -159,7 +161,7 @@ class FleetManager:
                     await asyncio.wait(pending, timeout=0.5)
 
             except Exception as e:
-                print(f"Error during graceful shutdown: {e}")
+                self._logger.error(f"Error during graceful shutdown: {e}")
 
         # Clear the task list
         self._running_tasks.clear()
@@ -258,7 +260,7 @@ class FleetManager:
                         # Handle cancellation gracefully
                         break
                     except Exception as e:
-                        print(f"Error in loop running {coro.__name__}: {e}")
+                        self._logger.error(f"Error in loop running {coro.__name__}: {e}")
                         # Shorter sleep during errors to check stop_event more
                         # frequently
                         await asyncio.sleep(0.1)
