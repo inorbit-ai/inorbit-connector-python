@@ -194,8 +194,8 @@ class FleetConnector(ABC):
         self.__annotation_converter: Optional[AnnotationConverter] = None
         # Per-frame sync managers: frame_id -> AnnotationSyncManager
         self.__annotation_sync_managers: dict[str, AnnotationSyncManager] = {}
+        self.__annotation_sync_managers_lock = threading.Lock()
         self.__annotation_sync_client: Optional[InOrbitConfigAPI] = None
-        # Flag indicating annotation sync is configured and ready
         self.__annotation_sync_enabled: bool = False
 
     @property
@@ -294,9 +294,6 @@ class FleetConnector(ABC):
         if not self.__annotation_sync_enabled:
             return
 
-        if frame_id in self.__annotation_sync_managers:
-            return
-
         sync_config = self.config.annotation_sync
         if (
             sync_config is None
@@ -306,17 +303,24 @@ class FleetConnector(ABC):
         ):
             return
 
-        self._logger.info(f"Starting annotation sync for frame_id '{frame_id}'")
-        manager = AnnotationSyncManager(
-            config=sync_config,
-            inorbit_config_client=self.__annotation_sync_client,
-            position_provider=self.__annotation_provider,
-            annotation_converter=self.__annotation_converter,
-            account_id=self.config.account_id,
-            frame_id=frame_id,
-            signature_value=self.config.connector_type,
-        )
-        self.__annotation_sync_managers[frame_id] = manager
+        # Ensure atomic check-and-add for annotation sync managers
+        with self.__annotation_sync_managers_lock:
+            if frame_id in self.__annotation_sync_managers:
+                return
+
+            self._logger.info(f"Starting annotation sync for frame_id '{frame_id}'")
+            manager = AnnotationSyncManager(
+                config=sync_config,
+                inorbit_config_client=self.__annotation_sync_client,
+                position_provider=self.__annotation_provider,
+                annotation_converter=self.__annotation_converter,
+                account_id=self.config.account_id,
+                frame_id=frame_id,
+                signature_value=self.config.connector_type,
+            )
+            self.__annotation_sync_managers[frame_id] = manager
+
+        # Start manager outside the lock to avoid holding it during async operations
         manager.start()
 
     def _handle_command_exception(
@@ -470,10 +474,13 @@ class FleetConnector(ABC):
         """Disconnect external services and disconnect from InOrbit."""
 
         # Stop all annotation sync managers
-        for frame_id, manager in self.__annotation_sync_managers.items():
+        with self.__annotation_sync_managers_lock:
+            managers = list(self.__annotation_sync_managers.items())
+            self.__annotation_sync_managers.clear()
+
+        for frame_id, manager in managers:
             self._logger.debug(f"Stopping annotation sync for frame_id '{frame_id}'")
             await manager.stop()
-        self.__annotation_sync_managers.clear()
 
         if self.__annotation_sync_client is not None:
             await self.__annotation_sync_client.close()
