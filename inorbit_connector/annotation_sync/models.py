@@ -11,7 +11,7 @@ For InOrbit Config API models and SpatialAnnotation, see inorbit_connector.inorb
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 ANNOTATION_SYNC_ORIGIN_PROPERTY = "syncOrigin"
 
@@ -55,6 +55,11 @@ class AnnotationSyncConfig(BaseModel):
     enabled: bool = False
     mode: AnnotationSyncMode = AnnotationSyncMode.EXTERNAL_TO_INORBIT
     sync_interval_seconds: int = Field(default=300, gt=0)
-
-    # InOrbit Config API settings
     location_id: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_location_id_when_enabled(self):
+        """Validate that location_id is provided when enabled is True."""
+        if self.enabled and self.location_id is None:
+            raise ValueError("location_id must be provided when enabled is True")
+        return self
