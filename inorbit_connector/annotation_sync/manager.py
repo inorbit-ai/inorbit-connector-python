@@ -222,7 +222,7 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
             self._data_to_annotation(data, scope) for data in annotation_data_list
         ]
 
-        # Synchronize with InOrbit (deletion is handled by synchronize_objects)
+        # Synchronize with InOrbit
         stats = await self._inorbit_client.synchronize_objects(
             scope=scope,
             objects=annotations,

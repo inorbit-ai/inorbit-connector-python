@@ -17,6 +17,7 @@ from inorbit_connector.annotation_sync.models import (
     AnnotationSyncMode,
 )
 from inorbit_connector.inorbit import (
+    ConfigObject,
     ConfigObjectMetadata,
     SpatialAnnotation,
     SpatialAnnotationData,
@@ -220,6 +221,37 @@ class TestInOrbitConfigAPI:
                 assert stats["deleted"] == 0
                 mock_apply.assert_called_once()
                 mock_delete.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_synchronize_objects_raises_on_mixed_kinds(self, client):
+        """Test synchronization raises ValueError when objects have mixed kinds."""
+        annotation1 = SpatialAnnotation(
+            metadata=ConfigObjectMetadata(id="obj-1"),
+            spec=WaypointAnnotationSpec(
+                data=WaypointData(x=1.0, y=2.0, theta=0.0),
+                label="Obj 1",
+                frameId="map",
+            ),
+        )
+
+        # Create a ConfigObject with a different kind using a minimal spec
+        class OtherSpec(BaseModel):
+            pass
+
+        other_kind_obj = ConfigObject[OtherSpec](
+            kind="OtherKind",
+            metadata=ConfigObjectMetadata(id="obj-2"),
+            spec=OtherSpec(),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            await client.synchronize_objects(
+                scope="tag/test/loc",
+                objects=[annotation1, other_kind_obj],
+            )
+
+        assert "has kind OtherKind but expected SpatialAnnotation" in str(exc_info.value)
+        assert "All objects must have the same kind" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_close(self, client):

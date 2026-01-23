@@ -148,7 +148,7 @@ class InOrbitConfigAPI:
             - deleted: Number of objects deleted
 
         Raises:
-            ValueError: If object has mismatched scope
+            ValueError: If object has mismatched scope or if objects have mixed kinds
             httpx.HTTPStatusError: If any API request fails
         """
         if not objects:
@@ -160,6 +160,14 @@ class InOrbitConfigAPI:
             }
 
         kind = objects[0].kind
+
+        # Validate all objects have the same kind
+        for obj in objects:
+            if obj.kind != kind:
+                raise ValueError(
+                    f"Object {obj.metadata.id} has kind {obj.kind} "
+                    f"but expected {kind}. All objects must have the same kind."
+                )
 
         # Inject scope into metadata
         for obj in objects:
