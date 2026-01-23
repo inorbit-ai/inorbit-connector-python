@@ -1465,7 +1465,9 @@ class TestAnnotationSyncManager:
                         "frameId": "test-map",
                         "label": "Existing Waypoint",
                         "data": {"x": 10.0, "y": 20.0, "theta": 0.0},
-                        "properties": {ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
+                        "properties": {
+                            ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE
+                        },
                     },
                 ),
                 # Non-waypoint annotation (should be filtered out)

@@ -224,9 +224,7 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
         else:
             properties = getattr(annotation.spec, "properties", {})
 
-        return (
-            properties.get(ANNOTATION_SYNC_ORIGIN_PROPERTY) == self._signature_value
-        )
+        return properties.get(ANNOTATION_SYNC_ORIGIN_PROPERTY) == self._signature_value
 
     async def sync_external_to_inorbit(self) -> dict:
         """Sync positions from external system to InOrbit annotations.
