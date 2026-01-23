@@ -33,6 +33,7 @@ from inorbit_connector.annotation_sync.models import (
     AnnotationSyncMode,
 )
 from inorbit_connector.inorbit import (
+    ConfigObject,
     ConfigObjectMetadata,
     InOrbitConfigAPI,
     SpatialAnnotation,
@@ -183,6 +184,50 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
             == self._signature_value
         )
 
+    def _is_waypoint_annotation(self, annotation: ConfigObject) -> bool:
+        """Check if an annotation is a waypoint annotation.
+
+        Handles both typed SpatialAnnotation (with WaypointAnnotationSpec) and
+        untyped ConfigObject instances where spec is a dict.
+
+        Args:
+            annotation: ConfigObject to check (may be typed or untyped)
+
+        Returns:
+            True if annotation is a SpatialAnnotation with type "waypoint"
+        """
+        if annotation.kind != "SpatialAnnotation":
+            return False
+
+        if isinstance(annotation.spec, dict):
+            return annotation.spec.get("type") == "waypoint"
+        return getattr(annotation.spec, "type", None) == "waypoint"
+
+    def _is_waypoint_with_sync_signature(self, annotation: ConfigObject) -> bool:
+        """Check if an annotation is a waypoint with sync signature.
+
+        Combines waypoint type checking and signature validation.
+        Handles both typed SpatialAnnotation (with WaypointAnnotationSpec) and
+        untyped ConfigObject instances where spec is a dict.
+
+        Args:
+            annotation: ConfigObject to check (may be typed or untyped)
+
+        Returns:
+            True if annotation is a waypoint and has matching sync signature
+        """
+        if not self._is_waypoint_annotation(annotation):
+            return False
+
+        if isinstance(annotation.spec, dict):
+            properties = annotation.spec.get("properties", {})
+        else:
+            properties = getattr(annotation.spec, "properties", {})
+
+        return (
+            properties.get(ANNOTATION_SYNC_ORIGIN_PROPERTY) == self._signature_value
+        )
+
     async def sync_external_to_inorbit(self) -> dict:
         """Sync positions from external system to InOrbit annotations.
 
@@ -226,7 +271,7 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
         stats = await self._inorbit_client.synchronize_objects(
             scope=scope,
             objects=annotations,
-            filter_fn=self._has_sync_signature,
+            filter_fn=self._is_waypoint_with_sync_signature,
         )
 
         self._logger.info(

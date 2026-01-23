@@ -250,7 +250,9 @@ class TestInOrbitConfigAPI:
                 objects=[annotation1, other_kind_obj],
             )
 
-        assert "has kind OtherKind but expected SpatialAnnotation" in str(exc_info.value)
+        assert "has kind OtherKind but expected SpatialAnnotation" in str(
+            exc_info.value
+        )
         assert "All objects must have the same kind" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -1257,3 +1259,247 @@ class TestAnnotationSyncManager:
 
         # Logger name should include frame_id
         assert "debug-map-123" in manager._logger.name
+
+    def test_is_waypoint_annotation_with_typed_spatial_annotation(self, manager):
+        """Test _is_waypoint_annotation with typed SpatialAnnotation."""
+        # Waypoint annotation
+        waypoint_ann = SpatialAnnotation(
+            metadata=ConfigObjectMetadata(id="wp-1"),
+            spec=WaypointAnnotationSpec(
+                data=WaypointData(x=1.0, y=2.0, theta=0.0),
+                label="Waypoint 1",
+                frameId="map",
+            ),
+        )
+        assert manager._is_waypoint_annotation(waypoint_ann) is True
+
+    def test_is_waypoint_annotation_with_dict_spec(self, manager):
+        """Test _is_waypoint_annotation with ConfigObject having dict spec."""
+        # Waypoint annotation with dict spec (simulating list_objects response)
+        waypoint_dict = ConfigObject.model_construct(
+            apiVersion="v0.1",
+            kind="SpatialAnnotation",
+            metadata=ConfigObjectMetadata(id="wp-1"),
+            spec={
+                "type": "waypoint",
+                "frameId": "map",
+                "label": "Waypoint 1",
+                "data": {"x": 1.0, "y": 2.0, "theta": 0.0},
+                "properties": {},
+            },
+        )
+        assert manager._is_waypoint_annotation(waypoint_dict) is True
+
+        # Non-waypoint annotation with dict spec
+        non_waypoint_dict = ConfigObject.model_construct(
+            apiVersion="v0.1",
+            kind="SpatialAnnotation",
+            metadata=ConfigObjectMetadata(id="ann-1"),
+            spec={
+                "type": "obstacle",
+                "frameId": "map",
+                "label": "Obstacle 1",
+                "properties": {},
+            },
+        )
+        assert manager._is_waypoint_annotation(non_waypoint_dict) is False
+
+        # Wrong kind
+        wrong_kind = ConfigObject.model_construct(
+            apiVersion="v0.1",
+            kind="OtherKind",
+            metadata=ConfigObjectMetadata(id="obj-1"),
+            spec={"type": "waypoint"},
+        )
+        assert manager._is_waypoint_annotation(wrong_kind) is False
+
+    def test_is_waypoint_with_sync_signature_typed_annotation(self, manager):
+        """Test _is_waypoint_with_sync_signature with typed SpatialAnnotation."""
+        # Waypoint with matching signature
+        waypoint_with_sig = SpatialAnnotation(
+            metadata=ConfigObjectMetadata(id="wp-1"),
+            spec=WaypointAnnotationSpec(
+                data=WaypointData(x=1.0, y=2.0, theta=0.0),
+                label="Waypoint 1",
+                frameId="map",
+                properties={ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
+            ),
+        )
+        assert manager._is_waypoint_with_sync_signature(waypoint_with_sig) is True
+
+        # Waypoint without signature
+        waypoint_no_sig = SpatialAnnotation(
+            metadata=ConfigObjectMetadata(id="wp-2"),
+            spec=WaypointAnnotationSpec(
+                data=WaypointData(x=2.0, y=3.0, theta=0.0),
+                label="Waypoint 2",
+                frameId="map",
+                properties={},
+            ),
+        )
+        assert manager._is_waypoint_with_sync_signature(waypoint_no_sig) is False
+
+        # Waypoint with wrong signature
+        waypoint_wrong_sig = SpatialAnnotation(
+            metadata=ConfigObjectMetadata(id="wp-3"),
+            spec=WaypointAnnotationSpec(
+                data=WaypointData(x=3.0, y=4.0, theta=0.0),
+                label="Waypoint 3",
+                frameId="map",
+                properties={ANNOTATION_SYNC_ORIGIN_PROPERTY: "other-connector"},
+            ),
+        )
+        assert manager._is_waypoint_with_sync_signature(waypoint_wrong_sig) is False
+
+    def test_is_waypoint_with_sync_signature_dict_spec(self, manager):
+        """Test _is_waypoint_with_sync_signature with ConfigObject having dict spec."""
+        # Waypoint with dict spec and matching signature
+        waypoint_with_sig = ConfigObject.model_construct(
+            apiVersion="v0.1",
+            kind="SpatialAnnotation",
+            metadata=ConfigObjectMetadata(id="wp-1"),
+            spec={
+                "type": "waypoint",
+                "frameId": "map",
+                "label": "Waypoint 1",
+                "data": {"x": 1.0, "y": 2.0, "theta": 0.0},
+                "properties": {ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
+            },
+        )
+        assert manager._is_waypoint_with_sync_signature(waypoint_with_sig) is True
+
+        # Waypoint with dict spec but no signature
+        waypoint_no_sig = ConfigObject.model_construct(
+            apiVersion="v0.1",
+            kind="SpatialAnnotation",
+            metadata=ConfigObjectMetadata(id="wp-2"),
+            spec={
+                "type": "waypoint",
+                "frameId": "map",
+                "label": "Waypoint 2",
+                "data": {"x": 2.0, "y": 3.0, "theta": 0.0},
+                "properties": {},
+            },
+        )
+        assert manager._is_waypoint_with_sync_signature(waypoint_no_sig) is False
+
+        # Waypoint with dict spec but wrong signature
+        waypoint_wrong_sig = ConfigObject.model_construct(
+            apiVersion="v0.1",
+            kind="SpatialAnnotation",
+            metadata=ConfigObjectMetadata(id="wp-3"),
+            spec={
+                "type": "waypoint",
+                "frameId": "map",
+                "label": "Waypoint 3",
+                "data": {"x": 3.0, "y": 4.0, "theta": 0.0},
+                "properties": {ANNOTATION_SYNC_ORIGIN_PROPERTY: "other-connector"},
+            },
+        )
+        assert manager._is_waypoint_with_sync_signature(waypoint_wrong_sig) is False
+
+        # Non-waypoint annotation (should return False)
+        non_waypoint = ConfigObject.model_construct(
+            apiVersion="v0.1",
+            kind="SpatialAnnotation",
+            metadata=ConfigObjectMetadata(id="ann-1"),
+            spec={
+                "type": "obstacle",
+                "frameId": "map",
+                "label": "Obstacle 1",
+                "properties": {ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
+            },
+        )
+        assert manager._is_waypoint_with_sync_signature(non_waypoint) is False
+
+    @pytest.mark.asyncio
+    async def test_sync_external_to_inorbit_uses_waypoint_filter(
+        self, manager, position_provider, inorbit_client
+    ):
+        """Test that sync_external_to_inorbit uses the waypoint filter function."""
+        position_provider.positions = [
+            MockPosition(id="pos-1", name="Position 1", x=1.0, y=2.0),
+        ]
+
+        await manager.sync_external_to_inorbit()
+
+        # Verify synchronize_objects was called with the filter function
+        inorbit_client.synchronize_objects.assert_called_once()
+        call_kwargs = inorbit_client.synchronize_objects.call_args.kwargs
+        assert call_kwargs["filter_fn"] == manager._is_waypoint_with_sync_signature
+
+    @pytest.mark.asyncio
+    async def test_sync_external_to_inorbit_filters_dict_spec_annotations(
+        self, config, inorbit_client, position_provider, converter
+    ):
+        """Test that sync_external_to_inorbit correctly filters ConfigObject with dict spec.
+
+        This test verifies the fix for the bug where _has_sync_signature would
+        crash when synchronize_objects calls list_objects and receives ConfigObject
+        instances with dict specs.
+        """
+        manager = ConcreteAnnotationSyncManager(
+            config=config,
+            inorbit_config_client=inorbit_client,
+            position_provider=position_provider,
+            annotation_converter=converter,
+            account_id="test-company",
+            frame_id="test-map",
+            signature_value=SIGNATURE_VALUE,
+        )
+
+        position_provider.positions = [
+            MockPosition(id="pos-1", name="Position 1", x=1.0, y=2.0),
+        ]
+
+        # Mock list_objects to return ConfigObject with dict spec (as it does in reality)
+        inorbit_client.list_objects = AsyncMock(
+            return_value=[
+                # Existing waypoint annotation with matching signature (should be filtered in)
+                ConfigObject.model_construct(
+                    apiVersion="v0.1",
+                    kind="SpatialAnnotation",
+                    metadata=ConfigObjectMetadata(id="existing-wp-1"),
+                    spec={
+                        "type": "waypoint",
+                        "frameId": "test-map",
+                        "label": "Existing Waypoint",
+                        "data": {"x": 10.0, "y": 20.0, "theta": 0.0},
+                        "properties": {ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
+                    },
+                ),
+                # Non-waypoint annotation (should be filtered out)
+                ConfigObject.model_construct(
+                    apiVersion="v0.1",
+                    kind="SpatialAnnotation",
+                    metadata=ConfigObjectMetadata(id="obstacle-1"),
+                    spec={
+                        "type": "obstacle",
+                        "frameId": "test-map",
+                        "label": "Obstacle",
+                        "properties": {},
+                    },
+                ),
+                # Waypoint without signature (should be filtered out)
+                ConfigObject.model_construct(
+                    apiVersion="v0.1",
+                    kind="SpatialAnnotation",
+                    metadata=ConfigObjectMetadata(id="wp-no-sig"),
+                    spec={
+                        "type": "waypoint",
+                        "frameId": "test-map",
+                        "label": "Waypoint No Sig",
+                        "data": {"x": 5.0, "y": 6.0, "theta": 0.0},
+                        "properties": {},
+                    },
+                ),
+            ]
+        )
+
+        # This should not raise AttributeError
+        await manager.sync_external_to_inorbit()
+
+        # Verify synchronize_objects was called
+        inorbit_client.synchronize_objects.assert_called_once()
+        # The filter should have been applied to the existing objects from list_objects
+        # Only the waypoint with matching signature should be considered for update/delete

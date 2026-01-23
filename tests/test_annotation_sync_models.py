@@ -75,9 +75,7 @@ class TestAnnotationSyncConfig:
 
     def test_custom_mode(self):
         """Test that custom mode can be set."""
-        config = AnnotationSyncConfig(
-            mode=AnnotationSyncMode.INORBIT_TO_EXTERNAL
-        )
+        config = AnnotationSyncConfig(mode=AnnotationSyncMode.INORBIT_TO_EXTERNAL)
         assert config.mode == AnnotationSyncMode.INORBIT_TO_EXTERNAL
 
     def test_all_fields_custom(self):
