@@ -10,64 +10,30 @@ InOrbit platform.
 This package provides a reusable framework for synchronizing annotations
 (currently waypoints) between external systems and InOrbit's Config API.
 
-Terminology:
-    - Annotation: InOrbit SpatialAnnotation object (kind: SpatialAnnotation)
-    - Position: Waypoint/location in the external system
-    - External system: Fleet manager or robot software
-
-Modules:
-    config_client: InOrbit Config API client for managing annotations
-    models: Configuration and data models (AnnotationSyncConfig, SpatialAnnotation)
-    interfaces: Provider and converter protocols
-    manager: Sync manager with all sync modes
-
-Example:
-    from inorbit_connector.waypoint_sync import (
-        AnnotationSyncConfig,
-        AnnotationSyncMode,
-        InOrbitConfigClient,
-        AnnotationSyncManager,
-        ExternalAnnotationProvider,
-        AnnotationConverter,
-        SpatialAnnotation,
-    )
+For InOrbit Config API models and client, see inorbit_connector.inorbit.
 """
 
-from inorbit_connector.annotation_sync.models import (
-    AnnotationSyncConfig,
-    AnnotationSyncMode,
-    ConfigObject,
-    ConfigObjectMetadata,
-    SpatialAnnotation,
-    SpatialAnnotationData,
-    WaypointAnnotationSpec,
-    WaypointData,
-)
-from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
 from inorbit_connector.annotation_sync.interfaces import (
     AnnotationConverter,
     ExternalAnnotationProvider,
     TExternalPosition,
 )
 from inorbit_connector.annotation_sync.manager import AnnotationSyncManager
+from inorbit_connector.annotation_sync.models import (
+    ANNOTATION_SYNC_ORIGIN_PROPERTY,
+    AnnotationSyncConfig,
+    AnnotationSyncMode,
+)
 
 __all__ = [
     # Configuration
     "AnnotationSyncConfig",
     "AnnotationSyncMode",
-    # Config API base models
-    "ConfigObject",
-    "ConfigObjectMetadata",
-    # SpatialAnnotation models
-    "SpatialAnnotation",
-    "SpatialAnnotationData",
-    "WaypointAnnotationSpec",
-    "WaypointData",
+    "ANNOTATION_SYNC_ORIGIN_PROPERTY",
     # Interfaces
     "ExternalAnnotationProvider",
     "AnnotationConverter",
     "TExternalPosition",
-    # Client and Manager
-    "InOrbitConfigClient",
+    # Manager
     "AnnotationSyncManager",
 ]

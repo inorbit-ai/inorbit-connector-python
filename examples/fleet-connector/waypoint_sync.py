@@ -6,7 +6,7 @@ from typing import Dict, List
 
 from pydantic import BaseModel, Field
 
-from inorbit_connector.annotation_sync.models import (
+from inorbit_connector.inorbit import (
     SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,
@@ -77,9 +77,7 @@ class MockPositionProvider:
         """Return positions filtered by frame_id (matched against map_ref)."""
         return [pos for pos in self._positions.values() if pos.map_ref == frame_id]
 
-    async def create_position(
-        self, position: ExternalPosition
-    ) -> None:
+    async def create_position(self, position: ExternalPosition) -> None:
         self._positions[position.external_id] = position
 
     async def update_position(

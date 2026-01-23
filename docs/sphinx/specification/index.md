@@ -14,5 +14,6 @@ models
 commands
 utils
 logging
+config-api
 annotation-sync
 ```

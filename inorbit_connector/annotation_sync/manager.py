@@ -22,19 +22,21 @@ import asyncio
 import logging
 from typing import Generic, Optional
 
-from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
-from inorbit_connector.annotation_sync.models import (
-    ANNOTATION_SYNC_ORIGIN_PROPERTY,
-    AnnotationSyncConfig,
-    AnnotationSyncMode,
-    ConfigObjectMetadata,
-    SpatialAnnotation,
-    SpatialAnnotationData,
-)
 from inorbit_connector.annotation_sync.interfaces import (
     AnnotationConverter,
     ExternalAnnotationProvider,
     TExternalPosition,
+)
+from inorbit_connector.annotation_sync.models import (
+    ANNOTATION_SYNC_ORIGIN_PROPERTY,
+    AnnotationSyncConfig,
+    AnnotationSyncMode,
+)
+from inorbit_connector.inorbit import (
+    ConfigObjectMetadata,
+    InOrbitConfigAPI,
+    SpatialAnnotation,
+    SpatialAnnotationData,
 )
 
 
@@ -70,7 +72,7 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
     def __init__(
         self,
         config: AnnotationSyncConfig,
-        inorbit_config_client: InOrbitConfigClient,
+        inorbit_config_client: InOrbitConfigAPI,
         position_provider: ExternalAnnotationProvider[TExternalPosition],
         annotation_converter: AnnotationConverter[TExternalPosition],
         account_id: Optional[str],
@@ -195,7 +197,7 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
             - created: Number of annotations created
             - updated: Number of annotations updated
             - up_to_date: Number of annotations unchanged
-            - to_delete_count: Number of annotations to delete
+            - deleted: Number of annotations deleted
         """
         self._logger.info(
             f"Starting external → InOrbit annotation sync for frame '{self._frame_id}'"
@@ -220,17 +222,17 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
             self._data_to_annotation(data, scope) for data in annotation_data_list
         ]
 
-        # Synchronize with InOrbit
-        stats = await self._inorbit_client.synchronize_annotations(
+        # Synchronize with InOrbit (deletion is handled by synchronize_objects)
+        stats = await self._inorbit_client.synchronize_objects(
             scope=scope,
-            annotations=annotations,
+            objects=annotations,
             filter_fn=self._has_sync_signature,
         )
 
         self._logger.info(
             f"External → InOrbit sync complete: "
             f"{stats['created']} created, {stats['updated']} updated, "
-            f"{stats['to_delete_count']} to delete"
+            f"{stats['deleted']} deleted"
         )
         return stats
 
@@ -255,13 +257,21 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
 
         # Fetch annotations from InOrbit
         scope = self._get_scope()
-        annotations = await self._inorbit_client.list_annotations(scope)
+        all_annotations = await self._inorbit_client.list_objects(
+            kind="SpatialAnnotation", scope=scope
+        )
+        # Filter for waypoint annotations and validate
+        annotations = []
+        for ann in all_annotations:
+            if ann.kind == "SpatialAnnotation":
+                # Convert to dict and check if it's a waypoint
+                ann_dict = ann.model_dump()
+                if ann_dict.get("spec", {}).get("type") == "waypoint":
+                    annotations.append(SpatialAnnotation.model_validate(ann_dict))
 
         # Filter for owned annotations only
         owned_annotations = [
-            ann
-            for ann in annotations
-            if ann.spec.type == "waypoint" and self._has_sync_signature(ann)
+            ann for ann in annotations if self._has_sync_signature(ann)
         ]
 
         self._logger.debug(

@@ -59,12 +59,12 @@ from inorbit_connector.models import (
     MapConfigTemp,
     RobotConfig,
 )
-from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
-from inorbit_connector.annotation_sync.interfaces import (
+from inorbit_connector.inorbit import InOrbitConfigAPI
+from inorbit_connector.annotation_sync import (
     AnnotationConverter,
     ExternalAnnotationProvider,
+    AnnotationSyncManager,
 )
-from inorbit_connector.annotation_sync.manager import AnnotationSyncManager
 
 
 class FleetConnector(ABC):
@@ -194,7 +194,7 @@ class FleetConnector(ABC):
         self.__annotation_converter: Optional[AnnotationConverter] = None
         # Per-frame sync managers: frame_id -> AnnotationSyncManager
         self.__annotation_sync_managers: dict[str, AnnotationSyncManager] = {}
-        self.__annotation_sync_client: Optional[InOrbitConfigClient] = None
+        self.__annotation_sync_client: Optional[InOrbitConfigAPI] = None
         # Flag indicating annotation sync is configured and ready
         self.__annotation_sync_enabled: bool = False
 
@@ -265,16 +265,16 @@ class FleetConnector(ABC):
             )
             return
 
-        self.__annotation_sync_client = InOrbitConfigClient(
+        self.__annotation_sync_client = InOrbitConfigAPI(
             base_url=str(self.config.rest_api_url),
             api_key=self.config.api_key,
         )
         self.__annotation_sync_enabled = True
         # Emit experimental feature warning
         warnings.warn(
-            "Annotation synchronization is an experimental feature with partial support "
-            "in the InOrbit platform.",
-            FutureWarning
+            "Annotation synchronization is an experimental feature with partial support"
+            " in the InOrbit platform.",
+            FutureWarning,
         )
         self._logger.info(
             f"Annotation sync configured: mode={sync_config.mode.value}, "

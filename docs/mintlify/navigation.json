@@ -24,6 +24,7 @@
         "ground-control/robot-integration/connector-framework/specification/commands",
         "ground-control/robot-integration/connector-framework/specification/utils",
         "ground-control/robot-integration/connector-framework/specification/logging",
+        "ground-control/robot-integration/connector-framework/specification/config-api",
         "ground-control/robot-integration/connector-framework/specification/annotation-sync"
       ]
     }

@@ -15,14 +15,16 @@ from inorbit_connector.annotation_sync.models import (
     ANNOTATION_SYNC_ORIGIN_PROPERTY,
     AnnotationSyncConfig,
     AnnotationSyncMode,
+)
+from inorbit_connector.inorbit import (
     ConfigObjectMetadata,
     SpatialAnnotation,
     SpatialAnnotationData,
     WaypointAnnotationSpec,
     WaypointData,
+    InOrbitConfigAPI,
 )
-from inorbit_connector.annotation_sync.config_client import InOrbitConfigClient
-from inorbit_connector.annotation_sync.manager import AnnotationSyncManager
+from inorbit_connector.annotation_sync import AnnotationSyncManager
 
 
 class TestAnnotationSyncConfig:
@@ -115,19 +117,19 @@ class TestSpatialAnnotation:
         assert annotation.spec.data.x == 1.0
 
 
-class TestInOrbitConfigClient:
-    """Tests for InOrbitConfigClient."""
+class TestInOrbitConfigAPI:
+    """Tests for InOrbitConfigAPI."""
 
     @pytest.fixture
     def client(self):
         """Create a test client."""
-        return InOrbitConfigClient(
+        return InOrbitConfigAPI(
             base_url="https://api.test.inorbit.ai",
             api_key="test-api-key",
         )
 
     @pytest.mark.asyncio
-    async def test_list_annotations(self, client):
+    async def test_list_objects(self, client):
         """Test listing annotations."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -150,14 +152,20 @@ class TestInOrbitConfigClient:
 
         with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = mock_response
-            result = await client.list_annotations(scope="tag/test/location")
+            result = await client.list_objects(
+                kind="SpatialAnnotation", scope="tag/test/location"
+            )
             assert len(result) == 1
-            assert isinstance(result[0], SpatialAnnotation)
-            assert result[0].metadata.id == "1"
+            # list_objects returns ConfigObject, validate as SpatialAnnotation
+            # Use the raw dict from the response since ConfigObject.model_dump() has issues
+            raw_data = mock_response.json.return_value["items"][0]
+            annotation = SpatialAnnotation.model_validate(raw_data)
+            assert isinstance(annotation, SpatialAnnotation)
+            assert annotation.metadata.id == "1"
             mock_get.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_apply_annotation(self, client):
+    async def test_apply_object(self, client):
         """Test applying an annotation."""
         annotation = SpatialAnnotation(
             metadata=ConfigObjectMetadata(id="new-obj"),
@@ -174,7 +182,7 @@ class TestInOrbitConfigClient:
 
         with patch.object(client._client, "post", new_callable=AsyncMock) as mock_post:
             mock_post.return_value = mock_response
-            result = await client.apply_annotation(annotation)
+            result = await client.apply_object(annotation)
             assert isinstance(result, SpatialAnnotation)
             assert result.metadata.id == "new-obj"
             mock_post.assert_called_once()
@@ -182,14 +190,17 @@ class TestInOrbitConfigClient:
     @pytest.mark.asyncio
     async def test_synchronize_creates_new_annotations(self, client):
         """Test synchronization creates new annotations."""
-        with patch.object(
-            client, "list_annotations", new_callable=AsyncMock
-        ) as mock_list:
+        with patch.object(client, "list_objects", new_callable=AsyncMock) as mock_list:
             mock_list.return_value = []
 
-            with patch.object(
-                client, "apply_annotation", new_callable=AsyncMock
-            ) as mock_apply:
+            with (
+                patch.object(
+                    client, "apply_object", new_callable=AsyncMock
+                ) as mock_apply,
+                patch.object(
+                    client, "delete_object", new_callable=AsyncMock
+                ) as mock_delete,
+            ):
                 new_annotation = SpatialAnnotation(
                     metadata=ConfigObjectMetadata(id="obj-1"),
                     spec=WaypointAnnotationSpec(
@@ -199,20 +210,23 @@ class TestInOrbitConfigClient:
                     ),
                 )
 
-                stats = await client.synchronize_annotations(
+                stats = await client.synchronize_objects(
                     scope="tag/test/loc",
-                    annotations=[new_annotation],
+                    objects=[new_annotation],
                 )
 
                 assert stats["created"] == 1
                 assert stats["updated"] == 0
-                assert stats["to_delete_count"] == 0
+                assert stats["deleted"] == 0
                 mock_apply.assert_called_once()
+                mock_delete.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_close(self, client):
         """Test closing the client."""
-        with patch.object(client._client, "aclose", new_callable=AsyncMock) as mock_close:
+        with patch.object(
+            client._client, "aclose", new_callable=AsyncMock
+        ) as mock_close:
             await client.close()
             mock_close.assert_called_once()
 
@@ -314,16 +328,17 @@ class TestAnnotationSyncLifecycle:
         client_instance.close = AsyncMock()
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ) as client_cls, patch(
-            "inorbit_connector.connector.AnnotationSyncManager",
-            return_value=manager_instance,
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ) as client_cls,
+            patch(
+                "inorbit_connector.connector.AnnotationSyncManager",
+                return_value=manager_instance,
+            ) as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
@@ -348,12 +363,10 @@ class TestAnnotationSyncLifecycle:
         """Test sync is not initialized when provider/converter not registered."""
         connector = DummyConnector(base_config)
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient"
-        ) as client_cls, patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
+        with (
+            patch("inorbit_connector.inorbit.InOrbitConfigAPI") as client_cls,
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
         ):
             await connector.run_connect()
             client_cls.assert_not_called()
@@ -366,12 +379,10 @@ class TestAnnotationSyncLifecycle:
         connector = DummyConnector(config)
         connector.register_annotation_sync(MagicMock(), MagicMock())
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient"
-        ) as client_cls, patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
+        with (
+            patch("inorbit_connector.inorbit.InOrbitConfigAPI") as client_cls,
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
         ):
             await connector.run_connect()
             client_cls.assert_not_called()
@@ -384,12 +395,10 @@ class TestAnnotationSyncLifecycle:
         connector = DummyConnector(config)
         connector.register_annotation_sync(MagicMock(), MagicMock())
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient"
-        ) as client_cls, patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
+        with (
+            patch("inorbit_connector.inorbit.InOrbitConfigAPI") as client_cls,
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
         ):
             await connector.run_connect()
             client_cls.assert_not_called()
@@ -410,12 +419,10 @@ class TestAnnotationSyncLifecycle:
         connector = DummyConnector(config)
         connector.register_annotation_sync(MagicMock(), MagicMock())
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient"
-        ) as client_cls, patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
+        with (
+            patch("inorbit_connector.inorbit.InOrbitConfigAPI") as client_cls,
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
         ):
             await connector.run_connect()
             client_cls.assert_not_called()
@@ -428,12 +435,10 @@ class TestAnnotationSyncLifecycle:
         connector = DummyConnector(config)
         connector.register_annotation_sync(MagicMock(), MagicMock())
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient"
-        ) as client_cls, patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
+        with (
+            patch("inorbit_connector.inorbit.InOrbitConfigAPI") as client_cls,
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
         ):
             await connector.run_connect()
             client_cls.assert_not_called()
@@ -449,15 +454,14 @@ class TestAnnotationSyncLifecycle:
         client_instance.close = AsyncMock()
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ), patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ),
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
@@ -504,23 +508,26 @@ class TestPerFrameSyncManager:
         def create_manager(*args, **kwargs):
             manager = MagicMock()
             manager.stop = AsyncMock()
-            managers_created.append({"args": args, "kwargs": kwargs, "manager": manager})
+            managers_created.append(
+                {"args": args, "kwargs": kwargs, "manager": manager}
+            )
             return manager
 
         client_instance = MagicMock()
         client_instance.close = AsyncMock()
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ), patch(
-            "inorbit_connector.connector.AnnotationSyncManager",
-            side_effect=create_manager,
-        ), patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ),
+            patch(
+                "inorbit_connector.connector.AnnotationSyncManager",
+                side_effect=create_manager,
+            ),
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
@@ -565,16 +572,17 @@ class TestPerFrameSyncManager:
         client_instance.close = AsyncMock()
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ), patch(
-            "inorbit_connector.connector.AnnotationSyncManager",
-            side_effect=create_manager,
-        ), patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ),
+            patch(
+                "inorbit_connector.connector.AnnotationSyncManager",
+                side_effect=create_manager,
+            ),
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
@@ -617,16 +625,17 @@ class TestPerFrameSyncManager:
         client_instance.close = AsyncMock()
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ), patch(
-            "inorbit_connector.connector.AnnotationSyncManager",
-            side_effect=create_manager,
-        ), patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ),
+            patch(
+                "inorbit_connector.connector.AnnotationSyncManager",
+                side_effect=create_manager,
+            ),
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
@@ -670,20 +679,23 @@ class TestPerFrameSyncManager:
         client_instance.close = AsyncMock()
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ), patch(
-            "inorbit_connector.connector.AnnotationSyncManager",
-            side_effect=create_manager,
-        ), patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ),
+            patch(
+                "inorbit_connector.connector.AnnotationSyncManager",
+                side_effect=create_manager,
+            ),
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
-            connector.publish_robot_pose("robot-1", 1.0, 2.0, 0.0, frame_id="building-a-floor-1")
+            connector.publish_robot_pose(
+                "robot-1", 1.0, 2.0, 0.0, frame_id="building-a-floor-1"
+            )
 
             assert len(manager_kwargs_list) == 1
             kwargs = manager_kwargs_list[0]
@@ -714,16 +726,17 @@ class TestPerFrameSyncManager:
         client_instance.close = AsyncMock()
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ), patch(
-            "inorbit_connector.connector.AnnotationSyncManager",
-            side_effect=create_manager,
-        ), patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ),
+            patch(
+                "inorbit_connector.connector.AnnotationSyncManager",
+                side_effect=create_manager,
+            ),
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
@@ -752,14 +765,11 @@ class TestPerFrameSyncManager:
         connector.register_annotation_sync(MagicMock(), MagicMock())
         mock_session = MagicMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient"
-        ) as client_cls, patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
-        ), patch.object(
-            connector, "_get_robot_session", return_value=mock_session
+        with (
+            patch("inorbit_connector.inorbit.InOrbitConfigAPI") as client_cls,
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
+            patch.object(connector, "_get_robot_session", return_value=mock_session),
         ):
             await connector.run_connect()
 
@@ -781,13 +791,13 @@ class TestPerFrameSyncManager:
         client_instance = MagicMock()
         client_instance.close = AsyncMock()
 
-        with patch(
-            "inorbit_connector.connector.InOrbitConfigClient",
-            return_value=client_instance,
-        ), patch(
-            "inorbit_connector.connector.AnnotationSyncManager"
-        ) as manager_cls, patch.object(
-            connector, "_FleetConnector__initialize_sessions"
+        with (
+            patch(
+                "inorbit_connector.connector.InOrbitConfigAPI",
+                return_value=client_instance,
+            ),
+            patch("inorbit_connector.connector.AnnotationSyncManager") as manager_cls,
+            patch.object(connector, "_FleetConnector__initialize_sessions"),
         ):
             await connector.run_connect()
 
@@ -829,9 +839,7 @@ class MockPositionProvider:
     async def create_position(self, position: MockPosition) -> None:
         self.created.append(position)
 
-    async def update_position(
-        self, position_id: str, position: MockPosition
-    ) -> None:
+    async def update_position(self, position_id: str, position: MockPosition) -> None:
         self.updated.append((position_id, position))
 
     async def delete_position(self, position_id: str) -> None:
@@ -891,16 +899,15 @@ class TestAnnotationSyncManager:
     @pytest.fixture
     def inorbit_client(self):
         """Create mock InOrbit client."""
-        client = MagicMock(spec=InOrbitConfigClient)
-        client.list_annotations = AsyncMock(return_value=[])
-        client.apply_annotation = AsyncMock()
-        client.synchronize_annotations = AsyncMock(
+        client = MagicMock(spec=InOrbitConfigAPI)
+        client.list_objects = AsyncMock(return_value=[])
+        client.apply_object = AsyncMock()
+        client.synchronize_objects = AsyncMock(
             return_value={
                 "created": 0,
                 "updated": 0,
                 "up_to_date": 0,
-                "to_delete": [],
-                "to_delete_count": 0,
+                "deleted": 0,
             }
         )
         return client
@@ -966,13 +973,11 @@ class TestAnnotationSyncManager:
 
         await manager.sync_external_to_inorbit()
 
-        # Should call synchronize_annotations with converted annotations
-        inorbit_client.synchronize_annotations.assert_called_once()
-        call_kwargs = inorbit_client.synchronize_annotations.call_args.kwargs
-        assert len(call_kwargs["annotations"]) == 2
-        assert all(
-            isinstance(a, SpatialAnnotation) for a in call_kwargs["annotations"]
-        )
+        # Should call synchronize_objects with converted annotations
+        inorbit_client.synchronize_objects.assert_called_once()
+        call_kwargs = inorbit_client.synchronize_objects.call_args.kwargs
+        assert len(call_kwargs["objects"]) == 2
+        assert all(isinstance(a, SpatialAnnotation) for a in call_kwargs["objects"])
 
     @pytest.mark.asyncio
     async def test_sync_inorbit_to_external(
@@ -991,7 +996,7 @@ class TestAnnotationSyncManager:
         )
 
         # Setup InOrbit annotations
-        inorbit_client.list_annotations.return_value = [
+        inorbit_client.list_objects.return_value = [
             SpatialAnnotation(
                 metadata=ConfigObjectMetadata(id="ann-1"),
                 spec=WaypointAnnotationSpec(
@@ -1147,7 +1152,9 @@ class TestAnnotationSyncManager:
         provider1.list_positions.assert_called_once_with("map-alpha")
         provider2.list_positions.assert_called_once_with("map-beta")
 
-    def test_get_scope_missing_location_id(self, inorbit_client, position_provider, converter):
+    def test_get_scope_missing_location_id(
+        self, inorbit_client, position_provider, converter
+    ):
         """Test scope generation fails without location_id."""
         config = AnnotationSyncConfig(
             enabled=True,

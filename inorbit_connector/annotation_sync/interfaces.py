@@ -8,13 +8,9 @@ This module defines the interfaces that connectors must implement
 to enable annotation synchronization between external systems and InOrbit.
 
 Terminology:
-    - **Annotation**: An InOrbit SpatialAnnotation object (kind: SpatialAnnotation).
-      Currently, we support waypoint annotations (spec.type == "waypoint").
-    - **Position**: A relevant position in the external system. This is the
-      external system's representation of a location that maps to a waypoint
-      annotation in InOrbit.
-    - **External system**: The software the connector interacts with, such as
-      a fleet manager (MiR Fleet, Bluebotics) or native robot software.
+    - Annotation: InOrbit SpatialAnnotation (kind: SpatialAnnotation)
+    - Position: Waypoint/location in the external system
+    - External system: Fleet manager or robot software
 
 The framework uses generics for external positions (TExternalPosition),
 requiring each connector to define its own Pydantic BaseModel subclass
@@ -26,7 +22,7 @@ from typing import Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel
 
-from inorbit_connector.annotation_sync.models import SpatialAnnotationData
+from inorbit_connector.inorbit import SpatialAnnotationData
 
 # Generic type for external system positions (must be a Pydantic BaseModel)
 TExternalPosition = TypeVar("TExternalPosition", bound=BaseModel)

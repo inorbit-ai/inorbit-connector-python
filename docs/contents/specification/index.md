@@ -87,4 +87,5 @@ The table below lists package-defined symbols meant for direct use (call) or ext
 - [Commands utilities](commands)
 - [Utilities](utils)
 - [Logging](logging)
+- [Config API](config-api)
 - [Annotation Synchronization](annotation-sync)
