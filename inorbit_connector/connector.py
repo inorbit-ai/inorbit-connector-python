@@ -319,9 +319,7 @@ class FleetConnector(ABC):
                 signature_value=self.config.connector_type,
             )
             self.__annotation_sync_managers[frame_id] = manager
-
-        # Start manager outside the lock to avoid holding it during async operations
-        manager.start()
+            manager.start()
 
     def _handle_command_exception(
         self,
