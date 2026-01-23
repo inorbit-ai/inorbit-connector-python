@@ -269,13 +269,16 @@ class AnnotationSyncManager(Generic[TExternalPosition]):
                 if ann_dict.get("spec", {}).get("type") == "waypoint":
                     annotations.append(SpatialAnnotation.model_validate(ann_dict))
 
-        # Filter for owned annotations only
+        # Filter for owned annotations belonging to this manager's frame_id
         owned_annotations = [
-            ann for ann in annotations if self._has_sync_signature(ann)
+            ann
+            for ann in annotations
+            if self._has_sync_signature(ann) and ann.spec.frameId == self._frame_id
         ]
 
         self._logger.debug(
-            f"Fetched {len(owned_annotations)} owned annotations from InOrbit"
+            f"Fetched {len(owned_annotations)} owned annotations from InOrbit "
+            f"for frame '{self._frame_id}'"
         )
 
         # Fetch existing positions from external system for this frame

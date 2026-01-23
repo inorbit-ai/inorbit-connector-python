@@ -1002,7 +1002,7 @@ class TestAnnotationSyncManager:
                 spec=WaypointAnnotationSpec(
                     data=WaypointData(x=1.0, y=2.0, theta=0.0),
                     label="Annotation 1",
-                    frameId="map",
+                    frameId="test-map",
                     properties={ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
                 ),
             )
@@ -1013,6 +1013,63 @@ class TestAnnotationSyncManager:
         assert stats["created"] == 1
         assert len(position_provider.created) == 1
         assert isinstance(position_provider.created[0], MockPosition)
+
+    @pytest.mark.asyncio
+    async def test_sync_inorbit_to_external_filters_by_frame_id(
+        self, config, inorbit_client, position_provider, converter
+    ):
+        """Test that sync_inorbit_to_external only processes annotations for manager's frame_id."""
+        config.mode = AnnotationSyncMode.INORBIT_TO_EXTERNAL
+        manager = ConcreteAnnotationSyncManager(
+            config=config,
+            inorbit_config_client=inorbit_client,
+            position_provider=position_provider,
+            annotation_converter=converter,
+            account_id="test-company",
+            frame_id="frame-1",
+            signature_value=SIGNATURE_VALUE,
+        )
+
+        # Setup InOrbit annotations with different frame_ids
+        inorbit_client.list_objects.return_value = [
+            # Annotation for frame-1 (should be processed)
+            SpatialAnnotation(
+                metadata=ConfigObjectMetadata(id="ann-1"),
+                spec=WaypointAnnotationSpec(
+                    data=WaypointData(x=1.0, y=2.0, theta=0.0),
+                    label="Annotation 1",
+                    frameId="frame-1",
+                    properties={ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
+                ),
+            ),
+            # Annotation for frame-2 (should be filtered out)
+            SpatialAnnotation(
+                metadata=ConfigObjectMetadata(id="ann-2"),
+                spec=WaypointAnnotationSpec(
+                    data=WaypointData(x=3.0, y=4.0, theta=0.0),
+                    label="Annotation 2",
+                    frameId="frame-2",
+                    properties={ANNOTATION_SYNC_ORIGIN_PROPERTY: SIGNATURE_VALUE},
+                ),
+            ),
+            # Annotation for frame-1 without signature (should be filtered out)
+            SpatialAnnotation(
+                metadata=ConfigObjectMetadata(id="ann-3"),
+                spec=WaypointAnnotationSpec(
+                    data=WaypointData(x=5.0, y=6.0, theta=0.0),
+                    label="Annotation 3",
+                    frameId="frame-1",
+                    properties={},
+                ),
+            ),
+        ]
+
+        stats = await manager.sync_inorbit_to_external()
+
+        # Should only create position for ann-1 (frame-1 with signature)
+        assert stats["created"] == 1
+        assert len(position_provider.created) == 1
+        assert position_provider.created[0].id == "ann-1"
 
     @pytest.mark.asyncio
     async def test_sync_once_disabled(

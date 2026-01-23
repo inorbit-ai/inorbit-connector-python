@@ -185,7 +185,9 @@ class Robot:
                         # Handle cancellation gracefully
                         break
                     except Exception as e:
-                        self._logger.error(f"Error in loop running {coro.__name__}: {e}")
+                        self._logger.error(
+                            f"Error in loop running {coro.__name__}: {e}"
+                        )
                         # Shorter sleep during errors to check stop_event more
                         # frequently
                         await asyncio.sleep(0.1)
