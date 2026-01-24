@@ -5,7 +5,7 @@ description: "API specification for synchronizing annotations between external s
 
 > **Note:** Annotation synchronization is currently an experimental feature with partial support in the InOrbit platform.
 
-The annotation synchronization framework enables connectors to synchronize waypoint annotations between external systems and InOrbit's Config API.
+The annotation synchronization feature enables connectors to synchronize waypoint annotations between external systems and InOrbit's Config API.
 
 For Config API models and client, see [Config API](config-api).
 
@@ -29,10 +29,6 @@ config = AnnotationSyncConfig(
     location_id="location-id"
 )
 ```
-
-**Note**: `frame_id` is not configured. The framework automatically starts sync for each unique `frame_id` as robot poses are published.
-
-**Note**: The ownership signature property is `syncOrigin`, with value set to `ConnectorConfig.connector_type`. The manager automatically injects this.
 
 ## Interfaces
 
@@ -90,7 +86,7 @@ manager = AnnotationSyncManager(
 )
 ```
 
-**Note**: The framework creates manager instances automatically when new `frame_id`s are detected.
+The connector creates manager instances automatically when new `frame_id`s are detected.
 
 ### Methods
 
