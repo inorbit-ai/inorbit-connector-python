@@ -55,6 +55,8 @@ See the [CONTRIBUTING.md](CONTRIBUTING.md) file for information on how to develo
 
 The [`examples`](examples) directory contains usage examples of the connector. See [examples/README](examples/README.md) for more information.
 
+A cookiecutter template is available for quickly generating a new connector project. See [`inorbit-connector-cookiecutter`](https://github.com/inorbit-ai/inorbit-connector-cookiecutter) for more information.
+
 ## Contributing
 
 Any contribution that you make to this repository will be under the MIT license, as dictated by that [license](https://opensource.org/licenses/MIT).

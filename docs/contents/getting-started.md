@@ -3,6 +3,20 @@ title: "Getting Started"
 description: "Installation and setup for the InOrbit Connector Framework"
 ---
 
+## Quick Start
+
+A cookiecutter template is available for quickly generating a new connector project. See [`inorbit-connector-cookiecutter`](https://github.com/inorbit-ai/inorbit-connector-cookiecutter) for more information.
+
+To generate a new connector project:
+
+1. Create a new repository and `cd` into it.
+2. Run `pipx run cookiecutter gh:inorbit-ai/inorbit-connector-cookiecutter`. This will install the [cookiecutter package](https://cookiecutter.readthedocs.io/) if you don't have it already and download the InOrbit connector cookiecutter.
+3. Follow the prompts to create a new connector.
+4. Once all questions are answered, the cookiecutter will generate a bunch of files and directories for you to start working on your connector.
+5. Read the notice at the top of the generated README.md file and follow the instructions to complete the setup.
+
+Continue reading for a complete usage guide and examples.
+
 ## Installation
 
 There are two ways of installing the `inorbit-connector` Python package.
