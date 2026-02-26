@@ -820,9 +820,12 @@ class FleetConnector(ABC):
     def _is_fleet_robot_online(self, robot_id: str) -> bool:
         """Check if a specific robot is online.
 
-        Default implementation assumes robot is online if connector is running.
-        Override this method in specific connectors to provide robot-specific
-        health checks (e.g., API connectivity, robot state, etc.).
+        Default implementation assumes robot is online if the connector is running.
+        Override this method in specific connectors to provide robot-specific health
+        checks (e.g., API connectivity, robot state, etc.).
+
+        NOTE: State will automatically be requested from InOrbit if the robot is marked
+        as offline but system stats are sent.
 
         Args:
             robot_id (str): The robot ID to check
@@ -904,6 +907,9 @@ class Connector(FleetConnector, ABC):
         Default implementation assumes robot is online if connector is running.
         Override this method in specific connectors to provide robot-specific
         health checks (e.g., API connectivity, robot state, etc.).
+
+        NOTE: State will automatically be requested from InOrbit if the robot is marked
+        as offline but system stats are sent.
 
         Returns:
             bool: True if robot is online, False otherwise.

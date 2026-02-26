@@ -156,7 +156,7 @@ async def _execution_loop(self) -> None:
 
 ### `_is_robot_online()`
 
-Override this method to provide custom robot health checks. The default implementation assumes the robot is online if the connector is running.
+Override this method to provide custom robot health checks. The default implementation assumes the robot is online if the connector is running. This callback is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received.
 
 ```python
 def _is_robot_online(self) -> bool:
