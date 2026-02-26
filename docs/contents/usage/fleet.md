@@ -138,7 +138,7 @@ def _is_fleet_robot_online(self, robot_id: str) -> bool:
     return self._fleet_manager.is_robot_online(robot_id)
 ```
 
-This is used by InOrbit to determine robot availability.
+This callback is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received. The connector framework always publishes system stats for all robots (even zeroed defaults), ensuring that any online/offline discrepancy is detected and corrected.
 
 ## Example Execution Loop
 

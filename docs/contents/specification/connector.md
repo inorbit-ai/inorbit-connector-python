@@ -83,7 +83,7 @@ Return `None` if the map can’t be fetched.
 
 **Optional override.**
 
-The Edge SDK uses this callback to determine if a robot should be considered online. Default implementation returns `True`.
+The Edge SDK uses this callback to determine if a robot should be considered online. It is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received. Default implementation returns `True`.
 
 <a id="spec-connector-fleetconnector-lifecycle"></a>
 ### `start()` / `join()` / `stop()`
@@ -177,7 +177,7 @@ Single-robot convenience for map fetching. The framework uses it by delegating `
 
 **Optional override.**
 
-Single-robot convenience for online status. The fleet-level online check delegates to this method.
+Single-robot convenience for online status. The fleet-level online check delegates to this method. Called when InOrbit requests state due to a discrepancy between the robot's offline status and incoming system stats.
 
 <a id="spec-connector-connector-publishing"></a>
 ### Publishing wrappers
