@@ -15,11 +15,6 @@ processors:
   batch:
     send_batch_size: 1024
     timeout: 10s
-  resource:
-    attributes:
-      - key: deployment.environment
-        value: ${env:INORBIT_DEPLOY_ENV}
-        action: upsert
 
 exporters:
   googlecloud:
@@ -33,7 +28,7 @@ service:
   pipelines:
     metrics:
       receivers: [prometheus]
-      processors: [batch, resource]
+      processors: [batch]
       exporters: [googlecloud]
   telemetry:
     logs:

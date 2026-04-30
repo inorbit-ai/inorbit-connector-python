@@ -9,7 +9,7 @@
 #   docker network create inorbit-metrics
 #
 # Then place a GCP service-account key at ./gcp-sa.json (gitignored in your
-# customer-side repo) and set GCP_PROJECT / INORBIT_DEPLOY_ENV in your env.
+# customer-side repo) and set GCP_PROJECT in your env.
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.118.0
@@ -23,7 +23,6 @@ services:
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /etc/otelcol/gcp-sa.json
       GCP_PROJECT: ${GCP_PROJECT}
-      INORBIT_DEPLOY_ENV: ${INORBIT_DEPLOY_ENV:-production}
 
 networks:
   inorbit-metrics:

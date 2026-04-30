@@ -17,7 +17,7 @@ Cloud Monitoring.
    conflict.
 2. Each connector writes a small JSON file to a shared Docker named volume
    (`inorbit-connector-metrics`). The file uses Prometheus `file_sd` format
-   and names the connector's advertised address (for example `mir-1:9090`).
+   and names the connector's advertised address (for example `brand-1:9090`).
 3. One OTEL collector runs alongside the connectors, mounts the same volume
    read-only, and uses `file_sd_configs` to discover every connector. It
    scrapes them and exports to GCP via the `googlecloud` exporter.
@@ -38,8 +38,8 @@ metrics:
   enabled: true
   bind_host: 0.0.0.0           # bridge-network mode; use 127.0.0.1 for host networking
   bind_port: 9090
-  advertise_host: mir-1        # must match the docker-compose `hostname:` field
-  connector_id: mir-1          # unique per host; used as discovery filename
+  advertise_host: brand-1        # must match the docker-compose `hostname:` field
+  connector_id: brand-1          # unique per host; used as discovery filename
   discovery_dir: /var/run/inorbit-metrics
 ```
 
@@ -48,9 +48,9 @@ compose service:
 
 ```yaml
 services:
-  mir-1:
+  brand-1:
     image: inorbit/mir-connector:latest
-    hostname: mir-1
+    hostname: brand-1
     networks: [inorbit-metrics]
     volumes:
       - inorbit-connector-metrics:/var/run/inorbit-metrics
@@ -69,10 +69,9 @@ For the connector configuration reference and metric catalog, see the
    this directory in a working directory on the host.
 2. Put a GCP service-account key with `roles/monitoring.metricWriter` at
    `./gcp-sa.json`.
-3. Export environment variables:
+3. Export your GCP project:
    ```bash
    export GCP_PROJECT=your-project-id
-   export INORBIT_DEPLOY_ENV=production
    ```
 4. Bring up the collector:
    ```bash
