@@ -12,7 +12,11 @@ import random
 
 from inorbit_edge.metrics import with_counter_metric
 
-from metrics import fleet_api_errors, fleet_api_requests
+from metrics import (
+    fleet_api_errors,
+    fleet_api_requests,
+    robot_updates_received,
+)
 
 
 class FleetManagerAPIWrapper:
@@ -42,10 +46,7 @@ class FleetManagerAPIWrapper:
             await asyncio.sleep(random.uniform(0.1, 0.3))
 
             telemetry_data = {}
-            for robot_id in robot_ids:
-                # Extract robot index for simulation
-                robot_index = int(robot_id.split("-")[-1])
-
+            for robot_index, robot_id in enumerate(robot_ids):
                 telemetry_data[robot_id] = {
                     "linear_speed": random.uniform(0.1, 0.9) + (robot_index * 0.05),
                     "angular_speed": random.uniform(0.1, 0.9) + (robot_index * 0.02),
@@ -56,6 +57,9 @@ class FleetManagerAPIWrapper:
                         "frame_id": "frameIdA",
                     },
                 }
+                robot_updates_received.add(
+                    1, {"endpoint": "telemetry", "robot_id": robot_id}
+                )
 
             return telemetry_data
         except Exception:
@@ -84,6 +88,9 @@ class FleetManagerAPIWrapper:
                     "ram": random.uniform(0.2, 0.8),
                     "hdd": random.uniform(0.3, 0.7),
                 }
+                robot_updates_received.add(
+                    1, {"endpoint": "system_stats", "robot_id": robot_id}
+                )
 
             return stats_data
         except Exception:
@@ -106,9 +113,7 @@ class FleetManagerAPIWrapper:
             await asyncio.sleep(random.uniform(0.1, 0.3))
 
             status_data = {}
-            for robot_id in robot_ids:
-                robot_index = int(robot_id.split("-")[-1])
-
+            for robot_index, robot_id in enumerate(robot_ids):
                 statuses = ["idle", "running", "charging", "error"]
                 status = random.choice(statuses[:3])  # Avoid errors for demo
 
@@ -119,6 +124,9 @@ class FleetManagerAPIWrapper:
                     "battery_level": random.uniform(0.3, 1.0),
                     "mission_id": f"mission_{robot_index}",
                 }
+                robot_updates_received.add(
+                    1, {"endpoint": "robot_status", "robot_id": robot_id}
+                )
 
             return status_data
         except Exception:
