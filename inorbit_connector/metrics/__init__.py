@@ -146,9 +146,7 @@ class MetricsServer:
             if path.exists():
                 path.unlink()
         except Exception as exc:
-            _logger.error(
-                "Failed to remove metrics discovery file %s: %s", path, exc
-            )
+            _logger.error("Failed to remove metrics discovery file %s: %s", path, exc)
 
     def _discovery_file_path(self) -> Path:
         return Path(self._config.discovery_dir) / f"{self._connector_id}.json"
@@ -158,9 +156,7 @@ class MetricsServer:
         discovery_dir.mkdir(parents=True, exist_ok=True)
 
         advertise_host = (
-            self._config.advertise_host
-            or socket.gethostname()
-            or "localhost"
+            self._config.advertise_host or socket.gethostname() or "localhost"
         )
         body = [
             {

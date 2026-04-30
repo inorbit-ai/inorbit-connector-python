@@ -192,9 +192,7 @@ class FleetConnector(ABC):
 
         # --- Metrics subsystem (opt-in via config.metrics.enabled) --------
         self._connector_id = (
-            config.metrics.connector_id
-            or socket.gethostname()
-            or "inorbit-connector"
+            config.metrics.connector_id or socket.gethostname() or "inorbit-connector"
         )
         metrics_active = setup_prometheus_metrics(
             config=config.metrics,
