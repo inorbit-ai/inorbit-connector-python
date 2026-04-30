@@ -47,14 +47,14 @@ def test_enabled_installs_provider_with_identity_attributes():
         exporter_namespace="inorbit_connector",
         extra_resource_attributes={"site": "lab"},
     )
-    assert setup_prometheus_metrics(cfg, "mir", "brand-1") is True
+    assert setup_prometheus_metrics(cfg, "brand-1", "rId-1") is True
 
     provider = otel_metrics.get_meter_provider()
     assert isinstance(provider, MeterProvider)
     attrs = dict(provider._sdk_config.resource.attributes)
     assert attrs["service.name"] == "inorbit_connector"
-    assert attrs["service.instance.id"] == "brand-1"
-    assert attrs["inorbit.connector.type"] == "mir"
-    assert attrs["inorbit.connector.id"] == "brand-1"
+    assert attrs["service.instance.id"] == "rId-1"
+    assert attrs["inorbit.connector.type"] == "brand-1"
+    assert attrs["inorbit.connector.id"] == "rId-1"
     assert attrs["site"] == "lab"
     assert "service.version" in attrs

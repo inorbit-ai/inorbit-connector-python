@@ -55,10 +55,10 @@ from inorbit_connector.commands import (  # noqa: F401
 from inorbit_connector.logging.logger import setup_logger
 from inorbit_connector import metrics as _metrics
 from inorbit_connector.metrics import (
+    MetricsServer,
     register_framework_gauges,
     setup_prometheus_metrics,
 )
-from inorbit_connector.metrics.server import MetricsServer
 from inorbit_connector.models import (
     ConnectorConfig,
     InorbitConnectorConfig,

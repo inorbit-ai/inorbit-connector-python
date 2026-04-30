@@ -9,8 +9,7 @@ import pytest
 from opentelemetry.metrics import _internal as otel_metrics_internal
 
 from inorbit_connector.models import MetricsConfig
-from inorbit_connector.metrics import setup_prometheus_metrics
-from inorbit_connector.metrics.server import MetricsServer
+from inorbit_connector.metrics import MetricsServer, setup_prometheus_metrics
 
 
 @pytest.fixture(autouse=True)
