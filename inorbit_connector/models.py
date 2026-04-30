@@ -7,7 +7,9 @@
 
 # Standard
 import os
+import re
 import warnings
+from pathlib import Path
 from typing import List, Optional
 
 # Third-party
@@ -125,6 +127,64 @@ class LoggingConfig(BaseModel):
     }
 
 
+_METRICS_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+class MetricsConfig(BaseModel):
+    """Configuration for the Prometheus-exported metrics server.
+
+    When ``enabled`` is True, the connector installs a process-global OTEL
+    MeterProvider with a PrometheusMetricReader and starts an HTTP server
+    serving ``/metrics`` on ``bind_host:bind_port``. It also writes a
+    Prometheus ``file_sd`` JSON file under ``discovery_dir`` so a host-side
+    OTEL collector can discover and scrape the endpoint.
+
+    When ``enabled`` is False (the default), no server is started and all
+    instrument calls are silently dropped by the OTEL no-op provider.
+
+    Identity labels set on every exported metric: ``service.name``,
+    ``service.instance.id``, ``service.version``, ``inorbit.connector.type``,
+    ``inorbit.connector.id``, plus any key/value from
+    ``extra_resource_attributes``.
+    """
+
+    enabled: bool = False
+    bind_host: str = "0.0.0.0"
+    bind_port: int = 9090
+    advertise_host: Optional[str] = None
+    discovery_dir: Path = Path("/var/run/inorbit-metrics")
+    connector_id: Optional[str] = None
+    exporter_namespace: str = "inorbit_connector"
+    extra_resource_attributes: dict[str, str] = {}
+
+    @field_validator("exporter_namespace")
+    @classmethod
+    def _validate_exporter_namespace(cls, value: str) -> str:
+        if not _METRICS_IDENTIFIER_RE.fullmatch(value):
+            raise ValueError(
+                "exporter_namespace must match [A-Za-z_][A-Za-z0-9_]* "
+                "(no hyphens, no leading digit) for GCP/Prometheus compatibility"
+            )
+        return value
+
+    @field_validator("extra_resource_attributes")
+    @classmethod
+    def _validate_extra_resource_attributes(
+        cls, value: dict[str, str]
+    ) -> dict[str, str]:
+        for key, val in value.items():
+            if not _METRICS_IDENTIFIER_RE.fullmatch(key):
+                raise ValueError(
+                    f"extra_resource_attributes key {key!r} must match "
+                    "[A-Za-z_][A-Za-z0-9_]* (no hyphens)"
+                )
+            if not val:
+                raise ValueError(
+                    f"extra_resource_attributes[{key!r}] must be a non-empty string"
+                )
+        return value
+
+
 class RobotConfig(BaseModel):
     """Class representing a robot configuration.
 
@@ -187,6 +247,7 @@ class ConnectorConfig(BaseModel):
     inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
+    metrics: MetricsConfig = MetricsConfig()
     # Kept for backwards compatibility. Deprecated in version 1.1.0
     # Use logging.log_level instead
     log_level: LogLevels | None = Field(default=None, exclude=True)

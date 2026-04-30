@@ -9,4 +9,5 @@ Guides for implementing connectors.
 single-robot
 fleet
 commands-handling
+metrics
 ```

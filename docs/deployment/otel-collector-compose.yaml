@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 InOrbit, Inc.
+# SPDX-License-Identifier: MIT
+#
+# Reference OTEL collector stack for scraping inorbit-connector metrics and
+# forwarding them to GCP Cloud Monitoring.
+#
+# Prerequisites on the host:
+#   docker volume create inorbit-connector-metrics
+#   docker network create inorbit-metrics
+#
+# Then place a GCP service-account key at ./gcp-sa.json (gitignored in your
+# customer-side repo) and set GCP_PROJECT / INORBIT_DEPLOY_ENV in your env.
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.118.0
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    networks: [inorbit-metrics]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+      - inorbit-connector-metrics:/var/run/inorbit-metrics:ro
+      - ./gcp-sa.json:/etc/otelcol/gcp-sa.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /etc/otelcol/gcp-sa.json
+      GCP_PROJECT: ${GCP_PROJECT}
+      INORBIT_DEPLOY_ENV: ${INORBIT_DEPLOY_ENV:-production}
+
+networks:
+  inorbit-metrics:
+    external: true
+
+volumes:
+  inorbit-connector-metrics:
+    external: true

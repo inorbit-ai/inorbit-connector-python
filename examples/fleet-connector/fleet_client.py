@@ -10,6 +10,10 @@ multiple robots at once.
 import asyncio
 import random
 
+from inorbit_edge.metrics import with_counter_metric
+
+from metrics import fleet_api_errors, fleet_api_requests
+
 
 class FleetManagerAPIWrapper:
     """
@@ -22,6 +26,7 @@ class FleetManagerAPIWrapper:
         self.endpoint = endpoint
         self.api_key = api_key
 
+    @with_counter_metric(fleet_api_requests, attributes={"endpoint": "telemetry"})
     async def fetch_fleet_telemetry_data(self, robot_ids: list[str]) -> dict:
         """Simulate a request to the fleet manager's telemetry API.
 
@@ -33,26 +38,31 @@ class FleetManagerAPIWrapper:
         Returns:
             Dictionary mapping robot_id to telemetry data
         """
-        await asyncio.sleep(random.uniform(0.1, 0.3))
+        try:
+            await asyncio.sleep(random.uniform(0.1, 0.3))
 
-        telemetry_data = {}
-        for robot_id in robot_ids:
-            # Extract robot index for simulation
-            robot_index = int(robot_id.split("-")[-1])
+            telemetry_data = {}
+            for robot_id in robot_ids:
+                # Extract robot index for simulation
+                robot_index = int(robot_id.split("-")[-1])
 
-            telemetry_data[robot_id] = {
-                "linear_speed": random.uniform(0.1, 0.9) + (robot_index * 0.05),
-                "angular_speed": random.uniform(0.1, 0.9) + (robot_index * 0.02),
-                "pose": {
-                    "x": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
-                    "y": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
-                    "yaw": random.uniform(-3.14, 3.14),
-                    "frame_id": "frameIdA",
-                },
-            }
+                telemetry_data[robot_id] = {
+                    "linear_speed": random.uniform(0.1, 0.9) + (robot_index * 0.05),
+                    "angular_speed": random.uniform(0.1, 0.9) + (robot_index * 0.02),
+                    "pose": {
+                        "x": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
+                        "y": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
+                        "yaw": random.uniform(-3.14, 3.14),
+                        "frame_id": "frameIdA",
+                    },
+                }
 
-        return telemetry_data
+            return telemetry_data
+        except Exception:
+            fleet_api_errors.add(1, {"endpoint": "telemetry"})
+            raise
 
+    @with_counter_metric(fleet_api_requests, attributes={"endpoint": "system_stats"})
     async def fetch_fleet_system_stats(self, robot_ids: list[str]) -> dict:
         """Simulate a request to the fleet manager's system stats API.
 
@@ -64,18 +74,23 @@ class FleetManagerAPIWrapper:
         Returns:
             Dictionary mapping robot_id to system stats
         """
-        await asyncio.sleep(random.uniform(0.1, 0.3))
+        try:
+            await asyncio.sleep(random.uniform(0.1, 0.3))
 
-        stats_data = {}
-        for robot_id in robot_ids:
-            stats_data[robot_id] = {
-                "cpu": random.uniform(0.1, 0.9),
-                "ram": random.uniform(0.2, 0.8),
-                "hdd": random.uniform(0.3, 0.7),
-            }
+            stats_data = {}
+            for robot_id in robot_ids:
+                stats_data[robot_id] = {
+                    "cpu": random.uniform(0.1, 0.9),
+                    "ram": random.uniform(0.2, 0.8),
+                    "hdd": random.uniform(0.3, 0.7),
+                }
 
-        return stats_data
+            return stats_data
+        except Exception:
+            fleet_api_errors.add(1, {"endpoint": "system_stats"})
+            raise
 
+    @with_counter_metric(fleet_api_requests, attributes={"endpoint": "robot_status"})
     async def fetch_fleet_robot_status(self, robot_ids: list[str]) -> dict:
         """Simulate a request to the fleet manager's robot status API.
 
@@ -87,24 +102,28 @@ class FleetManagerAPIWrapper:
         Returns:
             Dictionary mapping robot_id to status data
         """
-        await asyncio.sleep(random.uniform(0.1, 0.3))
+        try:
+            await asyncio.sleep(random.uniform(0.1, 0.3))
 
-        status_data = {}
-        for robot_id in robot_ids:
-            robot_index = int(robot_id.split("-")[-1])
+            status_data = {}
+            for robot_id in robot_ids:
+                robot_index = int(robot_id.split("-")[-1])
 
-            statuses = ["idle", "running", "charging", "error"]
-            status = random.choice(statuses[:3])  # Avoid errors for demo
+                statuses = ["idle", "running", "charging", "error"]
+                status = random.choice(statuses[:3])  # Avoid errors for demo
 
-            status_data[robot_id] = {
-                "status": status,
-                "error": None,
-                "message": f"Robot {robot_id} is {status}",
-                "battery_level": random.uniform(0.3, 1.0),
-                "mission_id": f"mission_{robot_index}",
-            }
+                status_data[robot_id] = {
+                    "status": status,
+                    "error": None,
+                    "message": f"Robot {robot_id} is {status}",
+                    "battery_level": random.uniform(0.3, 1.0),
+                    "mission_id": f"mission_{robot_index}",
+                }
 
-        return status_data
+            return status_data
+        except Exception:
+            fleet_api_errors.add(1, {"endpoint": "robot_status"})
+            raise
 
 
 class FleetManager:
