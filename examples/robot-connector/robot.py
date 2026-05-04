@@ -11,6 +11,10 @@ import asyncio
 import random
 from typing import Coroutine
 
+from inorbit_edge.metrics import with_counter_metric
+
+from metrics import api_errors, api_requests
+
 
 class ExampleBotAPIWrapper:
     """
@@ -22,37 +26,52 @@ class ExampleBotAPIWrapper:
         self.endpoint = endpoint
         self.api_key = api_key
 
+    @with_counter_metric(api_requests, attributes={"endpoint": "telemetry"})
     async def fetch_telemetry_data(self) -> dict:
         """Simulate a request to the robot's telemetry API."""
-        await asyncio.sleep(random.uniform(0.1, 0.3))
-        return {
-            "linear_speed": random.uniform(0.1, 0.9),
-            "angular_speed": random.uniform(0.1, 0.9),
-            "pose": {
-                "x": random.uniform(0.1, 0.9),
-                "y": random.uniform(0.1, 0.9),
-                "yaw": random.uniform(0.1, 0.9),
-                "frame_id": "frameIdA",
-            },
-        }
+        try:
+            await asyncio.sleep(random.uniform(0.1, 0.3))
+            return {
+                "linear_speed": random.uniform(0.1, 0.9),
+                "angular_speed": random.uniform(0.1, 0.9),
+                "pose": {
+                    "x": random.uniform(0.1, 0.9),
+                    "y": random.uniform(0.1, 0.9),
+                    "yaw": random.uniform(0.1, 0.9),
+                    "frame_id": "frameIdA",
+                },
+            }
+        except Exception:
+            api_errors.add(1, {"endpoint": "telemetry"})
+            raise
 
+    @with_counter_metric(api_requests, attributes={"endpoint": "system_stats"})
     async def fetch_system_stats(self) -> dict:
         """Simulate a request to the robot's system stats API."""
-        await asyncio.sleep(random.uniform(0.1, 0.3))
-        return {
-            "cpu": random.uniform(0.1, 0.9),
-            "ram": random.uniform(0.1, 0.9),
-            "hdd": random.uniform(0.1, 0.9),
-        }
+        try:
+            await asyncio.sleep(random.uniform(0.1, 0.3))
+            return {
+                "cpu": random.uniform(0.1, 0.9),
+                "ram": random.uniform(0.1, 0.9),
+                "hdd": random.uniform(0.1, 0.9),
+            }
+        except Exception:
+            api_errors.add(1, {"endpoint": "system_stats"})
+            raise
 
+    @with_counter_metric(api_requests, attributes={"endpoint": "robot_status"})
     async def fetch_robot_status(self) -> dict:
         """Simulate a request to the robot's status API."""
-        await asyncio.sleep(random.uniform(0.1, 0.3))
-        return {
-            "status": "running",
-            "error": None,
-            "message": "Robot is executing mission 123",
-        }
+        try:
+            await asyncio.sleep(random.uniform(0.1, 0.3))
+            return {
+                "status": "running",
+                "error": None,
+                "message": "Robot is executing mission 123",
+            }
+        except Exception:
+            api_errors.add(1, {"endpoint": "robot_status"})
+            raise
 
 
 class Robot:

@@ -8,6 +8,7 @@
 # Standard
 import os
 import logging
+import socket
 from pathlib import Path
 import tempfile
 import warnings
@@ -52,6 +53,12 @@ from inorbit_connector.commands import (  # noqa: F401
     parse_custom_command_args,
 )
 from inorbit_connector.logging.logger import setup_logger
+from inorbit_connector import metrics as _metrics
+from inorbit_connector.metrics import (
+    MetricsServer,
+    register_framework_gauges,
+    setup_prometheus_metrics,
+)
 from inorbit_connector.models import (
     ConnectorConfig,
     InorbitConnectorConfig,
@@ -182,6 +189,26 @@ class FleetConnector(ABC):
 
         # Create RobotSessionPool
         self.__session_pool = RobotSessionPool(self.__session_factory)
+
+        # --- Metrics subsystem (opt-in via config.metrics.enabled) --------
+        self._connector_id = (
+            config.metrics.connector_id or socket.gethostname() or "inorbit-connector"
+        )
+        metrics_active = setup_prometheus_metrics(
+            config=config.metrics,
+            connector_type=config.connector_type,
+            connector_id=self._connector_id,
+        )
+        register_framework_gauges(
+            is_alive=lambda: self.__thread.is_alive(),
+            robot_ids=lambda: self.robot_ids,
+            is_session_connected=self._is_session_connected,
+        )
+        self._metrics_server: MetricsServer | None = (
+            MetricsServer(config=config.metrics, connector_id=self._connector_id)
+            if metrics_active
+            else None
+        )
 
     @property
     def robot_ids(self) -> list[str]:
@@ -421,7 +448,9 @@ class FleetConnector(ABC):
                 )
                 # Publish stored system stats or defaults for all robots
                 self.__publish_pending_system_stats()
+                _metrics.execution_loop_ticks.add(1)
             except Exception as e:
+                _metrics.execution_loop_errors.add(1)
                 self._logger.error(f"Error in execution loop: {e}")
                 self._logger.error(f"Traceback: {traceback.format_exc()}")
                 self.__pending_system_stats.clear()
@@ -448,6 +477,25 @@ class FleetConnector(ABC):
         """
         return self.__session_pool.get_session(robot_id)
 
+    def _is_session_connected(self, robot_id: str) -> bool:
+        """Return True if the MQTT session for ``robot_id`` is currently connected.
+
+        Used by the ``inorbit.connector.session.connected`` ObservableGauge to
+        detect the case where the process is alive but its MQTT link to
+        InOrbit has dropped. Reads the connector's own session dict rather
+        than the pool to avoid any side effects (the pool's ``get_session``
+        triggers a connect attempt on miss). Returns False when the session
+        has not been initialized yet, which is the normal state before
+        ``_connect()`` runs.
+        """
+        session = self.__robot_sessions.get(robot_id)
+        if session is None:
+            return False
+        try:
+            return bool(session.client.is_connected())
+        except Exception:
+            return False
+
     def start(self) -> None:
         """Start the connector in a new thread.
 
@@ -467,6 +515,8 @@ class FleetConnector(ABC):
 
         # Prevent starting an already running thread
         if not self.__thread.is_alive():
+            if self._metrics_server is not None:
+                self._metrics_server.start()
             self.__stop_event.clear()
 
             # Create and start the thread
@@ -493,6 +543,8 @@ class FleetConnector(ABC):
         self._logger.info("Stopping connector")
         self.__stop_event.set()
         self.__thread.join(timeout=5)
+        if self._metrics_server is not None:
+            self._metrics_server.stop()
         if self.__thread.is_alive():
             raise Exception("Thread did not stop in time")
 

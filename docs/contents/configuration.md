@@ -26,6 +26,7 @@ Connectors should subclass `inorbit_connector.models.ConnectorConfig` and define
 - **`user_scripts_dir`** (DirectoryPath | None): Path to directory containing user scripts for command execution
 - **`account_id`** (str | None): InOrbit account ID, required for publishing footprints
 - **`inorbit_robot_key`** (str | None): Robot key for InOrbit Connect robots. See [API documentation](https://api.inorbit.ai/docs/index.html#operation/generateRobotKey)
+- **`metrics`** (MetricsConfig): Optional Prometheus metrics endpoint. Disabled by default. See [Metrics](usage/metrics) for the full guide and [`MetricsConfig`](#metricsconfig) for the field list.
 
 ### Environment Variables
 
@@ -60,6 +61,19 @@ Configuration for logging:
 - **`config_file`** (FilePath | None): Path to logging configuration file. If not set, uses default configuration
 - **`log_level`** (LogLevels | None): Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Overrides the level set in the config file
 - **`defaults`** (dict[str, str]): Default values to pass to the logging configuration file (e.g., log file path)
+
+## MetricsConfig
+
+Optional Prometheus metrics endpoint. When `enabled` is `false` (the default) no HTTP server is started and all instruments are no-ops. See [Metrics](usage/metrics) for the user guide.
+
+- **`enabled`** (bool): Master switch. Default is `false`
+- **`bind_host`** (str): HTTP server bind address. Default is `0.0.0.0`
+- **`bind_port`** (int): HTTP server TCP port. Default is `9090`. Use `0` to let the OS pick an ephemeral free port
+- **`advertise_host`** (str | None): Hostname written to the discovery file. Defaults to `socket.gethostname()`
+- **`discovery_dir`** (Path | None): Directory where the connector writes a Prometheus `file_sd`-format JSON file describing its endpoint. Auto-created. Default is `/var/run/inorbit-metrics`. Set to `null` (in YAML) / `None` (in Python) to skip writing the discovery file when the scraper already knows the connector's host and port.
+- **`connector_id`** (str | None): Unique-per-host identifier. Used as the OTEL `service.instance.id` resource attribute and as the discovery filename. Defaults to `socket.gethostname()`
+- **`exporter_namespace`** (str): Prefix prepended to every Prometheus metric name. ASCII identifier (no hyphens). Default is `"inorbit_connector"`
+- **`extra_resource_attributes`** (dict[str, str]): Static OTEL Resource attributes added to every metric (low-cardinality only). Default is `{}`
 
 (creating-a-custom-configuration)=
 ## Creating a Custom Configuration

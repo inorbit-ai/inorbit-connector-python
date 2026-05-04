@@ -35,3 +35,4 @@ Both connector types provide:
 - **Usage**: Detailed guides for implementing single-robot and fleet connectors ([Usage](usage/index))
 - **Configuration**: Connector configuration models and file formats ([Configuration](configuration))
 - **Publishing**: How to publish data to InOrbit ([Publishing](publishing))
+- **Metrics**: Expose connector health metrics over Prometheus ([Metrics](usage/metrics))

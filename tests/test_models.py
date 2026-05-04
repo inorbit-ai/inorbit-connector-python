@@ -25,9 +25,11 @@ from inorbit_connector.models import (
     MapConfig,
     MapConfigBase,
     MapConfigTemp,
+    MetricsConfig,
     RobotConfig,
     LoggingConfig,
 )
+from pathlib import Path
 from inorbit_connector.logging.logger import LogLevels
 
 
@@ -586,3 +588,60 @@ class TestMapConfig:
         )
         assert config.map_id == "test_map"
         assert config.format_version == 2
+
+
+class TestMetricsConfig:
+    """Tests for the opt-in metrics configuration."""
+
+    def test_defaults(self):
+        cfg = MetricsConfig()
+        assert cfg.enabled is False
+        assert cfg.bind_host == "0.0.0.0"
+        assert cfg.bind_port == 9090
+        assert cfg.advertise_host is None
+        assert cfg.discovery_dir == Path("/var/run/inorbit-metrics")
+        assert cfg.connector_id is None
+        assert cfg.exporter_namespace == "inorbit_connector"
+        assert cfg.extra_resource_attributes == {}
+
+    def test_exporter_namespace_rejects_hyphens(self):
+        with pytest.raises(ValidationError):
+            MetricsConfig(exporter_namespace="inorbit-connector")
+
+    def test_exporter_namespace_rejects_leading_digit(self):
+        with pytest.raises(ValidationError):
+            MetricsConfig(exporter_namespace="1connector")
+
+    def test_exporter_namespace_accepts_underscores_and_digits(self):
+        cfg = MetricsConfig(exporter_namespace="inorbit_connector_v2")
+        assert cfg.exporter_namespace == "inorbit_connector_v2"
+
+    def test_extra_resource_attributes_rejects_empty_values(self):
+        with pytest.raises(ValidationError):
+            MetricsConfig(extra_resource_attributes={"site": ""})
+
+    def test_extra_resource_attributes_rejects_invalid_keys(self):
+        with pytest.raises(ValidationError):
+            MetricsConfig(extra_resource_attributes={"has-hyphen": "ok"})
+
+    def test_extra_resource_attributes_accepts_valid_pairs(self):
+        cfg = MetricsConfig(
+            extra_resource_attributes={"site": "lab", "region": "us"}
+        )
+        assert cfg.extra_resource_attributes == {"site": "lab", "region": "us"}
+
+    def test_discovery_dir_accepts_none(self):
+        """discovery_dir=None opts out of writing the file_sd discovery file."""
+        cfg = MetricsConfig(discovery_dir=None)
+        assert cfg.discovery_dir is None
+
+
+def test_connector_config_includes_metrics_with_default():
+    cfg = ConnectorConfig(
+        api_key="ak",
+        connector_type="test",
+        connector_config=DummyConfig(),
+        fleet=[{"robot_id": "r1"}],
+    )
+    assert isinstance(cfg.metrics, MetricsConfig)
+    assert cfg.metrics.enabled is False
