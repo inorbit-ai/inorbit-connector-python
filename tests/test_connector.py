@@ -245,6 +245,29 @@ class TestFleetConnector:
         session.publish_map.assert_called_once()
         session.publish_pose.assert_called_once()
 
+    def test_publish_robot_pose_no_map_logs_once(
+        self, base_fleet_connector, mock_robot_session_pool
+    ):
+        """Test that pose with unknown frame_id only triggers map update once."""
+        robot_id = "TestRobot1"
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+        base_fleet_connector._FleetConnector__loop = mock_loop
+
+        with patch("asyncio.run_coroutine_threadsafe"):
+            base_fleet_connector.publish_robot_pose(
+                robot_id, 1.0, 2.0, 0.0, "unknown_frame"
+            )
+            base_fleet_connector.publish_robot_pose(
+                robot_id, 3.0, 4.0, 0.0, "unknown_frame"
+            )
+
+        session = base_fleet_connector._get_robot_session(robot_id)
+        # publish_map never called (map not in config)
+        session.publish_map.assert_not_called()
+        # publish_pose called both times
+        assert session.publish_pose.call_count == 2
+
     def test_publish_robot_odometry(
         self, base_fleet_connector, mock_robot_session_pool
     ):
