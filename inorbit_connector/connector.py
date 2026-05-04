@@ -574,6 +574,7 @@ class FleetConnector(ABC):
             self._logger.info(
                 f"Updating map {frame_id} with new pose for robot {robot_id}."
             )
+            self.__last_published_frame_ids[robot_id] = frame_id
             self.publish_robot_map(robot_id, frame_id, is_update=True)
         session.publish_pose(x, y, yaw, frame_id, **kwargs)
 
@@ -605,7 +606,6 @@ class FleetConnector(ABC):
                 is_update=is_update,
                 format_version=map_config.format_version,
             )
-            self.__last_published_frame_ids[robot_id] = frame_id
         else:
             # Map not in config - schedule async fetch if not already pending
             self._schedule_map_fetch(robot_id, frame_id, is_update)
