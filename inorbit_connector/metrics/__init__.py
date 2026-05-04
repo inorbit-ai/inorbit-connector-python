@@ -133,13 +133,30 @@ class MetricsServer:
             _logger.error("Failed to write metrics discovery file: %s", exc)
 
     def stop(self) -> None:
-        if self._http_server is not None:
-            try:
-                self._http_server.shutdown()
-            except Exception as exc:
-                _logger.error("Error shutting down metrics HTTP server: %s", exc)
+        server = self._http_server
+        thread = self._http_thread
+
+        try:
+            if server is not None:
+                try:
+                    server.shutdown()
+                except Exception as exc:
+                    _logger.error("Error shutting down metrics HTTP server: %s", exc)
+
+                try:
+                    server.close()
+                except Exception as exc:
+                    _logger.error("Error closing metrics HTTP server: %s", exc)
+
+            if thread is not None:
+                try:
+                    thread.join()
+                except Exception as exc:
+                    _logger.error("Error joining metrics HTTP server thread: %s", exc)
+        finally:
             self._http_server = None
             self._http_thread = None
+            self.actual_port = None
 
         path = self._discovery_file_path()
         try:
