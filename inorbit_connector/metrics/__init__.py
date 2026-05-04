@@ -89,7 +89,7 @@ def setup_prometheus_metrics(
 
 
 class MetricsServer:
-    """Prometheus HTTP server + ``file_sd``-format discovery writer.
+    """Prometheus HTTP server + optional ``file_sd``-format discovery writer.
 
     The HTTP-serving piece is one call to ``prometheus_client.start_http_server``;
     the value-add of this class is the discovery file. On ``start()`` the
@@ -97,6 +97,10 @@ class MetricsServer:
     tmp-and-rename) describing its bound ``host:port`` so a host-side OTEL
     collector can pick it up via ``file_sd_configs``. ``stop()`` removes the
     file and shuts the HTTP server down.
+
+    Setting ``MetricsConfig.discovery_dir`` to ``None`` disables the discovery
+    file entirely — useful for static deployments where the scraper already
+    knows the connector's host and port.
 
     Both methods degrade silently with a log entry if something goes wrong.
     """
@@ -127,6 +131,9 @@ class MetricsServer:
             self.actual_port = None
             return
 
+        if self._config.discovery_dir is None:
+            return
+
         try:
             self._write_discovery_file()
         except Exception as exc:
@@ -144,9 +151,9 @@ class MetricsServer:
                     _logger.error("Error shutting down metrics HTTP server: %s", exc)
 
                 try:
-                    server.close()
+                    server.server_close()
                 except Exception as exc:
-                    _logger.error("Error closing metrics HTTP server: %s", exc)
+                    _logger.error("Error closing metrics HTTP server socket: %s", exc)
 
             if thread is not None:
                 try:
@@ -159,16 +166,24 @@ class MetricsServer:
             self.actual_port = None
 
         path = self._discovery_file_path()
+        if path is None:
+            return
         try:
             if path.exists():
                 path.unlink()
         except Exception as exc:
             _logger.error("Failed to remove metrics discovery file %s: %s", path, exc)
 
-    def _discovery_file_path(self) -> Path:
+    def _discovery_file_path(self) -> Path | None:
+        if self._config.discovery_dir is None:
+            return None
         return Path(self._config.discovery_dir) / f"{self._connector_id}.json"
 
     def _write_discovery_file(self) -> None:
+        path = self._discovery_file_path()
+        if path is None:
+            return
+
         discovery_dir = Path(self._config.discovery_dir)
         discovery_dir.mkdir(parents=True, exist_ok=True)
 
@@ -181,7 +196,6 @@ class MetricsServer:
                 "labels": {},
             }
         ]
-        path = self._discovery_file_path()
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(body) + "\n")
         os.replace(tmp, path)

@@ -3,11 +3,16 @@ SPDX-FileCopyrightText: 2026 InOrbit, Inc.
 SPDX-License-Identifier: MIT
 -->
 
-# Deploying metrics export for inorbit-connector
+# Reference: metrics export with an OTEL collector
 
 This directory holds a reference setup for collecting metrics from one or more
 `inorbit-connector` containers on a single host and forwarding them to GCP
 Cloud Monitoring.
+
+It is intentionally an **example**, not a turn-key deployment: ports,
+hostnames, exporters, and credential mounts will all need to be adjusted for
+your environment. For the supported `metrics:` configuration fields, see the
+[Metrics user guide](../../docs/contents/usage/metrics.md).
 
 ## How it works
 
@@ -61,7 +66,7 @@ host — typically `<connector_type>-<robot_id>` or the docker-compose service
 name.
 
 For the connector configuration reference and metric catalog, see the
-[Metrics user guide](../contents/usage/metrics.md).
+[Metrics user guide](../../docs/contents/usage/metrics.md).
 
 ## Collector-side setup
 

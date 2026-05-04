@@ -123,3 +123,41 @@ def test_server_atomic_write_uses_tmp_rename(monkeypatch, metrics_enabled):
         assert dst.endswith("test-1.json")
     finally:
         server.stop()
+
+
+def test_server_skips_discovery_when_dir_is_none(metrics_enabled, tmp_path):
+    """discovery_dir=None: HTTP endpoint still serves, but no file is written."""
+    cfg = metrics_enabled
+    cfg.discovery_dir = None
+    server = MetricsServer(config=cfg, connector_id="test-1")
+    server.start()
+    try:
+        assert server.actual_port is not None and server.actual_port > 0
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{server.actual_port}/metrics", timeout=5
+        ) as resp:
+            assert resp.status == 200
+        assert not (tmp_path / "test-1.json").exists()
+    finally:
+        server.stop()
+
+
+def test_stop_closes_server_socket_and_joins_thread(metrics_enabled):
+    """stop() must call server_close() and join the background thread so the
+    listening port is freed promptly."""
+    cfg = metrics_enabled
+    server = MetricsServer(config=cfg, connector_id="test-1")
+    server.start()
+    httpd = server._http_server
+    thread = server._http_thread
+    assert httpd is not None and thread is not None and thread.is_alive()
+
+    server.stop()
+
+    # Thread is joined and the socket file descriptor is closed.
+    assert not thread.is_alive()
+    assert httpd.socket.fileno() == -1
+    # State is fully cleared.
+    assert server._http_server is None
+    assert server._http_thread is None
+    assert server.actual_port is None

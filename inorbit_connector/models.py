@@ -137,7 +137,9 @@ class MetricsConfig(BaseModel):
     MeterProvider with a PrometheusMetricReader and starts an HTTP server
     serving ``/metrics`` on ``bind_host:bind_port``. It also writes a
     Prometheus ``file_sd`` JSON file under ``discovery_dir`` so a host-side
-    OTEL collector can discover and scrape the endpoint.
+    OTEL collector can discover and scrape the endpoint. Set
+    ``discovery_dir`` to ``None`` to disable the discovery file (useful when
+    the scraper already knows the connector's host and port).
 
     When ``enabled`` is False (the default), no server is started and all
     instrument calls are silently dropped by the OTEL no-op provider.
@@ -152,7 +154,7 @@ class MetricsConfig(BaseModel):
     bind_host: str = "0.0.0.0"
     bind_port: int = 9090
     advertise_host: Optional[str] = None
-    discovery_dir: Path = Path("/var/run/inorbit-metrics")
+    discovery_dir: Optional[Path] = Path("/var/run/inorbit-metrics")
     connector_id: Optional[str] = None
     exporter_namespace: str = "inorbit_connector"
     extra_resource_attributes: dict[str, str] = {}

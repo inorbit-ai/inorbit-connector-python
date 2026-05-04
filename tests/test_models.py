@@ -630,6 +630,11 @@ class TestMetricsConfig:
         )
         assert cfg.extra_resource_attributes == {"site": "lab", "region": "us"}
 
+    def test_discovery_dir_accepts_none(self):
+        """discovery_dir=None opts out of writing the file_sd discovery file."""
+        cfg = MetricsConfig(discovery_dir=None)
+        assert cfg.discovery_dir is None
+
 
 def test_connector_config_includes_metrics_with_default():
     cfg = ConnectorConfig(

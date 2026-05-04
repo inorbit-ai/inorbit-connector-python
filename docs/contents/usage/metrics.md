@@ -58,7 +58,9 @@ metrics:
   discovery_dir: /var/run/inorbit-metrics  # for OTEL collector file_sd
 ```
 
-When enabled, the connector also writes a Prometheus `file_sd`-format JSON file to `discovery_dir`, naming the bound `host:port`. A host-side OTEL collector can mount this directory and discover every connector running on the host — see [`docs/deployment/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/docs/deployment) for a reference compose stack.
+When enabled, the connector also writes a Prometheus `file_sd`-format JSON file to `discovery_dir`, naming the bound `host:port`. A host-side OTEL collector can mount this directory and discover every connector running on the host — see [`examples/metrics/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/metrics) for a reference compose stack.
+
+If your scraper is configured statically (e.g. its `prometheus.yaml` already lists `host:port` targets, or you only run a single connector behind a known address), set `discovery_dir: null` to skip writing the discovery file entirely. The HTTP endpoint still serves `/metrics` as usual.
 
 When `enabled` is `false` (the default), no server is started and all instruments become no-ops with zero overhead.
 
@@ -70,7 +72,7 @@ When `enabled` is `false` (the default), no server is started and all instrument
 | `bind_host` | `0.0.0.0` | Address the HTTP server binds to. |
 | `bind_port` | `9090` | TCP port. Use `0` to let the OS pick. |
 | `advertise_host` | `socket.gethostname()` | Hostname written to the discovery file. |
-| `discovery_dir` | `/var/run/inorbit-metrics` | Auto-created on start. |
+| `discovery_dir` | `/var/run/inorbit-metrics` | Auto-created on start. Set to `null` to skip writing a discovery file. |
 | `connector_id` | `socket.gethostname()` | Used as `service.instance.id` and as the discovery filename. |
 | `exporter_namespace` | `"inorbit_connector"` | Prefix prepended to every Prometheus metric name. ASCII / no hyphens. |
 | `extra_resource_attributes` | `{}` | Added to every metric as OTEL Resource attributes (low-cardinality only). |
@@ -189,7 +191,7 @@ The callback runs on every scrape, so it should be cheap and side-effect free.
 
 ## Production deployment
 
-For multi-container deployments, see [`docs/deployment/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/docs/deployment) for a reference OTEL collector compose stack that:
+For multi-container deployments, see [`examples/metrics/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/metrics) for a reference OTEL collector compose stack that:
 
 - Discovers all connector containers on a host via Prometheus `file_sd`.
 - Exports to GCP Cloud Monitoring (other backends straightforward to swap in).

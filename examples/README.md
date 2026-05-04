@@ -150,4 +150,6 @@ You'll see the framework signals (`inorbit_connector_up`, `..._execution_loop_ti
 
 For the full guide on what to instrument and why, see [the Metrics doc](../docs/contents/usage/metrics.md).
 
+For a reference OTEL collector deployment that scrapes connector `/metrics` endpoints, see [`metrics/`](metrics/).
+
 ![Powered by InOrbit](../assets/inorbit_github_footer.png)
