@@ -127,6 +127,16 @@ self.publish_system_stats(
 
 Cameras are configured in the `RobotConfig.cameras` field and are automatically registered when the connector connects.
 
+### Installing camera support
+
+Camera streaming requires OpenCV, which is not installed by default. Install the optional `video` extra when your connector needs cameras:
+
+```bash
+pip install inorbit-connector[video]
+```
+
+This pulls in `opencv-python-headless` via `inorbit-edge[video]`. Connectors that don't use cameras can omit the extra and avoid the OpenCV dependency entirely (useful on platforms like Alpine Linux where OpenCV has no prebuilt wheel).
+
 ### Camera Configuration
 
 Cameras are configured using `CameraConfig` from the InOrbit Edge SDK. Each camera in the `RobotConfig.cameras` list is automatically registered with InOrbit.
