@@ -208,6 +208,27 @@ class TestFleetConnector:
         assert session.robot_id == robot_id
         mock_robot_session_pool.get_session.assert_called()
 
+    def test_use_websockets_defaults_false_in_factory(self, base_fleet_connector):
+        """By default the session factory should request the TCP transport."""
+        session_factory = base_fleet_connector._FleetConnector__session_factory
+        assert session_factory.robot_session_kw_args["use_websockets"] is False
+
+    def test_use_websockets_propagates_to_factory(self, base_model):
+        """When use_websockets=True is set on the config, it must reach the
+        RobotSessionFactory so the edge-sdk RobotSession picks the websockets
+        (wss when use_ssl is on) transport."""
+        config = ConnectorConfig(
+            **base_model,
+            use_websockets=True,
+            fleet=[
+                RobotConfig(robot_id="TestRobot1"),
+                RobotConfig(robot_id="TestRobot2"),
+            ],
+        )
+        connector = FleetConnector(config)
+        session_factory = connector._FleetConnector__session_factory
+        assert session_factory.robot_session_kw_args["use_websockets"] is True
+
     def test_publish_robot_pose(self, base_fleet_connector, mock_robot_session_pool):
         """Test publishing pose for a specific robot."""
         robot_id = "TestRobot1"

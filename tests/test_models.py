@@ -414,6 +414,29 @@ class TestConnectorConfig:
         singular = model.to_singular_config("robot1")
         assert isinstance(singular, CustomConnectorConfig)
 
+    def test_use_websockets_defaults_to_false(self, base_model):
+        model = ConnectorConfig(**base_model)
+        assert model.use_websockets is False
+
+    def test_use_websockets_can_be_enabled(self, base_model):
+        init_input = base_model.copy()
+        init_input["use_websockets"] = True
+        model = ConnectorConfig(**init_input)
+        assert model.use_websockets is True
+
+    def test_use_websockets_must_be_bool(self, base_model):
+        init_input = base_model.copy()
+        init_input["use_websockets"] = "not-a-bool"
+        with pytest.raises(ValidationError):
+            ConnectorConfig(**init_input)
+
+    def test_use_websockets_preserved_in_to_singular_config(self, base_model):
+        init_input = base_model.copy()
+        init_input["use_websockets"] = True
+        model = ConnectorConfig(**init_input)
+        singular = model.to_singular_config("robot1")
+        assert singular.use_websockets is True
+
 
 class TestInorbitConnectorConfigToFleetConfig:
     @pytest.fixture
