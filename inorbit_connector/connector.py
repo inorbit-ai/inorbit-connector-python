@@ -185,6 +185,11 @@ class FleetConnector(ABC):
         factory_kwargs = robot_session_config.model_dump(
             exclude={"robot_id", "robot_name"}
         )
+        # Select MQTT transport. The edge-sdk's RobotSession accepts
+        # ``use_websockets`` as a constructor kwarg and uses it to pick between
+        # the "tcp" and "websockets" paho transports (with ``use_ssl`` still
+        # controlling TLS, so True+True yields a wss:// connection).
+        factory_kwargs["use_websockets"] = config.use_websockets
         self.__session_factory = RobotSessionFactory(**factory_kwargs)
 
         # Create RobotSessionPool

@@ -221,6 +221,12 @@ class ConnectorConfig(BaseModel):
                                      INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
         connector_type (str): The type of connector (see Class comment above)
         connector_config (BaseModel): The configuration for the connector
+        use_websockets (bool, optional): If True, the underlying edge-sdk
+            ``RobotSession`` connects to the InOrbit MQTT broker over the
+            WebSockets transport instead of the default TCP transport. Combined
+            with the edge-sdk's default ``use_ssl=True`` this yields a ``wss://``
+            connection. Useful when the connector runs behind a firewall or
+            proxy that only allows outbound HTTPS traffic. Default is False.
         update_freq (float, optional): Update frequency or 1 Hz by default
         location_tz (str, optional): The timezone of the location or "UTC" by default
         logging (LoggingConfig, optional): The logging configuration
@@ -241,6 +247,7 @@ class ConnectorConfig(BaseModel):
     api_url: HttpUrl = os.getenv("INORBIT_API_URL", INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL)
     connector_type: str
     connector_config: BaseModel
+    use_websockets: bool = False
     update_freq: float = 1.0
     location_tz: str = DEFAULT_TIMEZONE
     logging: LoggingConfig = LoggingConfig()
