@@ -58,3 +58,15 @@ def test_enabled_installs_provider_with_identity_attributes():
     assert attrs["inorbit.connector.id"] == "rId-1"
     assert attrs["site"] == "lab"
     assert "service.version" in attrs
+
+
+def test_enabled_derives_namespace_from_connector_type_when_unset():
+    cfg = MetricsConfig(enabled=True)  # exporter_namespace left at None
+    assert setup_prometheus_metrics(cfg, "acme", "rId-1") is True
+
+    provider = otel_metrics.get_meter_provider()
+    attrs = dict(provider._sdk_config.resource.attributes)
+    # service.name is the wire-level prefix; the prom exporter prepends
+    # it to every metric. With connector_type="acme" the derived value
+    # gives `inorbit_acme_connector_*` on the wire.
+    assert attrs["service.name"] == "inorbit_acme_connector"

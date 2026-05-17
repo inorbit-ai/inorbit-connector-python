@@ -156,12 +156,14 @@ class MetricsConfig(BaseModel):
     advertise_host: Optional[str] = None
     discovery_dir: Optional[Path] = Path("/var/run/inorbit-metrics")
     connector_id: Optional[str] = None
-    exporter_namespace: str = "inorbit_connector"
+    exporter_namespace: Optional[str] = None
     extra_resource_attributes: dict[str, str] = {}
 
     @field_validator("exporter_namespace")
     @classmethod
-    def _validate_exporter_namespace(cls, value: str) -> str:
+    def _validate_exporter_namespace(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
         if not _METRICS_IDENTIFIER_RE.fullmatch(value):
             raise ValueError(
                 "exporter_namespace must match [A-Za-z_][A-Za-z0-9_]* "
