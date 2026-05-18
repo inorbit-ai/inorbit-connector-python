@@ -91,7 +91,8 @@ def test_metrics_server_lifecycle(tmp_path, patched_run_connector):
         ) as resp:
             body = resp.read().decode()
         assert resp.status == 200
-        assert "inorbit_connector_up" in body
+        # connector_type="test" → derived namespace `inorbit_test_connector_*`.
+        assert "inorbit_test_connector_up" in body
     finally:
         conn.stop()
 

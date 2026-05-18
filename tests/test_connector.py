@@ -275,7 +275,7 @@ class TestFleetConnector:
         mock_loop.is_running.return_value = True
         base_fleet_connector._FleetConnector__loop = mock_loop
 
-        with patch("asyncio.run_coroutine_threadsafe"):
+        with patch("asyncio.run_coroutine_threadsafe") as mock_run:
             base_fleet_connector.publish_robot_pose(
                 robot_id, 1.0, 2.0, 0.0, "unknown_frame"
             )
@@ -288,6 +288,10 @@ class TestFleetConnector:
         session.publish_map.assert_not_called()
         # publish_pose called both times
         assert session.publish_pose.call_count == 2
+        # mock_run never scheduled the coroutine(s) — close them so GC
+        # doesn't surface "coroutine was never awaited" later.
+        for call in mock_run.call_args_list:
+            call[0][0].close()
 
     def test_publish_robot_odometry(
         self, base_fleet_connector, mock_robot_session_pool
@@ -423,6 +427,10 @@ class TestFleetConnectorMapFetching:
             assert "unknown_frame" in (
                 fleet_connector._FleetConnector__pending_map_fetches
             )
+            # mock_run swallowed the coroutine without scheduling it on a
+            # real loop; close it so the GC doesn't surface an
+            # "coroutine was never awaited" warning later.
+            mock_run.call_args[0][0].close()
 
     def test_schedule_map_fetch_avoids_duplicates(
         self, fleet_connector, mock_robot_session_pool
@@ -441,6 +449,9 @@ class TestFleetConnectorMapFetching:
             # Second request for same frame should be ignored
             fleet_connector._schedule_map_fetch("TestRobot1", "frame1", False)
             assert mock_run.call_count == 1  # Still 1, not 2
+
+            # mock_run never scheduled the coroutine; close it explicitly.
+            mock_run.call_args_list[0][0][0].close()
 
     def test_schedule_map_fetch_requires_running_loop(
         self, fleet_connector, mock_robot_session_pool
