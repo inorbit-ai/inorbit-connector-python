@@ -1,35 +1,116 @@
 # SPDX-FileCopyrightText: 2026 InOrbit, Inc.
 # SPDX-License-Identifier: MIT
+#
+# Reference OTEL collector config for inorbit-connector fleets exporting to
+# GCP Cloud Monitoring. See README.md in this directory for the rules each
+# block encodes; do not loosen them without reading that file first.
 
 receivers:
   prometheus:
     config:
+      global:
+        scrape_interval: 30s
+        scrape_timeout: 10s
       scrape_configs:
-        - job_name: inorbit-connectors
-          scrape_interval: 30s
+        - job_name: inorbit_connectors
+          # Preserve target_info series labels so connector-side resource
+          # attributes (notably inorbit_connector_id) surface as OTEL
+          # resource attributes for the `resource` processor below.
+          honor_labels: true
+          metrics_path: /metrics
           file_sd_configs:
-            - files: [/var/run/inorbit-metrics/*.json]
+            - files: ['/var/run/inorbit-metrics/*.json']
               refresh_interval: 30s
+          # Drop-only relabels are safe. Do NOT add a rule that writes
+          # `__name__` — see Rule 1 in README.md.
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: 'python_.*|process_.*'
+              action: drop
 
 processors:
+  # Bound RSS so backpressure from the metric backend can't balloon it.
+  memory_limiter:
+    check_interval: 2s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # Pin the generic_task Monitored Resource fields. The googlecloud
+  # exporter's MR mapping is hardcoded to these standard OTel attributes:
+  #   generic_task.namespace <- service.namespace
+  #   generic_task.job       <- service.name
+  #   generic_task.location  <- cloud.availability_zone | cloud.region
+  #   generic_task.task_id   <- service.instance.id
+  resource:
+    attributes:
+      - {key: service.namespace,   value: inorbit_connector_fleet, action: upsert}
+      - {key: service.name,        value: inorbit_connector,       action: upsert}
+      - {key: cloud.region,        value: us-central1,             action: upsert}
+      - {key: service.instance.id, from_attribute: inorbit_connector_id,   action: upsert}
+      # Promote the connector_type tag the framework already attaches as
+      # a metric label so cross-connector dashboards can group / filter
+      # by it without inspecting metric names.
+      - {key: connector_type,      from_attribute: inorbit_connector_type, action: upsert}
+      # Per-customer label. Any other resource attribute you want as a
+      # series-key must be added here AND matched under resource_filters.
+      - {key: customer, value: CHANGEME, action: upsert}
+
   batch:
-    send_batch_size: 1024
+    send_batch_size: 200
+    send_batch_max_size: 500
     timeout: 10s
 
 exporters:
   googlecloud:
-    project: ${env:GCP_PROJECT}
+    project: ${env:GOOGLE_CLOUD_PROJECT}
     metric:
-      prefix: custom.googleapis.com/inorbit_connector
+      # One shared prefix for every connector type. Descriptor isolation
+      # is guaranteed by the per-connector_type metric NAME prefix that
+      # the framework derives at the source (inorbit_<type>_connector_*),
+      # so the operator no longer picks a prefix per vendor.
+      prefix: workload.googleapis.com/
+      # connector_type is exported as a series-key label too, so a single
+      # query can slice across connector types ("all robots offline for
+      # customer=acme") AND drill into one ("MIR fleet only").
       resource_filters:
-        - prefix: ""
+        - regex: ^customer$
+        - regex: ^connector_type$
+    # Default 12s is too aggressive given hourly OAuth-refresh reconnect
+    # windows; dials get canceled mid-handshake at 12s.
+    timeout: 30s
+    sending_queue:
+      enabled: true
+      # Serial sends — see Rule 2 in README.md. CUMULATIVE writes must
+      # arrive monotonically per series; parallel consumers can deliver
+      # older batches after newer ones during retry storms and trip the
+      # per-series ordering rejection. Serial sending makes the queue
+      # strictly FIFO, so retries block the next batch rather than
+      # racing it.
+      num_consumers: 1
+      # Absorbs backpressure (OAuth refresh, NAT reconnect) without the
+      # prometheus receiver dropping at enqueue time. CUMULATIVE writes
+      # are self-healing across drops — the next successful write
+      # carries the full running total — but we still want headroom.
+      queue_size: 10000
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
 
 service:
-  pipelines:
-    metrics:
-      receivers: [prometheus]
-      processors: [batch]
-      exporters: [googlecloud]
+  extensions: [health_check]
   telemetry:
     logs:
       level: info
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [googlecloud]

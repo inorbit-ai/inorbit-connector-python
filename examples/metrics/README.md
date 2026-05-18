@@ -14,6 +14,76 @@ hostnames, exporters, and credential mounts will all need to be adjusted for
 your environment. For the supported `metrics:` configuration fields, see the
 [Metrics user guide](../../docs/contents/usage/metrics.md).
 
+## Design rules
+
+The example config in this directory encodes two rules that keep metrics
+flowing into a managed metric backend (GCP Cloud Monitoring in
+particular). Each addresses a failure mode that produces sparse data
+with no clear error in the collector log.
+
+> **Note on descriptor isolation.** A separate "one `metric.prefix` per
+> connector type" rule used to live here. The framework now derives a
+> per-connector-type prefix at the source
+> (`inorbit_<connector_type>_connector_*`), so two connectors built on
+> this framework can never share a downstream metric descriptor and the
+> operator no longer picks a prefix per vendor. `connector_type` is also
+> surfaced as a series-key label so cross-vendor queries work without
+> inspecting metric names.
+
+### Rule 1 — Don't rewrite `__name__` in `metric_relabel_configs`
+
+The Prometheus receiver warns at startup that any rule writing
+`__name__` produces "unknown-typed metrics without a unit or
+description". The renamed metric loses its Counter/Histogram type and
+exports as a Gauge regardless of its real type — and that then pins the
+downstream descriptor kind to `GAUGE`, which later writes of the
+correct kind cannot recover from.
+
+Fix metric names at the source (see [Metrics user
+guide](../../docs/contents/usage/metrics.md)). Drop-only relabel rules
+(no `target_label: __name__`) are safe — they filter before any naming
+step.
+
+### Rule 2 — Preserve per-series write ordering
+
+GCP rejects `CUMULATIVE` and `DELTA` writes whose `interval.start_time`
+precedes the last accepted `end_time` for the same series. Dropped
+points produce no error log entry, only gaps on the chart. This
+pipeline keeps cumulative counters as CUMULATIVE end to end and relies
+on three invariants to keep writes monotonic:
+
+- **One writer per series.** The framework's per-`connector_type`
+  namespace guarantees this for framework-emitted metrics — a series
+  is keyed by metric name + labels, and the metric name is now
+  vendor-prefixed. If you add custom resource attributes that bridge
+  connector types, keep ownership inside one connector type.
+- **Serial sends.** `sending_queue.num_consumers: 1` makes the
+  exporter's queue strictly FIFO. A retry blocks the queue rather
+  than racing the next batch.
+- **Single collector per fleet.** Two collector replicas scraping the
+  same connector and writing to the same project would race; deploy
+  one collector instance per metric-namespace scope.
+
+CUMULATIVE has a self-healing property under transient failures: if a
+batch is dropped permanently (queue eviction during a long outage,
+exhausted retries), the next successful write still carries the full
+running total, so the series's reconstruction stays correct from that
+point on.
+
+Connector restarts are handled natively. The Prometheus receiver
+detects the counter reset (value decrease), advances the series's
+`start_time`, and GCP recognizes it as a new cumulative epoch.
+`ALIGN_RATE` charts and `rate(...)`-based alerts cross the restart
+boundary without artifacts.
+
+### Switching to a different metric backend
+
+If you swap `googlecloud` for Cortex/Mimir/Prometheus remote_write,
+`num_consumers: 1` can be relaxed — those backends accept out-of-order
+writes for cumulative counters and reconcile on the server side. Rule
+1 still applies to any backend that consumes Prometheus type
+information.
+
 ## How it works
 
 1. Each connector container runs a Prometheus-format HTTP endpoint bound to a
@@ -98,7 +168,8 @@ For the connector configuration reference and metric catalog, see the
   Look for `Scrape iteration` entries referring to your connector targets.
 
 - In GCP Cloud Monitoring, under Custom Metrics, look for
-  `custom.googleapis.com/inorbit_connector/*` series.
+  `workload.googleapis.com/<vendor>_connector/*` series (using whichever
+  `metric.prefix` you set in the exporter — see Rule 1 above).
 
 ## Host-networking alternative
 

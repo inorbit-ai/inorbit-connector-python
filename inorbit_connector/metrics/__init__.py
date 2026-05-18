@@ -9,16 +9,27 @@ connector health and provides one entry point — :func:`setup_prometheus_metric
 
 Framework instruments (always declared, no-op when metrics are disabled):
 
-* ``inorbit.connector.up`` — 1 while the connector's main thread is alive
-* ``inorbit.connector.session.connected`` — per-robot MQTT connection status (1/0)
-* ``inorbit.connector.execution_loop.ticks`` — successful run-loop iterations
-* ``inorbit.connector.execution_loop.errors`` — exceptions caught in the loop
+* ``up`` — 1 while the connector's main thread is alive
+* ``session.connected`` — per-robot MQTT connection status (1/0)
+* ``execution_loop.ticks`` — successful run-loop iterations
+* ``execution_loop.errors`` — exceptions caught in the loop
+
+The Prometheus reader prepends ``exporter_namespace`` to every metric on
+export. When ``MetricsConfig.exporter_namespace`` is left unset (the
+default), :func:`setup_prometheus_metrics` derives it as
+``inorbit_<connector_type>_connector``, so a connector with
+``connector_type="acme"`` exports ``inorbit_acme_connector_up``,
+``inorbit_acme_connector_execution_loop_ticks_total`` etc. Two connector
+types therefore never share a metric name and never collide on a
+downstream metric descriptor. Instrument names must not repeat the
+namespace — the prefix is added once on export, never in the name.
 
 For domain metrics (e.g. ``fleet.api.errors``, ``mqtt.broker.connected``),
 concrete connectors get their own meter via
 ``inorbit_edge.metrics.get_meter("inorbit_<vendor>_connector")`` and declare
-instruments on it. They share the global MeterProvider installed here, so
-everything flows through the same Prometheus endpoint.
+instruments on it under the same convention. They share the global
+MeterProvider installed here, so everything flows through the same
+Prometheus endpoint.
 
 The Prometheus exporter ships transitively via ``inorbit-edge[telemetry]``,
 which is a base dependency of this package, so OTEL is always importable.
@@ -62,12 +73,26 @@ def setup_prometheus_metrics(
     that maps :class:`MetricsConfig` to the SDK call. Returns True when a
     provider was installed; False when metrics are disabled or the telemetry
     dependencies are missing.
+
+    The wire-level metric prefix is derived per connector_type when
+    ``config.exporter_namespace`` is unset (the default). That gives every
+    connector type a unique namespace
+    (``inorbit_<connector_type>_connector``) so two connector types
+    sharing a downstream metric store don't collide on the same metric
+    descriptor — each owns its own. Pass ``exporter_namespace`` explicitly
+    only to opt out of the derivation (e.g. to keep a legacy wire name).
     """
     if not config.enabled:
         return False
 
+    namespace = (
+        config.exporter_namespace
+        if config.exporter_namespace is not None
+        else f"inorbit_{connector_type}_connector"
+    )
+
     installed = setup_prometheus_meter_provider(
-        service_name=config.exporter_namespace,
+        service_name=namespace,
         service_instance_id=connector_id,
         service_version=_connector_version,
         extra_resource_attributes={
@@ -206,12 +231,12 @@ class MetricsServer:
 meter = get_meter("inorbit_connector")
 
 execution_loop_ticks = meter.create_counter(
-    "inorbit.connector.execution_loop.ticks",
+    "execution_loop.ticks",
     unit="1",
     description="Successful iterations of the connector's _execution_loop",
 )
 execution_loop_errors = meter.create_counter(
-    "inorbit.connector.execution_loop.errors",
+    "execution_loop.errors",
     unit="1",
     description="Exceptions caught in the run loop",
 )
@@ -229,14 +254,14 @@ def register_framework_gauges(
 
     Args:
         is_alive: zero-arg callable returning whether the connector's main
-            thread is alive. Drives ``inorbit.connector.up``.
+            thread is alive. Drives ``up``.
         robot_ids: zero-arg callable returning the current list of robot ids
             in the fleet.
         is_session_connected: callable ``(robot_id: str) -> bool`` that
             returns whether the underlying MQTT session for that robot is
-            currently connected. Drives
-            ``inorbit.connector.session.connected``. Should swallow lookup
-            errors and return False when the session is not yet available.
+            currently connected. Drives ``session.connected``. Should
+            swallow lookup errors and return False when the session is not
+            yet available.
     """
     if not OTEL_API_AVAILABLE:
         return
@@ -254,13 +279,13 @@ def register_framework_gauges(
         ]
 
     meter.create_observable_gauge(
-        "inorbit.connector.up",
+        "up",
         callbacks=[_up_callback],
         unit="1",
         description="1 while the connector main thread is alive",
     )
     meter.create_observable_gauge(
-        "inorbit.connector.session.connected",
+        "session.connected",
         callbacks=[_session_callback],
         unit="1",
         description=(

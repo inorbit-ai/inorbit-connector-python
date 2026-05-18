@@ -9,40 +9,51 @@ The framework ships an OpenTelemetry-based metrics subsystem that connectors can
 
 When `metrics.enabled = true` in your connector configuration, the framework starts a Prometheus HTTP server and exposes:
 
+Every framework metric is namespaced by `connector_type` at the source.
+With `connector_type="acme"` (set on `ConnectorConfig`), the four
+framework signals come out as:
+
 | Metric | Type | Attributes | Meaning |
 |---|---|---|---|
-| `inorbit_connector_up` | Gauge | — | 1 while the connector's main thread is alive |
-| `inorbit_connector_session_connected` | Gauge | `robot_id` | 1 when the per-robot MQTT session to InOrbit is connected. Catches the "process running but robot offline" failure mode where MQTT drops and reconnect fails |
-| `inorbit_connector_execution_loop_ticks_total` | Counter | — | Successful iterations of `_execution_loop` |
-| `inorbit_connector_execution_loop_errors_total` | Counter | — | Exceptions caught in the run loop |
+| `inorbit_acme_connector_up` | Gauge | — | 1 while the connector's main thread is alive |
+| `inorbit_acme_connector_session_connected` | Gauge | `robot_id` | 1 when the per-robot MQTT session to InOrbit is connected. Catches the "process running but robot offline" failure mode where MQTT drops and reconnect fails |
+| `inorbit_acme_connector_execution_loop_ticks_total` | Counter | — | Successful iterations of `_execution_loop` |
+| `inorbit_acme_connector_execution_loop_errors_total` | Counter | — | Exceptions caught in the run loop |
 
-Plus the per-robot publish counters that come from the SDK:
+Plus the per-robot publish counters that come from the SDK (same
+namespacing):
 
 | Metric | Attributes | Meaning |
 |---|---|---|
-| `calls_publish_pose_total` | `robot_id` | Calls to `publish_pose` |
-| `calls_publish_odometry_total` | `robot_id` | Calls to `publish_odometry` |
-| `calls_publish_key_values_total` | `robot_id` | Calls to `publish_key_values` |
-| `calls_publish_system_stats_total` | `robot_id` | Calls to `publish_system_stats` |
-| `calls_publish_map_total` | `robot_id` | Calls to `publish_map` |
-| `calls_publish_camera_frame_total` | `robot_id` | Calls to `publish_camera_frame` |
-| `calls_publish_lasers_total` | `robot_id` | Calls to `publish_lasers` / `publish_laser` |
-| `calls_publish_path_total` | `robot_id` | Calls to `publish_path` |
+| `inorbit_acme_connector_calls_publish_pose_total` | `robot_id` | Calls to `publish_pose` |
+| `inorbit_acme_connector_calls_publish_odometry_total` | `robot_id` | Calls to `publish_odometry` |
+| `inorbit_acme_connector_calls_publish_key_values_total` | `robot_id` | Calls to `publish_key_values` |
+| `inorbit_acme_connector_calls_publish_system_stats_total` | `robot_id` | Calls to `publish_system_stats` |
+| `inorbit_acme_connector_calls_publish_map_total` | `robot_id` | Calls to `publish_map` |
+| `inorbit_acme_connector_calls_publish_camera_frame_total` | `robot_id` | Calls to `publish_camera_frame` |
+| `inorbit_acme_connector_calls_publish_lasers_total` | `robot_id` | Calls to `publish_lasers` / `publish_laser` |
+| `inorbit_acme_connector_calls_publish_path_total` | `robot_id` | Calls to `publish_path` |
+
+The per-connector-type prefix means descriptors in any downstream metric
+store are isolated by connector type — two connectors built on this
+framework never collide. To query across connector types, use a wildcard
+(`inorbit_*_connector_*`) and rely on the `connector_type` label
+attached automatically.
 
 These signals are usually enough for an MVP alerting setup:
 
 ```promql
-# Process is dead or scrape failing
-inorbit_connector_up == 0
+# Process is dead or scrape failing — across every connector type
+inorbit_.*_connector_up == 0
 
 # Process is up but its MQTT link to InOrbit is down (robot appears offline)
-inorbit_connector_session_connected == 0
+inorbit_.*_connector_session_connected == 0
 
 # Process is up but not progressing
-rate(inorbit_connector_execution_loop_ticks_total[5m]) == 0
+rate(inorbit_acme_connector_execution_loop_ticks_total[5m]) == 0
 
 # Process is up but erroring
-rate(inorbit_connector_execution_loop_errors_total[5m]) > 0
+rate(inorbit_acme_connector_execution_loop_errors_total[5m]) > 0
 ```
 
 ## Enabling metrics
@@ -74,7 +85,7 @@ When `enabled` is `false` (the default), no server is started and all instrument
 | `advertise_host` | `socket.gethostname()` | Hostname written to the discovery file. |
 | `discovery_dir` | `/var/run/inorbit-metrics` | Auto-created on start. Set to `null` to skip writing a discovery file. |
 | `connector_id` | `socket.gethostname()` | Used as `service.instance.id` and as the discovery filename. |
-| `exporter_namespace` | `"inorbit_connector"` | Prefix prepended to every Prometheus metric name. ASCII / no hyphens. |
+| `exporter_namespace` | `None` (auto: `inorbit_<connector_type>_connector`) | Prefix prepended to every Prometheus metric name. ASCII / no hyphens. Set explicitly only to override the auto-derived value. |
 | `extra_resource_attributes` | `{}` | Added to every metric as OTEL Resource attributes (low-cardinality only). |
 
 ## Adding metrics to your connector
@@ -90,14 +101,23 @@ from inorbit_edge.metrics import get_meter
 meter = get_meter("inorbit_my_connector")
 
 api_requests = meter.create_counter(
-    "my.api.requests", unit="1", description="Calls to the device API",
+    "api.requests", unit="1", description="Calls to the device API",
 )
 api_errors = meter.create_counter(
-    "my.api.errors", unit="1", description="Failed calls to the device API",
+    "api.errors", unit="1", description="Failed calls to the device API",
 )
 ```
 
 The same module-level pattern the SDK uses for its own counters. `get_meter` returns a real OTEL `Meter` when telemetry deps are installed (always the case via `inorbit-edge[telemetry]`), or a no-op `Meter` otherwise.
+
+#### Naming rule: don't repeat the namespace in instrument names
+
+`exporter_namespace` is prepended to every metric on export — for a connector with `connector_type="acme"`, the framework derives `inorbit_acme_connector`, so `api.requests` above surfaces as `inorbit_acme_connector_api_requests_total` on `/metrics`. Don't add the namespace to the instrument name yourself — the meter name is decorative (it surfaces only as `instrumentation_scope`); the instrument name is the metric.
+
+- ✅ `meter.create_counter("api.requests", ...)` → `inorbit_acme_connector_api_requests_total`
+- ❌ `meter.create_counter("inorbit.acme.connector.api.requests", ...)` → `inorbit_acme_connector_inorbit_acme_connector_api_requests_total`
+
+A double-prefixed wire name can only be cleaned up by a collector-side `metric_relabel_configs` rule that rewrites `__name__`. Those rewrites strip the Prometheus `# TYPE` line, so the metric arrives at the OTEL pipeline as `UNKNOWN` and is exported as a Gauge regardless of its real type. Downstream metric stores that pin descriptor kind on first write (GCP Cloud Monitoring, for example) then silently drop later writes of the correct type.
 
 ### Step 2 — Instrument calls
 
