@@ -24,12 +24,6 @@ try:
 except ImportError:
     from typing_extensions import override
 
-# Python 3.13+ compatibility for deprecated decorator
-try:
-    from warnings import deprecated
-except ImportError:
-    from typing_extensions import deprecated
-
 # Third Party
 from inorbit_edge.models import RobotSessionModel
 from inorbit_edge.robot import (
@@ -966,11 +960,6 @@ class Connector(FleetConnector, ABC):
         cases accessing the robot session directly may be necessary.
         """
         return super()._get_robot_session(self.robot_id)
-
-    @property
-    @deprecated("Use self._get_session() instead")
-    def _robot_session(self) -> RobotSession:
-        return self._get_session()
 
     def _is_robot_online(self) -> bool:
         """Check if the robot is online.
