@@ -13,7 +13,7 @@ Reads a YAML file and returns a dictionary.
 Behavior:
 
 - If the file is empty (YAML `null` / no content), returns `{}`.
-- Otherwise, returns the entire YAML object.
+- Otherwise, returns the parsed YAML content.
 
 ## Constants
 

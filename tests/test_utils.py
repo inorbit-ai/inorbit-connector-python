@@ -52,6 +52,20 @@ def test_read_yaml_returns_empty_dict_when_file_empty(_):
     assert result == expected
 
 
+@pytest.mark.parametrize(
+    "yaml_content,expected",
+    [
+        ("false", False),
+        ("0", 0),
+        ("[]", []),
+    ],
+)
+def test_read_yaml_preserves_falsy_but_valid_values(yaml_content, expected):
+    with mock.patch("builtins.open", mock.mock_open(read_data=yaml_content)):
+        result = utils.read_yaml("dummy.yaml")
+        assert result == expected
+
+
 @mock.patch(
     "builtins.open",
     new_callable=mock.mock_open,

@@ -5,9 +5,11 @@
 #
 # SPDX-License-Identifier: MIT
 
+# Standard
+import os
+
 # Third-party
 import yaml
-import os
 
 # Constants
 DEFAULT_TIMEZONE = "UTC"
@@ -30,4 +32,4 @@ def read_yaml(fname: str) -> dict:
     """
     with open(fname, "r") as file:
         data = yaml.safe_load(file)
-        return data if data else {}
+        return data if data is not None else {}
