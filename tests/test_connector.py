@@ -783,6 +783,8 @@ class TestConnectorIsAbstract:
             SubConnector("TestRobot", MagicMock())
 
     def test_can_be_subclassed_with_all_abstract_methods_implemented(self):
+        """Test subclassing with all abstract methods implemented."""
+
         class SubConnector(Connector):
             async def _connect(self):
                 pass
@@ -807,7 +809,7 @@ class TestConnectorIsAbstract:
             ),
         )
         assert isinstance(connector, Connector)
-        assert isinstance(connector, FleetConnector)
+        assert isinstance(connector, FleetConnector)  # Connector is a FleetConnector
 
 
 class TestConnector:
@@ -833,6 +835,7 @@ class TestConnector:
         )
 
     def test_init(self, base_model):
+        """Test Connector initialization."""
         robot_id = "TestRobot"
         config = ConnectorConfig(
             **base_model,
@@ -848,6 +851,7 @@ class TestConnector:
         assert connector._logger.name == Connector.__module__
 
     def test_init_with_robot_key(self, base_model, mock_robot_session_pool):
+        """Test initialization with robot key."""
         config = ConnectorConfig(
             **base_model,
             inorbit_robot_key="valid_robot_key",
@@ -860,12 +864,14 @@ class TestConnector:
         assert session.robot_id == "TestRobot"
 
     def test_get_session(self, base_connector, mock_robot_session_pool):
+        """Test that _get_session returns the session for the single robot."""
         session = base_connector._get_session()
         assert session is not None
         assert session.robot_id == "TestRobot"
         mock_robot_session_pool.get_session.assert_called()
 
     def test_publish_map(self, base_model, mock_robot_session_pool):
+        """Test publish_map delegates to FleetConnector.publish_robot_map."""
         base_model["maps"] = {
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -887,6 +893,7 @@ class TestConnector:
         session.publish_map.assert_called_once()
 
     def test_publish_pose(self, base_model, mock_robot_session_pool):
+        """Test publish_pose delegates to FleetConnector.publish_robot_pose."""
         base_model["maps"] = {
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -908,6 +915,7 @@ class TestConnector:
         session.publish_pose.assert_called()
 
     def test_publish_pose_updates_maps(self, base_model, mock_robot_session_pool):
+        """Test that publishing pose with new frame_id updates the map."""
         base_model["maps"] = {
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -947,12 +955,14 @@ class TestConnector:
         assert session.publish_pose.call_count == 3  # Now 3
 
     def test_publish_odometry(self, base_connector, mock_robot_session_pool):
+        """Test publish_odometry delegates correctly."""
         base_connector.publish_odometry(linear_speed=1.0, angular_speed=0.5)
 
         session = base_connector._get_session()
         session.publish_odometry.assert_called()
 
     def test_publish_key_values(self, base_connector, mock_robot_session_pool):
+        """Test publish_key_values delegates correctly."""
         base_connector.publish_key_values(key1="value1")
 
         session = base_connector._get_session()
@@ -961,23 +971,29 @@ class TestConnector:
     def test_publish_system_stats_stores_stats(
         self, base_connector, mock_robot_session_pool
     ):
+        """Test publish_system_stats stores stats for deferred publishing."""
         base_connector.publish_system_stats(cpu_load_percentage=0.5)
 
+        # Stats should be stored, not published immediately
         session = base_connector._get_session()
         session.publish_system_stats.assert_not_called()
 
+        # Verify stats were stored
         pending_stats = base_connector._FleetConnector__pending_system_stats
         assert base_connector.robot_id in pending_stats
         assert pending_stats[base_connector.robot_id]["cpu_load_percentage"] == 0.5
 
     def test_is_robot_online_default_implementation(self, base_connector):
+        """Test that _is_robot_online returns True by default."""
         assert base_connector._is_robot_online() is True
 
     def test_is_fleet_robot_online_delegates_to_is_robot_online(self, base_connector):
+        """Test that _is_fleet_robot_online delegates to _is_robot_online."""
         assert base_connector._is_fleet_robot_online("TestRobot") is True
 
     @pytest.mark.asyncio
     async def test_inorbit_robot_command_handler_delegates(self, base_connector):
+        """Test that _inorbit_robot_command_handler delegates to _inorbit_command_handler."""
         base_connector._inorbit_command_handler = AsyncMock()
 
         await base_connector._inorbit_robot_command_handler(
@@ -992,6 +1008,8 @@ class TestConnector:
     async def test_register_user_scripts(
         self, base_model, tmp_path, mock_robot_session_pool
     ):
+        """Test user scripts registration for single robot connector."""
+        # Create a connector with user scripts enabled
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
@@ -1000,12 +1018,15 @@ class TestConnector:
         )
         connector._connect = AsyncMock()
 
+        # Initialize sessions (this is what happens during start/connect)
         await connector._FleetConnector__connect()
 
+        # Verify register_commands_path was called
         session = connector._get_session()
         session.register_commands_path.assert_called_once()
 
     def test_uses_env_vars(self, base_model):
+        """Test environment variables are set from config."""
         base_model["env_vars"] = {"ENV_VAR": "env_value"}
         Connector(
             "TestRobot",
@@ -1016,6 +1037,7 @@ class TestConnector:
 
     @pytest.mark.asyncio
     async def test_start_stop_integration(self, base_model):
+        """Integration test for start/stop functionality."""
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
@@ -1033,11 +1055,13 @@ class TestConnector:
 
     @pytest.mark.asyncio
     async def test_fetch_map_default_returns_none(self, base_connector):
+        """Test that default fetch_map returns None."""
         result = await base_connector.fetch_map("frame1")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_fetch_robot_map_delegates_to_fetch_map(self, base_connector):
+        """Test that fetch_robot_map delegates to fetch_map."""
         from inorbit_connector.models import MapConfigTemp
 
         mock_map = MapConfigTemp(
@@ -1051,6 +1075,7 @@ class TestConnector:
 
         result = await base_connector.fetch_robot_map("TestRobot", "frame1")
 
+        # Verify fetch_map was called with just frame_id
         base_connector.fetch_map.assert_awaited_once_with("frame1")
         assert result == mock_map
 
@@ -1081,14 +1106,17 @@ class TestConnectorCommandHandler:
     async def test_register_command_handler_by_default(
         self, base_model, mock_robot_session_pool
     ):
+        """Test that command handler is registered by default."""
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         connector._connect = AsyncMock()
 
+        # Initialize sessions (this triggers command handler registration)
         await connector._FleetConnector__connect()
 
+        # Verify register_command_callback was called
         session = connector._get_session()
         session.register_command_callback.assert_called_once()
 
@@ -1096,6 +1124,7 @@ class TestConnectorCommandHandler:
     async def test_does_not_register_when_disabled(
         self, base_model, mock_robot_session_pool
     ):
+        """Test that command handler is not registered when disabled."""
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
@@ -1103,8 +1132,10 @@ class TestConnectorCommandHandler:
         )
         connector._connect = AsyncMock()
 
+        # Initialize sessions
         await connector._FleetConnector__connect()
 
+        # Verify register_command_callback was NOT called
         session = connector._get_session()
         session.register_command_callback.assert_not_called()
 
@@ -1112,23 +1143,28 @@ class TestConnectorCommandHandler:
     async def test_sets_online_status_callback(
         self, base_model, mock_robot_session_pool
     ):
+        """Test that online status callback is set on EdgeSDK."""
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         connector._connect = AsyncMock()
 
+        # Initialize sessions
         await connector._FleetConnector__connect()
 
+        # Verify callback was set
         session = connector._get_session()
         session.set_online_status_callback.assert_called_once()
 
+        # Verify the callback calls _is_robot_online
         callback = session.set_online_status_callback.call_args[0][0]
-        assert callback() is True
+        assert callback() is True  # Should return True by default
 
     def test_handle_command_exception_with_command_failure(
         self, base_model, mock_robot_session_pool
     ):
+        """Test that CommandFailure exceptions are properly handled and passed to result_function."""
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
@@ -1157,6 +1193,7 @@ class TestConnectorCommandHandler:
     def test_handle_command_exception_with_generic_exception(
         self, base_model, mock_robot_session_pool
     ):
+        """Test that generic exceptions are handled and passed to result_function with generic message."""
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
@@ -1182,6 +1219,7 @@ class TestConnectorCommandHandler:
     def test_handle_command_exception_without_message(
         self, base_model, mock_robot_session_pool
     ):
+        """Test that exceptions without a message use the class name as stderr."""
         connector = Connector(
             "TestRobot",
             ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
