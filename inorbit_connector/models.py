@@ -17,6 +17,7 @@ from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 from pydantic import (
     BaseModel,
+    ConfigDict,
     field_validator,
     HttpUrl,
     FilePath,
@@ -240,6 +241,8 @@ class ConnectorConfig(BaseModel):
             value is the value to set.
         fleet (list[RobotConfig]): The list of robot configurations.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     api_key: str | None = os.getenv("INORBIT_API_KEY")
     # default_factory + explicit HttpUrl construction: handing a bare
