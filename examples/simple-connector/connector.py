@@ -21,7 +21,8 @@ except ImportError:
 from pydantic import field_validator, BaseModel
 
 # InOrbit
-from inorbit_connector.connector import CommandResultCode, Connector
+from inorbit_connector.commands import CommandResultCode
+from inorbit_connector.connector import Connector
 from inorbit_connector.models import ConnectorConfig
 from inorbit_connector.utils import read_yaml
 

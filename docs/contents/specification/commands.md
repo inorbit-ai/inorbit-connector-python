@@ -44,15 +44,3 @@ These classes support type-safe parsing and validation of structured command par
 - `ExcludeUnsetMixin` changes `model_dump()` default behavior to `exclude_unset=True` (useful when you want to emit only explicitly-provided fields).
 
 See [Commands Handling](../usage/commands-handling) for end-to-end usage patterns.
-
-## Note: re-exports via `inorbit_connector.connector`
-
-For backwards compatibility, the connector module re-exports:
-
-- `CommandFailure`
-- `CommandResultCode`
-- `parse_custom_command_args`
-
-New code may import from either module, but the canonical definitions live in `inorbit_connector.commands`.
-
-

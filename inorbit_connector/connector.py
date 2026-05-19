@@ -51,12 +51,9 @@ except ImportError:
     PSUTIL_AVAILABLE = False
 
 # InOrbit
-from inorbit_connector.commands import (  # noqa: F401
-    # Re-export command-related functionality for backwards compatibility
-    # TODO: Remove in the next major release
+from inorbit_connector.commands import (
     CommandFailure,
     CommandResultCode,
-    parse_custom_command_args,
 )
 from inorbit_connector.logging.logger import setup_logger
 from inorbit_connector import metrics as _metrics
