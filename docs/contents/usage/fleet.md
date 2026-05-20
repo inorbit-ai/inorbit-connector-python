@@ -33,7 +33,7 @@ See the [Commands Handling](commands-handling) chapter for more details.
 Handle commands for a specific robot. This method is automatically registered if `register_custom_command_handler` is True (default).
 
 ```python
-from inorbit_connector.connector import CommandResultCode, CommandFailure
+from inorbit_connector.commands import CommandResultCode, CommandFailure
 
 @override
 async def _inorbit_robot_command_handler(

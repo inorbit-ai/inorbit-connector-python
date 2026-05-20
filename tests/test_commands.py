@@ -15,11 +15,6 @@ from inorbit_connector.commands import (
     ExcludeUnsetMixin,
     parse_custom_command_args,
 )
-from inorbit_connector.connector import (
-    CommandFailure as ConnectorCommandFailure,
-    parse_custom_command_args as connector_parse_custom_command_args,
-)
-
 
 # Test models for ExcludeUnsetMixin
 class ModelWithMixin(ExcludeUnsetMixin, BaseModel):
@@ -254,27 +249,6 @@ def test_parse_custom_command_args_protobuf_repeated_odd_length_raises():
 
     with pytest.raises(CommandFailure):
         parse_custom_command_args([msg.file_name, msg.arg_options])
-
-
-# ==============================================================================
-# Tests for backwards compatibility
-# TODO: Remove in the next major release
-# ==============================================================================
-
-
-def test_command_failure_importable_from_connector():
-    """Test that CommandFailure can still be imported from connector module."""
-    assert CommandFailure is ConnectorCommandFailure
-    failure = CommandFailure("test", "error")
-    assert isinstance(failure, ConnectorCommandFailure)
-
-
-def test_parse_custom_command_args_importable_from_connector():
-    """Test that parse_custom_command_args can still be imported from connector module."""
-    assert parse_custom_command_args is connector_parse_custom_command_args
-    script, params = parse_custom_command_args(["script.sh", ["x", "1.0"]])
-    assert script == "script.sh"
-    assert params == {"x": "1.0"}
 
 
 def test_command_model_works_with_parse_custom_command_args():
