@@ -304,7 +304,7 @@ class ConnectorConfig(BaseModel):
         """Warn if log_level is set as it is deprecated.
 
         Returns:
-            InorbitConnectorConfig: The model instance
+            ConnectorConfig: The model instance
         """
         if self.log_level is not None:
             warnings.warn(
@@ -403,38 +403,3 @@ class ConnectorConfig(BaseModel):
         if update_freq <= 0:
             raise ValueError("Must be positive and non-zero")
         return update_freq
-
-
-class InorbitConnectorConfig(ConnectorConfig, RobotConfig):
-    """Class representing an Inorbit connector model for a single robot.
-
-    This class is deprecated. Use ConnectorConfig instead.
-    """
-
-    # Exclude robot_id from single-robot configs - it will be provided when converting
-    # to fleet
-    robot_id: str | None = Field(default=None, exclude=True)
-    fleet: list[RobotConfig] = Field(default_factory=list, exclude=True)
-
-    def to_fleet_config(self, robot_id: str) -> ConnectorConfig:
-        """Convert a single-robot config to a fleet config.
-
-        Creates a ConnectorConfig with a fleet list containing this robot's
-        configuration.
-
-        Args:
-            robot_id: The robot ID to use for the fleet config (ensures consistency)
-        """
-        # Get the full config dump, excluding fleet and robot-specific fields
-        connector_data = self.model_dump(exclude={"fleet", "robot_id", "cameras"})
-
-        # Create RobotConfig instance from this config's robot-specific fields
-        robot_config = RobotConfig(
-            robot_id=robot_id,
-            cameras=self.cameras,
-        )
-
-        return ConnectorConfig(
-            **connector_data,
-            fleet=[robot_config],
-        )

@@ -24,7 +24,6 @@ from inorbit_connector.connector import (
 )
 from inorbit_connector.models import (
     ConnectorConfig,
-    InorbitConnectorConfig,
     RobotConfig,
 )
 
@@ -783,9 +782,8 @@ class TestConnectorIsAbstract:
         with pytest.raises(TypeError):
             SubConnector("TestRobot", MagicMock())
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_can_be_subclassed_with_all_abstract_methods_implemented(self):
-        """Test subclassing with deprecated InorbitConnectorConfig."""
+        """Test subclassing with all abstract methods implemented."""
 
         class SubConnector(Connector):
             async def _connect(self):
@@ -802,11 +800,12 @@ class TestConnectorIsAbstract:
 
         connector = SubConnector(
             "TestRobot",
-            InorbitConnectorConfig(
+            ConnectorConfig(
                 api_key="valid_key",
                 api_url="https://valid.com/",
                 connector_type="valid_connector",
                 connector_config=DummyConfig(),
+                fleet=[RobotConfig(robot_id="TestRobot")],
             ),
         )
         assert isinstance(connector, Connector)
@@ -830,25 +829,13 @@ class TestConnector:
 
     @pytest.fixture
     def base_connector(self, base_model):
-        return Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        return Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_init(self, base_model):
-        """Test initialization with deprecated InorbitConnectorConfig."""
-        config = InorbitConnectorConfig(**base_model)
-        robot_id = "TestRobot"
-
-        connector = Connector(robot_id, config)
-        assert connector.robot_id == robot_id
-        assert connector.robot_ids == [robot_id]  # Single robot wrapped in list
-        # Config is converted from InorbitConnectorConfig to ConnectorConfig
-        assert isinstance(connector.config, ConnectorConfig)
-        assert len(connector.config.fleet) == 1
-        assert connector.config.fleet[0].robot_id == robot_id
-        assert connector._logger.name == Connector.__module__
-
-    def test_init_with_connector_config(self, base_model):
-        """Test initialization with new ConnectorConfig API."""
+        """Test Connector initialization."""
         robot_id = "TestRobot"
         config = ConnectorConfig(
             **base_model,
@@ -861,21 +848,21 @@ class TestConnector:
         assert isinstance(connector.config, ConnectorConfig)
         assert len(connector.config.fleet) == 1
         assert connector.config.fleet[0].robot_id == robot_id
+        assert connector._logger.name == Connector.__module__
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_init_with_robot_key(self, base_model, mock_robot_session_pool):
-        """Test initialization with robot key using deprecated InorbitConnectorConfig."""
-        config = InorbitConnectorConfig(
-            **base_model, inorbit_robot_key="valid_robot_key"
+        """Test initialization with robot key."""
+        config = ConnectorConfig(
+            **base_model,
+            inorbit_robot_key="valid_robot_key",
+            fleet=[RobotConfig(robot_id="TestRobot")],
         )
         robot_id = "TestRobot"
 
         connector = Connector(robot_id, config)
-        # Session is created on-demand, check when accessed
         session = connector._get_session()
         assert session.robot_id == "TestRobot"
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_get_session(self, base_connector, mock_robot_session_pool):
         """Test that _get_session returns the session for the single robot."""
         session = base_connector._get_session()
@@ -883,9 +870,8 @@ class TestConnector:
         assert session.robot_id == "TestRobot"
         mock_robot_session_pool.get_session.assert_called()
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_publish_map(self, base_model, mock_robot_session_pool):
-        """Test publish_map delegates to FleetConnector.publish_robot_map (deprecated config)."""
+        """Test publish_map delegates to FleetConnector.publish_robot_map."""
         base_model["maps"] = {
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -896,16 +882,18 @@ class TestConnector:
                 "resolution": 0.1,
             }
         }
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
 
         connector.publish_map("frameA")
 
         session = connector._get_session()
         session.publish_map.assert_called_once()
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_publish_pose(self, base_model, mock_robot_session_pool):
-        """Test publish_pose delegates to FleetConnector.publish_robot_pose (deprecated config)."""
+        """Test publish_pose delegates to FleetConnector.publish_robot_pose."""
         base_model["maps"] = {
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -916,16 +904,18 @@ class TestConnector:
                 "resolution": 0.1,
             }
         }
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
 
         connector.publish_pose(1.0, 2.0, 3.14, "frameA")
 
         session = connector._get_session()
         session.publish_pose.assert_called()
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_publish_pose_updates_maps(self, base_model, mock_robot_session_pool):
-        """Test that publishing pose with new frame_id updates the map (deprecated config)."""
+        """Test that publishing pose with new frame_id updates the map."""
         base_model["maps"] = {
             "frameA": {
                 "file": f"{os.path.dirname(__file__)}/dir/test_map.png",
@@ -943,7 +933,10 @@ class TestConnector:
                 "resolution": 0.1,
             },
         }
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
 
         session = connector._get_session()
 
@@ -961,7 +954,6 @@ class TestConnector:
         assert session.publish_map.call_count == 2  # Now 2
         assert session.publish_pose.call_count == 3  # Now 3
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_publish_odometry(self, base_connector, mock_robot_session_pool):
         """Test publish_odometry delegates correctly."""
         base_connector.publish_odometry(linear_speed=1.0, angular_speed=0.5)
@@ -969,7 +961,6 @@ class TestConnector:
         session = base_connector._get_session()
         session.publish_odometry.assert_called()
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_publish_key_values(self, base_connector, mock_robot_session_pool):
         """Test publish_key_values delegates correctly."""
         base_connector.publish_key_values(key1="value1")
@@ -977,7 +968,6 @@ class TestConnector:
         session = base_connector._get_session()
         session.publish_key_values.assert_called()
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_publish_system_stats_stores_stats(
         self, base_connector, mock_robot_session_pool
     ):
@@ -993,18 +983,15 @@ class TestConnector:
         assert base_connector.robot_id in pending_stats
         assert pending_stats[base_connector.robot_id]["cpu_load_percentage"] == 0.5
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_is_robot_online_default_implementation(self, base_connector):
         """Test that _is_robot_online returns True by default."""
         assert base_connector._is_robot_online() is True
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_is_fleet_robot_online_delegates_to_is_robot_online(self, base_connector):
         """Test that _is_fleet_robot_online delegates to _is_robot_online."""
         assert base_connector._is_fleet_robot_online("TestRobot") is True
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_inorbit_robot_command_handler_delegates(self, base_connector):
         """Test that _inorbit_robot_command_handler delegates to _inorbit_command_handler."""
         base_connector._inorbit_command_handler = AsyncMock()
@@ -1018,15 +1005,14 @@ class TestConnector:
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_register_user_scripts(
         self, base_model, tmp_path, mock_robot_session_pool
     ):
-        """Test user scripts registration for single robot connector (deprecated config)."""
+        """Test user scripts registration for single robot connector."""
         # Create a connector with user scripts enabled
         connector = Connector(
             "TestRobot",
-            InorbitConnectorConfig(**base_model),
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
             register_user_scripts=True,
             default_user_scripts_dir=tmp_path,
         )
@@ -1039,19 +1025,23 @@ class TestConnector:
         session = connector._get_session()
         session.register_commands_path.assert_called_once()
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_uses_env_vars(self, base_model):
-        """Test environment variables with deprecated config."""
+        """Test environment variables are set from config."""
         base_model["env_vars"] = {"ENV_VAR": "env_value"}
-        Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
         assert "ENV_VAR" in os.environ
         assert os.environ["ENV_VAR"] == "env_value"
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_start_stop_integration(self, base_model):
-        """Integration test for start/stop functionality (deprecated config)."""
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        """Integration test for start/stop functionality."""
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
         connector._execution_loop = AsyncMock()
         connector._connect = AsyncMock()
         connector._disconnect = AsyncMock()
@@ -1064,14 +1054,12 @@ class TestConnector:
         assert not connector._FleetConnector__loop.is_running()
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_fetch_map_default_returns_none(self, base_connector):
         """Test that default fetch_map returns None."""
         result = await base_connector.fetch_map("frame1")
         assert result is None
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_fetch_robot_map_delegates_to_fetch_map(self, base_connector):
         """Test that fetch_robot_map delegates to fetch_map."""
         from inorbit_connector.models import MapConfigTemp
@@ -1109,15 +1097,20 @@ class TestConnectorCommandHandler:
 
     @pytest.fixture
     def base_connector(self, base_model):
-        return Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        return Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_register_command_handler_by_default(
         self, base_model, mock_robot_session_pool
     ):
-        """Test that command handler is registered by default (deprecated config)."""
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        """Test that command handler is registered by default."""
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
         connector._connect = AsyncMock()
 
         # Initialize sessions (this triggers command handler registration)
@@ -1128,14 +1121,13 @@ class TestConnectorCommandHandler:
         session.register_command_callback.assert_called_once()
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_does_not_register_when_disabled(
         self, base_model, mock_robot_session_pool
     ):
-        """Test that command handler is not registered when disabled (deprecated config)."""
+        """Test that command handler is not registered when disabled."""
         connector = Connector(
             "TestRobot",
-            InorbitConnectorConfig(**base_model),
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
             register_custom_command_handler=False,
         )
         connector._connect = AsyncMock()
@@ -1148,12 +1140,14 @@ class TestConnectorCommandHandler:
         session.register_command_callback.assert_not_called()
 
     @pytest.mark.asyncio
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     async def test_sets_online_status_callback(
         self, base_model, mock_robot_session_pool
     ):
-        """Test that online status callback is set on EdgeSDK (deprecated config)."""
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        """Test that online status callback is set on EdgeSDK."""
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
         connector._connect = AsyncMock()
 
         # Initialize sessions
@@ -1167,12 +1161,14 @@ class TestConnectorCommandHandler:
         callback = session.set_online_status_callback.call_args[0][0]
         assert callback() is True  # Should return True by default
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_handle_command_exception_with_command_failure(
         self, base_model, mock_robot_session_pool
     ):
         """Test that CommandFailure exceptions are properly handled and passed to result_function."""
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
         result_function = MagicMock()
 
         command_failure = CommandFailure(
@@ -1194,12 +1190,14 @@ class TestConnectorCommandHandler:
             stderr="Error details here",
         )
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_handle_command_exception_with_generic_exception(
         self, base_model, mock_robot_session_pool
     ):
         """Test that generic exceptions are handled and passed to result_function with generic message."""
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
         result_function = MagicMock()
 
         error = ValueError("Something went wrong")
@@ -1218,12 +1216,14 @@ class TestConnectorCommandHandler:
             stderr="Something went wrong",
         )
 
-    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_handle_command_exception_without_message(
         self, base_model, mock_robot_session_pool
     ):
         """Test that exceptions without a message use the class name as stderr."""
-        connector = Connector("TestRobot", InorbitConnectorConfig(**base_model))
+        connector = Connector(
+            "TestRobot",
+            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+        )
         result_function = MagicMock()
 
         class CustomException(Exception):
