@@ -18,16 +18,15 @@ from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 from pydantic import (
     BaseModel,
     ConfigDict,
-    field_validator,
-    HttpUrl,
-    FilePath,
     DirectoryPath,
     Field,
-    model_validator,
+    FilePath,
+    HttpUrl,
+    field_validator,
 )
 
 # InOrbit
-from inorbit_connector.utils import DEFAULT_TIMEZONE, DEFAULT_LOGGING_CONFIG
+from inorbit_connector.utils import DEFAULT_LOGGING_CONFIG, DEFAULT_TIMEZONE
 from inorbit_connector.logging.logger import LogLevels
 
 
