@@ -156,6 +156,12 @@ class TestConnectorConfig:
         singular = model.to_singular_config("robot1")
         assert singular.use_websockets is True
 
+    def test_extra_fields_are_forbidden(self, base_model):
+        init_input = base_model.copy()
+        init_input["log_level"] = "INFO"
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            ConnectorConfig(**init_input)
+
     @mock.patch.dict(os.environ, {"INORBIT_API_KEY": "env_valid_key"})
     def test_reads_api_key_from_environment_variable(self, base_model):
         importlib.reload(sys.modules["inorbit_connector.models"])
