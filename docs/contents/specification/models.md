@@ -56,13 +56,3 @@ Logging configuration used by the connector at startup:
 - `defaults`: dictionary passed to the logging config (e.g. `log_file`).
 
 See [setup_logger()](logging.md#spec-logging-setup-logger) for how it is applied.
-
-## Deprecated: `InorbitConnectorConfig`
-
-`InorbitConnectorConfig` is a deprecated single-robot configuration format. It can be converted to a fleet config via:
-
-- `to_fleet_config(robot_id) -> ConnectorConfig`
-
-New implementations should use `ConnectorConfig` directly.
-
-

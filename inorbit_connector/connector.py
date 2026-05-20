@@ -11,7 +11,6 @@ import logging
 import socket
 from pathlib import Path
 import tempfile
-import warnings
 import asyncio
 import threading
 import traceback
@@ -67,7 +66,6 @@ from inorbit_connector.metrics import (
 )
 from inorbit_connector.models import (
     ConnectorConfig,
-    InorbitConnectorConfig,
     MapConfig,
     MapConfigTemp,
     RobotConfig,
@@ -926,12 +924,10 @@ class Connector(FleetConnector, ABC):
 
         Args:
             robot_id (str): The ID of the InOrbit robot
-            config (ConnectorConfig): The connector configuration.
-                - New API: pass `ConnectorConfig` with a `fleet` field containing
-                  multiple robot configurations. The one for the current robot will be
-                  selected by the `robot_id` parameter.
-                - Deprecated: pass `InorbitConnectorConfig` (single-robot); it will be
-                  converted to a `ConnectorConfig`.
+            config (ConnectorConfig): The connector configuration. Pass a
+                `ConnectorConfig` with a `fleet` field containing robot
+                configurations. The one for the current robot will be selected
+                by the `robot_id` parameter.
 
         Keyword Args:
             register_user_scripts (bool): Register user scripts automatically.
@@ -944,19 +940,7 @@ class Connector(FleetConnector, ABC):
                 Relevant only if register_user_scripts is True.
         """
         self.robot_id = robot_id
-
-        if isinstance(config, InorbitConnectorConfig):
-            # Deprecated behavior
-            warnings.warn(
-                "Passing InorbitConnectorConfig to Connector.__init__ is deprecated; "
-                "pass ConnectorConfig instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            fleet_config = config.to_fleet_config(robot_id)
-        else:
-            fleet_config = config.to_singular_config(robot_id)
-
+        fleet_config = config.to_singular_config(robot_id)
         super().__init__(fleet_config, **kwargs)
 
     def _get_session(self) -> RobotSession:
