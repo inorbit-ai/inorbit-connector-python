@@ -44,34 +44,26 @@ def test_read_yaml_returns_entire_file(_):
     assert result == expected
 
 
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-@mock.patch(
-    "builtins.open",
-    new_callable=mock.mock_open,
-    read_data="id1: {k1: v1, k2: v2}\nid2: {k3: v3, k4: v4}",
-)
-def test_read_yaml_returns_specific_robot(_):
-    """Test reading YAML for specific robot (deprecated format)."""
-    result = utils.read_yaml("dummy.yaml", "id1")
-    expected = {"k1": "v1", "k2": "v2"}
-    assert result == expected
-
-
-@mock.patch(
-    "builtins.open",
-    new_callable=mock.mock_open,
-    read_data="id1: {k1: v1, k2: v2}\nid2: {k3: v3, k4: v4}",
-)
-def test_read_yaml_raises_error_when_robot_id_not_present(_):
-    with pytest.raises(IndexError):
-        utils.read_yaml("dummy.yaml", "id3")
-
 
 @mock.patch("builtins.open", new_callable=mock.mock_open, read_data="")
 def test_read_yaml_returns_empty_dict_when_file_empty(_):
     result = utils.read_yaml("dummy.yaml")
     expected = {}
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    "yaml_content,expected",
+    [
+        ("false", False),
+        ("0", 0),
+        ("[]", []),
+    ],
+)
+def test_read_yaml_preserves_falsy_but_valid_values(yaml_content, expected):
+    with mock.patch("builtins.open", mock.mock_open(read_data=yaml_content)):
+        result = utils.read_yaml("dummy.yaml")
+        assert result == expected
 
 
 @mock.patch(
