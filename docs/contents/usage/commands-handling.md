@@ -72,7 +72,7 @@ The `CommandFailure` exception can be used to intentionally indicate a failure:
 Example usage:
 
 ```python
-from inorbit_connector.connector import CommandResultCode, CommandFailure
+from inorbit_connector.commands import CommandResultCode, CommandFailure
 
 @override
 async def _inorbit_robot_command_handler(
@@ -120,7 +120,7 @@ For details on how to configure actions with arguments, refer to the
 Use the helper `parse_custom_command_args()` to turn these into a script name and a parameters dictionary:
 
 ```python
-from inorbit_connector.connector import (
+from inorbit_connector.commands import (
     parse_custom_command_args,
     CommandResultCode,
     CommandFailure,
@@ -161,8 +161,12 @@ Optionally, you can combine `CommandModel` with `ExcludeUnsetMixin` to exclude u
 Define a command model by subclassing `CommandModel`:
 
 ```python
-from inorbit_connector.commands import CommandModel, parse_custom_command_args
-from inorbit_connector.connector import CommandResultCode, CommandFailure
+from inorbit_connector.commands import (
+    CommandModel,
+    parse_custom_command_args,
+    CommandResultCode,
+    CommandFailure,
+)
 
 class CommandQueueMission(CommandModel):
     """Command model for queue_mission command."""
@@ -297,8 +301,13 @@ The connector implements the command handler for the `schedule_mission` command 
 
 ```python
 from enum import StrEnum
-from inorbit_connector.commands import CommandModel, ExcludeUnsetMixin, parse_custom_command_args
-from inorbit_connector.connector import CommandResultCode
+from inorbit_connector.commands import (
+    CommandModel,
+    ExcludeUnsetMixin,
+    parse_custom_command_args,
+    CommandResultCode,
+    CommandFailure,
+)
 from inorbit_edge.commands import COMMAND_CUSTOM_COMMAND
 
 class CommandScheduleMission(ExcludeUnsetMixin, CommandModel):

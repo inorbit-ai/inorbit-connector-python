@@ -12,7 +12,8 @@ except ImportError:
     from typing_extensions import override
 
 # InOrbit
-from inorbit_connector.connector import CommandResultCode, FleetConnector
+from inorbit_connector.commands import CommandResultCode
+from inorbit_connector.connector import FleetConnector
 from inorbit_connector.models import MapConfigTemp
 
 # Local
