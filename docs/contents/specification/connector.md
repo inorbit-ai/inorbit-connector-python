@@ -196,8 +196,4 @@ Single-robot convenience for online status. The fleet-level online check delegat
 
 Returns the underlying Edge SDK session for the current robot.
 
-### Deprecated: `_robot_session`
-
-`Connector._robot_session` is deprecated; use `_get_session()` instead.
-
 
