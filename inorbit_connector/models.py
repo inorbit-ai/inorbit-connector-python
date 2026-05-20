@@ -8,7 +8,6 @@
 # Standard
 import os
 import re
-import warnings
 from pathlib import Path
 from typing import List, Optional
 
@@ -18,20 +17,17 @@ from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 from pydantic import (
     BaseModel,
-    field_validator,
-    HttpUrl,
-    FilePath,
+    ConfigDict,
     DirectoryPath,
     Field,
-    model_validator,
+    FilePath,
+    HttpUrl,
+    field_validator,
 )
 
 # InOrbit
-from inorbit_connector.utils import DEFAULT_TIMEZONE, DEFAULT_LOGGING_CONFIG
+from inorbit_connector.utils import DEFAULT_LOGGING_CONFIG, DEFAULT_TIMEZONE
 from inorbit_connector.logging.logger import LogLevels
-
-# Ensure deprecation warnings are shown
-warnings.filterwarnings("always", category=DeprecationWarning)
 
 
 class MapConfigBase(BaseModel):
@@ -245,6 +241,8 @@ class ConnectorConfig(BaseModel):
         fleet (list[RobotConfig]): The list of robot configurations.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     api_key: str | None = os.getenv("INORBIT_API_KEY")
     # default_factory + explicit HttpUrl construction: handing a bare
     # string default to a `HttpUrl`-typed field stores it as `str` (the
@@ -267,9 +265,6 @@ class ConnectorConfig(BaseModel):
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
     metrics: MetricsConfig = MetricsConfig()
-    # Kept for backwards compatibility. Deprecated in version 1.1.0
-    # Use logging.log_level instead
-    log_level: LogLevels | None = Field(default=None, exclude=True)
     fleet: list[RobotConfig]
 
     def to_singular_config(self, robot_id: str) -> "ConnectorConfig":
@@ -298,24 +293,6 @@ class ConnectorConfig(BaseModel):
             fleet=filtered_fleet,
         )
         return config
-
-    @model_validator(mode="after")
-    def warn_log_level_deprecated(self) -> "ConnectorConfig":
-        """Warn if log_level is set as it is deprecated.
-
-        Returns:
-            ConnectorConfig: The model instance
-        """
-        if self.log_level is not None:
-            warnings.warn(
-                "The 'log_level' field is deprecated. "
-                "Please use 'logging.log_level' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if self.logging.log_level is None:
-                self.logging.log_level = self.log_level
-        return self
 
     @field_validator("fleet")
     def must_contain_at_least_one_robot(

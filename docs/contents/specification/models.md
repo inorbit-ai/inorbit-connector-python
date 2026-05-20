@@ -20,10 +20,6 @@ Key points:
 
 Returns a config instance of the same subclass type, with `fleet` filtered down to exactly the requested robot.
 
-### Deprecated: `log_level`
-
-`ConnectorConfig.log_level` is deprecated in favor of `ConnectorConfig.logging.log_level`.
-
 (spec-models-robotconfig)=
 ## `RobotConfig`
 
