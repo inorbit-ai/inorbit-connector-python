@@ -366,8 +366,8 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
             ann_type = cls.model_fields["connector_config"].annotation
             if (
                 isinstance(ann_type, type)
-                and issubclass(ann_type, ConnectorSpecificConfig)
-                and ann_type is not ConnectorSpecificConfig
+                and issubclass(ann_type, BaseSettings)
+                and ann_type not in (BaseSettings, ConnectorSpecificConfig)
             ):
                 env_file_kwargs = {}
                 env_file = _env_file_var.get()
