@@ -5,18 +5,18 @@ description: "Configuration models and file formats for connectors"
 
 The `inorbit-connector` framework uses Pydantic models for configuration, providing validation and type safety.
 
-## ConnectorConfig
+## ConnectorRootConfig
 
-The main configuration class is `ConnectorConfig`, which contains all settings for your connector. It includes a `fleet` field containing a list of `RobotConfig` entries.
+The main configuration class is `ConnectorRootConfig`, which contains all settings for your connector. It is a `BaseSettings` subclass (from pydantic-settings) that resolves `INORBIT_*` environment variables and reads `config/.env` at instantiation time. It includes a `fleet` field containing a list of `RobotConfig` entries.
 
-Connectors should subclass `inorbit_connector.models.ConnectorConfig` and define a `connector_config` field that contains the configuration for the connector. For more details see the [Creating a Custom Configuration](#creating-a-custom-configuration) section below.
+Connectors should subclass `inorbit_connector.models.ConnectorRootConfig` and narrow the `connector_config` field to a concrete `ConnectorSpecificConfig` subclass. For more details see the [Creating a Custom Configuration](#creating-a-custom-configuration) section below.
 
 ### Key Fields
 
 - **`api_key`** (str | None): The InOrbit API key. Can be set via environment variable `INORBIT_API_KEY`
 - **`api_url`** (HttpUrl): The URL of the InOrbit API endpoint. Defaults to InOrbit Cloud SDK URL. Can be set via environment variable `INORBIT_API_URL`
 - **`connector_type`** (str): A string identifier for your connector type (e.g., "example_bot")
-- **`connector_config`** (BaseModel): Your custom configuration model that inherits from Pydantic's `BaseModel`. This is where you define connector-specific fields
+- **`connector_config`** (ConnectorSpecificConfig): Your custom configuration model that inherits from `ConnectorSpecificConfig`. Set the `CONNECTOR_TYPE` class variable to get automatic env-var loading with prefix `INORBIT_{CONNECTOR_TYPE}_`
 - **`update_freq`** (float): Update frequency in Hz for the execution loop. Default is 1.0
 - **`location_tz`** (str): The timezone of the robot location (e.g., "America/Los_Angeles", "UTC"). Must be a valid pytz timezone
 - **`logging`** (LoggingConfig): Logging configuration (see below)
@@ -30,7 +30,7 @@ Connectors should subclass `inorbit_connector.models.ConnectorConfig` and define
 
 ### Environment Variables
 
-The following environment variables are automatically read during configuration:
+`ConnectorRootConfig` is a pydantic-settings `BaseSettings` subclass. Environment variables with the `INORBIT_` prefix are resolved at instantiation time (not import time) and `config/.env` is read automatically. Init kwargs (e.g. from YAML) take precedence over env vars.
 
 - **`INORBIT_API_KEY`** (required): The InOrbit API key
 - **`INORBIT_API_URL`** (optional): The InOrbit API endpoint URL
@@ -78,28 +78,25 @@ Optional Prometheus metrics endpoint. When `enabled` is `false` (the default) no
 (creating-a-custom-configuration)=
 ## Creating a Custom Configuration
 
-To create a connector-specific configuration, subclass `ConnectorConfig`:
+To create a connector-specific configuration, subclass `ConnectorSpecificConfig` for the vendor-specific fields and `ConnectorRootConfig` for the top-level config:
 
 ```python
-from pydantic import BaseModel
-from inorbit_connector.models import ConnectorConfig, RobotConfig
+from inorbit_connector.models import ConnectorRootConfig, ConnectorSpecificConfig
 
-class MyRobotConfig(BaseModel):
-    """Custom fields for your robot."""
+class MyConnectorConfig(ConnectorSpecificConfig):
+    """Custom fields for your connector."""
+    CONNECTOR_TYPE = "my_connector"
+
     api_version: str
     hardware_revision: str
     custom_setting: str
 
-class MyConnectorConfig(ConnectorConfig):
-    """Configuration for your connector."""
-    connector_config: MyRobotConfig
-    
-    @field_validator("connector_type")
-    def check_connector_type(cls, connector_type: str) -> str:
-        if connector_type != "my_connector":
-            raise ValueError(f"Expected connector type 'my_connector'")
-        return connector_type
+class MyRootConfig(ConnectorRootConfig):
+    """Top-level configuration for your connector."""
+    connector_config: MyConnectorConfig
 ```
+
+`ConnectorSpecificConfig` automatically loads environment variables with the prefix `INORBIT_{CONNECTOR_TYPE}_` and reads `config/.env`. For example, with `CONNECTOR_TYPE = "my_connector"`, setting `INORBIT_MY_CONNECTOR_API_VERSION=v2` will populate the `api_version` field.
 
 ## Configuration Files
 
@@ -113,6 +110,6 @@ Use `inorbit_connector.utils.read_yaml()` to load configuration from YAML files:
 from inorbit_connector.utils import read_yaml
 
 yaml_data = read_yaml("config.yaml")
-config = MyConnectorConfig(**yaml_data)
+config = MyRootConfig(**yaml_data)
 ```
 
