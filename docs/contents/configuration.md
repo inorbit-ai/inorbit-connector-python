@@ -13,7 +13,7 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 
 ### Key Fields
 
-- **`api_key`** (str | None): The InOrbit API key. Can be set via environment variable `INORBIT_API_KEY`
+- **`api_key`** (str | None): The InOrbit API key. Can be set via environment variable `INORBIT_API_KEY`. Required unless `inorbit_robot_key` is provided
 - **`api_url`** (HttpUrl): The URL of the InOrbit API endpoint. Defaults to InOrbit Cloud SDK URL. Can be set via environment variable `INORBIT_API_URL`
 - **`connector_type`** (str): A string identifier for your connector type (e.g., "example_bot")
 - **`connector_config`** (ConnectorSpecificConfig): Your custom configuration model that inherits from `ConnectorSpecificConfig`. Set the `CONNECTOR_TYPE` class variable to get automatic env-var loading with prefix `INORBIT_{CONNECTOR_TYPE}_`
@@ -25,14 +25,14 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 - **`fleet`** (list[RobotConfig]): List of robot configurations (see below)
 - **`user_scripts_dir`** (DirectoryPath | None): Path to directory containing user scripts for command execution
 - **`account_id`** (str | None): InOrbit account ID, required for publishing footprints
-- **`inorbit_robot_key`** (str | None): Robot key for InOrbit Connect robots. See [API documentation](https://api.inorbit.ai/docs/index.html#operation/generateRobotKey)
+- **`inorbit_robot_key`** (str | None): Robot key for InOrbit Connect robots. Required unless `api_key` is provided. See [API documentation](https://api.inorbit.ai/docs/index.html#operation/generateRobotKey)
 - **`metrics`** (MetricsConfig): Optional Prometheus metrics endpoint. Disabled by default. See [Metrics](usage/metrics) for the full guide and [`MetricsConfig`](#metricsconfig) for the field list.
 
 ### Environment Variables
 
 `ConnectorRootConfig` is a pydantic-settings `BaseSettings` subclass. Environment variables with the `INORBIT_` prefix are resolved at instantiation time (not import time) and `config/.env` is read automatically. Init kwargs (e.g. from YAML) take precedence over env vars.
 
-- **`INORBIT_API_KEY`** (required): The InOrbit API key
+- **`INORBIT_API_KEY`**: The InOrbit API key. Required unless `inorbit_robot_key` is provided
 - **`INORBIT_API_URL`** (optional): The InOrbit API endpoint URL
 
 When `connector_config` is passed as a dict (e.g. from YAML), the `_env_file` override is forwarded to the nested `ConnectorSpecificConfig` constructor. Passing `_env_file=None` to `ConnectorRootConfig` disables dotenv reading for both root and connector-specific fields.

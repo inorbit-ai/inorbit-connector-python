@@ -170,6 +170,7 @@ class TestConnectorRootConfig:
     def test_reads_api_url_from_env(self, monkeypatch):
         monkeypatch.setenv("INORBIT_API_URL", "https://valid.env/")
         model = ConnectorRootConfig(
+            api_key="valid_key",
             connector_type="valid_connector",
             connector_config=DummyConfig(),
             fleet=[{"robot_id": "robot1"}],
@@ -179,6 +180,7 @@ class TestConnectorRootConfig:
 
     def test_api_url_default_when_no_env(self):
         model = ConnectorRootConfig(
+            api_key="valid_key",
             connector_type="valid_connector",
             connector_config=DummyConfig(),
             fleet=[{"robot_id": "robot1"}],
@@ -186,14 +188,17 @@ class TestConnectorRootConfig:
         )
         assert str(model.api_url) == INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 
-    def test_api_key_none_when_no_env(self):
+    def test_api_key_none_with_robot_key(self):
+        """api_key can be None when inorbit_robot_key provides authentication."""
         model = ConnectorRootConfig(
+            inorbit_robot_key="valid_robot_key",
             connector_type="valid_connector",
             connector_config=DummyConfig(),
             fleet=[{"robot_id": "robot1"}],
             _env_file=None,
         )
         assert model.api_key is None
+        assert model.inorbit_robot_key == "valid_robot_key"
 
     def test_init_kwargs_override_env(self, monkeypatch):
         monkeypatch.setenv("INORBIT_API_KEY", "env_key")
@@ -216,6 +221,30 @@ class TestConnectorRootConfig:
             _env_file=str(env_file),
         )
         assert model.api_key == "from_dotenv"
+
+    def test_requires_api_key_or_robot_key(self, base_model):
+        init_input = base_model.copy()
+        del init_input["api_key"]
+        with pytest.raises(
+            ValidationError,
+            match="At least one of 'api_key' or 'inorbit_robot_key' must be provided",
+        ):
+            ConnectorRootConfig(**init_input, _env_file=None)
+
+    def test_accepts_only_inorbit_robot_key(self, base_model):
+        init_input = base_model.copy()
+        del init_input["api_key"]
+        init_input["inorbit_robot_key"] = "valid_robot_key"
+        model = ConnectorRootConfig(**init_input, _env_file=None)
+        assert model.api_key is None
+        assert model.inorbit_robot_key == "valid_robot_key"
+
+    def test_accepts_both_api_key_and_robot_key(self, base_model):
+        init_input = base_model.copy()
+        init_input["inorbit_robot_key"] = "valid_robot_key"
+        model = ConnectorRootConfig(**init_input, _env_file=None)
+        assert model.api_key == "valid_key"
+        assert model.inorbit_robot_key == "valid_robot_key"
 
     def test_connector_config_env_resolves_through_root(self, monkeypatch):
         """Env vars with connector-specific prefix resolve when connector_config
@@ -350,6 +379,7 @@ class TestConnectorRootConfigGeneric:
         env_file = tmp_path / ".env"
         env_file.write_text("INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n")
         config = ConnectorRootConfig[FieldedConfig](
+            api_key="ak",
             connector_type="test_bot",
             connector_config={},
             fleet=[{"robot_id": "r1"}],
@@ -372,6 +402,7 @@ class TestConnectorRootConfigGeneric:
             "INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n"
         )
         config = ConnectorRootConfig[FieldedConfig](
+            api_key="ak",
             connector_type="test_bot",
             connector_config={},
             fleet=[{"robot_id": "r1"}],
@@ -392,6 +423,7 @@ class TestConnectorRootConfigGeneric:
         env_file = tmp_path / ".env"
         env_file.write_text("INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n")
         config = RootWithFielded(
+            api_key="ak",
             connector_type="test_bot",
             connector_config={},
             fleet=[{"robot_id": "r1"}],

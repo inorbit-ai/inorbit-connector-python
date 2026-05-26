@@ -290,8 +290,13 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
     dotenv reading for both root and nested config, or an explicit path
     to make both read from the same file.
 
+    At least one of ``api_key`` or ``inorbit_robot_key`` must be provided.
+    If neither is set (via init kwargs, environment variables, or dotenv),
+    a ``ValidationError`` is raised at instantiation time.
+
     Attributes:
-        api_key (str | None, optional): The InOrbit API key
+        api_key (str | None, optional): The InOrbit API key. Required unless
+            ``inorbit_robot_key`` is provided.
         api_url (HttpUrl, optional): The URL of the API or inorbit_edge's
                                      INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
         connector_type (str): The type of connector
@@ -310,6 +315,7 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
         account_id (str | None, optional): InOrbit account id, required for publishing
             footprints
         inorbit_robot_key (str | None, optional): Robot key for InOrbit Connect robots.
+            Required unless ``api_key`` is provided.
             See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
         maps (dict[str, MapConfig], optional): frame_id to map configuration mapping
         env_vars (dict[str, str], optional): Environment variables to be set in the
@@ -380,6 +386,22 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
                     ),
                 }
         return data
+
+    @model_validator(mode="after")
+    def _require_api_key_or_robot_key(self) -> Self:
+        """Validate that at least one authentication credential is provided.
+
+        Raises:
+            ValueError: If neither ``api_key`` nor ``inorbit_robot_key`` is set.
+
+        Returns:
+            Self: The validated configuration instance.
+        """
+        if self.api_key is None and self.inorbit_robot_key is None:
+            raise ValueError(
+                "At least one of 'api_key' or 'inorbit_robot_key' must be provided"
+            )
+        return self
 
     def to_singular_config(self, robot_id: str) -> Self:
         """Filters out configurations not related to the given robot. The result is a
