@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 # Third-party
 import pytest
-from pydantic import AnyHttpUrl, BaseModel
+from pydantic import AnyHttpUrl
 from inorbit_edge.robot import RobotSession
 
 # InOrbit
@@ -23,13 +23,14 @@ from inorbit_connector.connector import (
     FleetConnector,
 )
 from inorbit_connector.models import (
-    ConnectorConfig,
+    ConnectorRootConfig,
+    ConnectorSpecificConfig,
     RobotConfig,
 )
 
 
-class DummyConfig(BaseModel):
-    pass
+class DummyConfig(ConnectorSpecificConfig):
+    CONNECTOR_TYPE = "dummy"
 
 
 # ==============================================================================
@@ -116,7 +117,7 @@ class TestFleetConnectorIsAbstract:
                 pass
 
         connector = SubFleetConnector(
-            ConnectorConfig(
+            ConnectorRootConfig(
                 api_key="valid_key",
                 api_url="https://valid.com/",
                 connector_type="valid_connector",
@@ -148,7 +149,7 @@ class TestFleetConnector:
     @pytest.fixture
     def base_fleet_connector(self, base_model):
         return FleetConnector(
-            ConnectorConfig(
+            ConnectorRootConfig(
                 **base_model,
                 fleet=[
                     RobotConfig(robot_id="TestRobot1"),
@@ -158,7 +159,7 @@ class TestFleetConnector:
         )
 
     def test_init(self, base_model):
-        config = ConnectorConfig(
+        config = ConnectorRootConfig(
             **base_model,
             fleet=[
                 RobotConfig(robot_id="TestRobot1"),
@@ -173,7 +174,7 @@ class TestFleetConnector:
         assert connector._logger.name == FleetConnector.__module__
 
     def test_init_with_robot_key(self, base_model):
-        config = ConnectorConfig(
+        config = ConnectorRootConfig(
             **base_model,
             inorbit_robot_key="valid_robot_key",
             fleet=[
@@ -216,7 +217,7 @@ class TestFleetConnector:
         """When use_websockets=True is set on the config, it must reach the
         RobotSessionFactory so the edge-sdk RobotSession picks the websockets
         (wss when use_ssl is on) transport."""
-        config = ConnectorConfig(
+        config = ConnectorRootConfig(
             **base_model,
             use_websockets=True,
             fleet=[
@@ -252,7 +253,7 @@ class TestFleetConnector:
             }
         }
         connector = FleetConnector(
-            ConnectorConfig(
+            ConnectorRootConfig(
                 **base_model,
                 fleet=[RobotConfig(robot_id="TestRobot1")],
             )
@@ -341,7 +342,7 @@ class TestFleetConnector:
         """Test user scripts registration for fleet connector."""
         # Create a connector with user scripts enabled
         connector = FleetConnector(
-            ConnectorConfig(
+            ConnectorRootConfig(
                 **base_model,
                 fleet=[
                     RobotConfig(robot_id="TestRobot1"),
@@ -365,7 +366,7 @@ class TestFleetConnector:
     def test_uses_env_vars(self, base_model):
         base_model["env_vars"] = {"FLEET_ENV_VAR": "fleet_value"}
         FleetConnector(
-            ConnectorConfig(
+            ConnectorRootConfig(
                 **base_model,
                 fleet=[RobotConfig(robot_id="TestRobot1")],
             )
@@ -393,7 +394,7 @@ class TestFleetConnectorMapFetching:
     @pytest.fixture
     def fleet_connector(self, base_model):
         return FleetConnector(
-            ConnectorConfig(
+            ConnectorRootConfig(
                 **base_model,
                 fleet=[RobotConfig(robot_id="TestRobot1")],
             )
@@ -575,7 +576,7 @@ class TestFleetConnectorDeferredSystemStats:
     @pytest.fixture
     def fleet_connector(self, base_model):
         return FleetConnector(
-            ConnectorConfig(
+            ConnectorRootConfig(
                 **base_model,
                 fleet=[
                     RobotConfig(robot_id="TestRobot1"),
@@ -685,7 +686,7 @@ class TestFleetConnectorDeferredSystemStats:
                 mock_psutil.disk_usage.return_value.percent = 70.0
 
                 connector = FleetConnector(
-                    ConnectorConfig(
+                    ConnectorRootConfig(
                         **base_model,
                         fleet=[RobotConfig(robot_id="TestRobot1")],
                     ),
@@ -707,7 +708,7 @@ class TestFleetConnectorDeferredSystemStats:
         """Test fallback to zeroed defaults when psutil not available."""
         with patch("inorbit_connector.connector.PSUTIL_AVAILABLE", False):
             connector = FleetConnector(
-                ConnectorConfig(
+                ConnectorRootConfig(
                     **base_model,
                     fleet=[RobotConfig(robot_id="TestRobot1")],
                 ),
@@ -737,7 +738,7 @@ class TestFleetConnectorDeferredSystemStats:
                 mock_logging.getLogger.return_value = mock_logger
 
                 FleetConnector(
-                    ConnectorConfig(
+                    ConnectorRootConfig(
                         **base_model,
                         fleet=[RobotConfig(robot_id="TestRobot1")],
                     ),
@@ -800,7 +801,7 @@ class TestConnectorIsAbstract:
 
         connector = SubConnector(
             "TestRobot",
-            ConnectorConfig(
+            ConnectorRootConfig(
                 api_key="valid_key",
                 api_url="https://valid.com/",
                 connector_type="valid_connector",
@@ -831,13 +832,13 @@ class TestConnector:
     def base_connector(self, base_model):
         return Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
 
     def test_init(self, base_model):
         """Test Connector initialization."""
         robot_id = "TestRobot"
-        config = ConnectorConfig(
+        config = ConnectorRootConfig(
             **base_model,
             fleet=[RobotConfig(robot_id=robot_id)],
         )
@@ -845,14 +846,14 @@ class TestConnector:
         connector = Connector(robot_id, config)
         assert connector.robot_id == robot_id
         assert connector.robot_ids == [robot_id]
-        assert isinstance(connector.config, ConnectorConfig)
+        assert isinstance(connector.config, ConnectorRootConfig)
         assert len(connector.config.fleet) == 1
         assert connector.config.fleet[0].robot_id == robot_id
         assert connector._logger.name == Connector.__module__
 
     def test_init_with_robot_key(self, base_model, mock_robot_session_pool):
         """Test initialization with robot key."""
-        config = ConnectorConfig(
+        config = ConnectorRootConfig(
             **base_model,
             inorbit_robot_key="valid_robot_key",
             fleet=[RobotConfig(robot_id="TestRobot")],
@@ -884,7 +885,7 @@ class TestConnector:
         }
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
 
         connector.publish_map("frameA")
@@ -906,7 +907,7 @@ class TestConnector:
         }
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
 
         connector.publish_pose(1.0, 2.0, 3.14, "frameA")
@@ -935,7 +936,7 @@ class TestConnector:
         }
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
 
         session = connector._get_session()
@@ -1012,7 +1013,7 @@ class TestConnector:
         # Create a connector with user scripts enabled
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
             register_user_scripts=True,
             default_user_scripts_dir=tmp_path,
         )
@@ -1030,7 +1031,7 @@ class TestConnector:
         base_model["env_vars"] = {"ENV_VAR": "env_value"}
         Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         assert "ENV_VAR" in os.environ
         assert os.environ["ENV_VAR"] == "env_value"
@@ -1040,7 +1041,7 @@ class TestConnector:
         """Integration test for start/stop functionality."""
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         connector._execution_loop = AsyncMock()
         connector._connect = AsyncMock()
@@ -1099,7 +1100,7 @@ class TestConnectorCommandHandler:
     def base_connector(self, base_model):
         return Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
 
     @pytest.mark.asyncio
@@ -1109,7 +1110,7 @@ class TestConnectorCommandHandler:
         """Test that command handler is registered by default."""
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         connector._connect = AsyncMock()
 
@@ -1127,7 +1128,7 @@ class TestConnectorCommandHandler:
         """Test that command handler is not registered when disabled."""
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
             register_custom_command_handler=False,
         )
         connector._connect = AsyncMock()
@@ -1146,7 +1147,7 @@ class TestConnectorCommandHandler:
         """Test that online status callback is set on EdgeSDK."""
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         connector._connect = AsyncMock()
 
@@ -1167,7 +1168,7 @@ class TestConnectorCommandHandler:
         """Test that CommandFailure exceptions are properly handled and passed to result_function."""
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         result_function = MagicMock()
 
@@ -1196,7 +1197,7 @@ class TestConnectorCommandHandler:
         """Test that generic exceptions are handled and passed to result_function with generic message."""
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         result_function = MagicMock()
 
@@ -1222,7 +1223,7 @@ class TestConnectorCommandHandler:
         """Test that exceptions without a message use the class name as stderr."""
         connector = Connector(
             "TestRobot",
-            ConnectorConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
         )
         result_function = MagicMock()
 

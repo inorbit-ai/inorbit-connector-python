@@ -18,12 +18,12 @@ except ImportError:
     from typing_extensions import override
 
 # Third-party
-from pydantic import field_validator, BaseModel
+from pydantic import field_validator
 
 # InOrbit
 from inorbit_connector.commands import CommandResultCode
 from inorbit_connector.connector import Connector
-from inorbit_connector.models import ConnectorConfig
+from inorbit_connector.models import ConnectorRootConfig, ConnectorSpecificConfig
 from inorbit_connector.utils import read_yaml
 
 CONFIG_FILE = Path(__file__).resolve().parent.parent / "example.yaml"  # ../example.yaml
@@ -31,7 +31,7 @@ ROBOT_ID = "my-example-robot"
 CONNECTOR_TYPE = "example_bot"
 
 
-class ExampleBotConfig(BaseModel):
+class ExampleBotConfig(ConnectorSpecificConfig):
     """The configuration for the example bot.
 
     This is where you would define and validate additional custom fields for the robot.
@@ -42,43 +42,23 @@ class ExampleBotConfig(BaseModel):
         example_bot_custom_value (str): An example field for a custom value of the robot
     """
 
+    CONNECTOR_TYPE = "example_bot"
+
     example_bot_api_version: str
     example_bot_hw_rev: str
     example_bot_custom_value: str
 
 
-class ExampleBotConnectorConfig(ConnectorConfig):
+class ExampleBotConnectorConfig(ConnectorRootConfig):
     """The configuration for the example bot connector.
 
-    Each connector should create a class that inherits from ConnectorConfig.
+    Each connector should create a class that inherits from ConnectorRootConfig.
 
     Attributes:
         connector_config (ExampleBotConfig): The config with custom fields for the robot
     """
 
     connector_config: ExampleBotConfig
-
-    # noinspection PyMethodParameters
-    @field_validator("connector_type")
-    def check_connector_type(cls, connector_type: str) -> str:
-        """Validate the connector type.
-
-        This should always be equal to the pre-defined constant.
-
-        Args:
-            connector_type (str): The defined connector type passed in
-
-        Returns:
-            str: The validated connector type
-
-        Raises:
-            ValueError: If the connector type is not equal to the pre-defined constant
-        """
-        if connector_type != CONNECTOR_TYPE:
-            raise ValueError(
-                f"Expected connector type '{CONNECTOR_TYPE}' not '{connector_type}'"
-            )
-        return connector_type
 
 
 async def get_robot_linear_speed() -> float:
