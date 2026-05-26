@@ -410,13 +410,10 @@ class TestFleetConnectorMapFetching:
             )
         )
 
-    def test_fetch_robot_map_default_returns_none(self, fleet_connector):
+    @pytest.mark.asyncio
+    async def test_fetch_robot_map_default_returns_none(self, fleet_connector):
         """Test that default fetch_robot_map returns None."""
-        import asyncio
-
-        result = asyncio.get_event_loop().run_until_complete(
-            fleet_connector.fetch_robot_map("TestRobot1", "frame1")
-        )
+        result = await fleet_connector.fetch_robot_map("TestRobot1", "frame1")
         assert result is None
 
     def test_publish_robot_map_schedules_fetch_when_map_not_found(
