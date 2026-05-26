@@ -358,7 +358,7 @@ class FleetConnector(ABC):
         # Publish the connector type so the platform can identify the connector
         # driving this robot.
         session.publish_key_values(
-            {"inorbit.connector.type": self.config.connector_type}
+            {"connector_type": self.config.connector_type}
         )
 
         return session
