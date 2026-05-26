@@ -832,7 +832,9 @@ class TestConnector:
     def base_connector(self, base_model):
         return Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
 
     def test_init(self, base_model):
@@ -885,7 +887,9 @@ class TestConnector:
         }
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
 
         connector.publish_map("frameA")
@@ -907,7 +911,9 @@ class TestConnector:
         }
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
 
         connector.publish_pose(1.0, 2.0, 3.14, "frameA")
@@ -936,7 +942,9 @@ class TestConnector:
         }
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
 
         session = connector._get_session()
@@ -994,7 +1002,7 @@ class TestConnector:
 
     @pytest.mark.asyncio
     async def test_inorbit_robot_command_handler_delegates(self, base_connector):
-        """Test that _inorbit_robot_command_handler delegates to _inorbit_command_handler."""
+        """Test _inorbit_robot_command_handler delegates to _inorbit_command_handler."""
         base_connector._inorbit_command_handler = AsyncMock()
 
         await base_connector._inorbit_robot_command_handler(
@@ -1013,7 +1021,9 @@ class TestConnector:
         # Create a connector with user scripts enabled
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
             register_user_scripts=True,
             default_user_scripts_dir=tmp_path,
         )
@@ -1031,7 +1041,9 @@ class TestConnector:
         base_model["env_vars"] = {"ENV_VAR": "env_value"}
         Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         assert "ENV_VAR" in os.environ
         assert os.environ["ENV_VAR"] == "env_value"
@@ -1041,7 +1053,9 @@ class TestConnector:
         """Integration test for start/stop functionality."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         connector._execution_loop = AsyncMock()
         connector._connect = AsyncMock()
@@ -1100,7 +1114,9 @@ class TestConnectorCommandHandler:
     def base_connector(self, base_model):
         return Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
 
     @pytest.mark.asyncio
@@ -1110,7 +1126,9 @@ class TestConnectorCommandHandler:
         """Test that command handler is registered by default."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         connector._connect = AsyncMock()
 
@@ -1128,7 +1146,9 @@ class TestConnectorCommandHandler:
         """Test that command handler is not registered when disabled."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
             register_custom_command_handler=False,
         )
         connector._connect = AsyncMock()
@@ -1147,7 +1167,9 @@ class TestConnectorCommandHandler:
         """Test that online status callback is set on EdgeSDK."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         connector._connect = AsyncMock()
 
@@ -1165,10 +1187,12 @@ class TestConnectorCommandHandler:
     def test_handle_command_exception_with_command_failure(
         self, base_model, mock_robot_session_pool
     ):
-        """Test that CommandFailure exceptions are properly handled and passed to result_function."""
+        """Test CommandFailure exceptions are handled and passed to result_function."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         result_function = MagicMock()
 
@@ -1194,10 +1218,12 @@ class TestConnectorCommandHandler:
     def test_handle_command_exception_with_generic_exception(
         self, base_model, mock_robot_session_pool
     ):
-        """Test that generic exceptions are handled and passed to result_function with generic message."""
+        """Test generic exceptions are handled and passed to result_function."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         result_function = MagicMock()
 
@@ -1223,7 +1249,9 @@ class TestConnectorCommandHandler:
         """Test that exceptions without a message use the class name as stderr."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         result_function = MagicMock()
 

@@ -16,6 +16,7 @@ from inorbit_connector.commands import (
     parse_custom_command_args,
 )
 
+
 # Test models for ExcludeUnsetMixin
 class ModelWithMixin(ExcludeUnsetMixin, BaseModel):
     """Test model using ExcludeUnsetMixin."""
@@ -106,7 +107,7 @@ def test_command_model_validation_error_converted_to_command_failure_in_validate
 
 
 def test_command_model_validation_error_converted_to_command_failure_in_validate_json():
-    """Test that ValidationError in model_validate_json is converted to CommandFailure."""
+    """Test ValidationError in model_validate_json converts to CommandFailure."""
     with pytest.raises(CommandFailure):
         SimpleCommand.model_validate_json(
             '{"command_id": "test", "priority": "not_an_int"}'
@@ -264,7 +265,7 @@ def test_command_model_works_with_parse_custom_command_args():
 
 
 def test_command_model_invalid_args_from_parse_custom_command_args():
-    """Test that invalid arguments from parse_custom_command_args raise CommandFailure."""
+    """Test invalid args from parse_custom_command_args raise CommandFailure."""
     script_name, script_args = parse_custom_command_args(
         ["queue_mission", ["command_id", "test123", "priority", "not_an_int"]]
     )

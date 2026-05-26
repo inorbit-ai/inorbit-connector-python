@@ -71,8 +71,7 @@ def _reset_otel_global():
 def patched_run_connector(monkeypatch):
     """Replace the connector run thread target with a no-op."""
     monkeypatch.setattr(
-        "inorbit_connector.connector.FleetConnector."
-        "_FleetConnector__run_connector",
+        "inorbit_connector.connector.FleetConnector." "_FleetConnector__run_connector",
         lambda self: None,
     )
 
