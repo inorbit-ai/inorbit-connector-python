@@ -8,7 +8,12 @@
 # Standard
 import re
 from pathlib import Path
-from typing import ClassVar, List, Optional
+from typing import ClassVar, Generic, List, Optional, TypeVar
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 # Third-party
 import pytz
@@ -273,15 +278,15 @@ class ConnectorSpecificConfig(BaseSettings):
         )
 
 
-class ConnectorRootConfig(BaseSettings):
+T = TypeVar("T", bound=ConnectorSpecificConfig)
+
+
+class ConnectorRootConfig(BaseSettings, Generic[T]):
     """Top-level InOrbit connector configuration.
 
     Reads ``INORBIT_*`` environment variables and ``config/.env`` at
     **instantiation time** via pydantic-settings.  Init kwargs (typically
     loaded from YAML) take precedence over env vars.
-
-    Subclass this and narrow the ``connector_config`` field to a concrete
-    ``ConnectorSpecificConfig`` subclass.
 
     Attributes:
         api_key (str | None, optional): The InOrbit API key
@@ -327,7 +332,7 @@ class ConnectorRootConfig(BaseSettings):
         default=HttpUrl(INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL),
     )
     connector_type: str
-    connector_config: ConnectorSpecificConfig
+    connector_config: T
     use_websockets: bool = False
     update_freq: float = 1.0
     location_tz: str = DEFAULT_TIMEZONE
@@ -368,7 +373,7 @@ class ConnectorRootConfig(BaseSettings):
                 }
         return data
 
-    def to_singular_config(self, robot_id: str) -> "ConnectorRootConfig":
+    def to_singular_config(self, robot_id: str) -> Self:
         """Filters out configurations not related to the given robot. The result is a
         config with a fleet field of length 1.
 
@@ -376,8 +381,7 @@ class ConnectorRootConfig(BaseSettings):
             robot_id (str): The ID of the robot to filter the configuration for
 
         Returns:
-            ConnectorRootConfig: The filtered configuration
-                (preserves the subclass type)
+            Self: The filtered configuration
         """
         filtered_fleet = [robot for robot in self.fleet if robot.robot_id == robot_id]
 

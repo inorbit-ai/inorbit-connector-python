@@ -9,7 +9,8 @@ import sys
 
 from inorbit_connector.utils import read_yaml
 from connector import ExampleBotFleetConnector
-from datatypes import ExampleBotConnectorConfig
+from inorbit_connector.models import ConnectorRootConfig
+from datatypes import ExampleBotConfig
 
 """
 This is the main entry point for the fleet connector.
@@ -48,7 +49,7 @@ def start():
         yaml_data = read_yaml(config_filename)
 
         # Create the connector configuration
-        config = ExampleBotConnectorConfig(**yaml_data)
+        config = ConnectorRootConfig[ExampleBotConfig](**yaml_data)
 
         # Extract robot IDs from the fleet configuration for logging purposes
         robot_ids = [robot.robot_id for robot in config.fleet]

@@ -9,7 +9,7 @@ The `inorbit-connector` framework uses Pydantic models for configuration, provid
 
 The main configuration class is `ConnectorRootConfig`, which contains all settings for your connector. It is a `BaseSettings` subclass (from pydantic-settings) that resolves `INORBIT_*` environment variables and reads `config/.env` at instantiation time. It includes a `fleet` field containing a list of `RobotConfig` entries.
 
-Connectors should subclass `inorbit_connector.models.ConnectorRootConfig` and narrow the `connector_config` field to a concrete `ConnectorSpecificConfig` subclass. For more details see the [Creating a Custom Configuration](#creating-a-custom-configuration) section below.
+Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecificConfig` subclass to get typed access to `connector_config`. For more details see the [Creating a Custom Configuration](#creating-a-custom-configuration) section below.
 
 ### Key Fields
 
@@ -78,7 +78,7 @@ Optional Prometheus metrics endpoint. When `enabled` is `false` (the default) no
 (creating-a-custom-configuration)=
 ## Creating a Custom Configuration
 
-To create a connector-specific configuration, subclass `ConnectorSpecificConfig` for the vendor-specific fields and `ConnectorRootConfig` for the top-level config:
+Subclass `ConnectorSpecificConfig` for your vendor-specific fields, then parametrize `ConnectorRootConfig` with it directly:
 
 ```python
 from inorbit_connector.models import ConnectorRootConfig, ConnectorSpecificConfig
@@ -91,9 +91,7 @@ class MyConnectorConfig(ConnectorSpecificConfig):
     hardware_revision: str
     custom_setting: str
 
-class MyRootConfig(ConnectorRootConfig):
-    """Top-level configuration for your connector."""
-    connector_config: MyConnectorConfig
+config = ConnectorRootConfig[MyConnectorConfig](**yaml_data)
 ```
 
 `ConnectorSpecificConfig` automatically loads environment variables with the prefix `INORBIT_{CONNECTOR_TYPE}_` and reads `config/.env`. For example, with `CONNECTOR_TYPE = "my_connector"`, setting `INORBIT_MY_CONNECTOR_API_VERSION=v2` will populate the `api_version` field.
@@ -110,6 +108,5 @@ Use `inorbit_connector.utils.read_yaml()` to load configuration from YAML files:
 from inorbit_connector.utils import read_yaml
 
 yaml_data = read_yaml("config.yaml")
-config = MyRootConfig(**yaml_data)
+config = ConnectorRootConfig[MyConnectorConfig](**yaml_data)
 ```
-

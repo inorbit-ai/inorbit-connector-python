@@ -50,16 +50,6 @@ class ExampleBotConfig(ConnectorSpecificConfig):
     example_bot_custom_value: str
 
 
-class ExampleBotConnectorConfig(ConnectorRootConfig):
-    """The configuration for the example bot connector.
-
-    Each connector should create a class that inherits from ConnectorRootConfig.
-
-    Attributes:
-        connector_config (ExampleBotConfig): The config with custom fields for the fleet
-    """
-
-    connector_config: ExampleBotConfig
 
 
 async def get_fleet_robot_data(robot_id: str) -> dict:
@@ -100,10 +90,10 @@ class ExampleBotFleetConnector(FleetConnector):
 
     Args:
         robot_ids (list[str]): List of robot IDs in the fleet
-        config (ExampleBotConnectorConfig): The configuration for the connector
+        config (ConnectorRootConfig[ExampleBotConfig]): The configuration for the connector
     """
 
-    def __init__(self, config: ExampleBotConnectorConfig) -> None:
+    def __init__(self, config: ConnectorRootConfig[ExampleBotConfig]) -> None:
         super().__init__(config)
 
         # Setup any other initialization things here
@@ -230,7 +220,7 @@ def main():
         yaml_data = read_yaml(CONFIG_FILE)
 
         # Create the connector configuration
-        config = ExampleBotConnectorConfig(**yaml_data)
+        config = ConnectorRootConfig[ExampleBotConfig](**yaml_data)
 
         # Extract robot IDs from the fleet configuration for logging purposes
         robot_ids = [robot.robot_id for robot in config.fleet]

@@ -8,17 +8,17 @@ This page specifies the configuration models defined by `inorbit_connector.model
 (spec-models-connectorrootconfig)=
 ## `ConnectorRootConfig`
 
-Top-level configuration model for connectors. Subclasses `BaseSettings` from pydantic-settings.
+Top-level configuration model for connectors. Subclasses `BaseSettings` from pydantic-settings and is generic over `T: ConnectorSpecificConfig`.
 
 Key points:
 
-- You typically **subclass** this and narrow the `connector_config` field to a concrete `ConnectorSpecificConfig` subclass.
+- **Parametrize** with a concrete `ConnectorSpecificConfig` subclass to get typed `connector_config` access: `ConnectorRootConfig[MyConfig](**yaml_data)`.
 - Resolves `INORBIT_*` environment variables and reads `config/.env` at instantiation time via pydantic-settings. Init kwargs (typically values from a YAML file) take precedence over env vars.
 - `fleet` must contain at least one `RobotConfig`, and robot IDs must be unique.
 
-### `to_singular_config(robot_id) -> ConnectorRootConfig`
+### `to_singular_config(robot_id) -> Self`
 
-Returns a config instance of the same subclass type, with `fleet` filtered down to exactly the requested robot.
+Returns a config instance of the same type, with `fleet` filtered down to exactly the requested robot.
 
 (spec-models-connectorspecificconfig)=
 ## `ConnectorSpecificConfig`

@@ -49,18 +49,6 @@ class ExampleBotConfig(ConnectorSpecificConfig):
     example_bot_custom_value: str
 
 
-class ExampleBotConnectorConfig(ConnectorRootConfig):
-    """The configuration for the example bot connector.
-
-    Each connector should create a class that inherits from ConnectorRootConfig.
-
-    Attributes:
-        connector_config (ExampleBotConfig): The config with custom fields for the robot
-    """
-
-    connector_config: ExampleBotConfig
-
-
 async def get_robot_linear_speed() -> float:
     """Simulate a request to the robot's linear speed API."""
     await asyncio.sleep(random.uniform(0.1, 0.3))
@@ -81,10 +69,10 @@ class ExampleBotConnector(Connector):
 
     Args:
             robot_id (str): The ID of the InOrbit robot
-            config (ExampleBotConnectorConfig): The configuration for the connector
+            config (ConnectorRootConfig[ExampleBotConfig]): The configuration for the connector
     """
 
-    def __init__(self, robot_id: str, config: ExampleBotConnectorConfig) -> None:
+    def __init__(self, robot_id: str, config: ConnectorRootConfig[ExampleBotConfig]) -> None:
         super().__init__(robot_id, config)
 
         # Setup any other initialization things here
@@ -181,7 +169,7 @@ def main():
 
     try:
         yaml_data = read_yaml(CONFIG_FILE)
-        config = ExampleBotConnectorConfig(**yaml_data)
+        config = ConnectorRootConfig[ExampleBotConfig](**yaml_data)
     except FileNotFoundError:
         logger.error(f"'{CONFIG_FILE}' configuration file does not exist")
         exit(1)

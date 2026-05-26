@@ -7,7 +7,6 @@
 
 # Standard
 import os
-import re
 
 # Third-party
 import pytest
@@ -24,10 +23,8 @@ from inorbit_connector.models import (
     MapConfigTemp,
     MetricsConfig,
     RobotConfig,
-    LoggingConfig,
 )
 from pathlib import Path
-from inorbit_connector.logging.logger import LogLevels
 
 
 class DummyConfig(ConnectorSpecificConfig):
@@ -262,6 +259,88 @@ class TestConnectorRootConfig:
         assert model.connector_config.some_field == "from_yaml"
 
 
+class TestConnectorRootConfigGeneric:
+    """Tests for the generic ConnectorRootConfig[T] parametrization."""
+
+    @pytest.fixture
+    def base_kwargs(self):
+        return {
+            "api_key": "valid_key",
+            "connector_type": "dummy",
+            "fleet": [{"robot_id": "robot1"}, {"robot_id": "robot2"}],
+            "_env_file": None,
+        }
+
+    def test_generic_basic_construction(self, base_kwargs):
+        config = ConnectorRootConfig[DummyConfig](
+            **base_kwargs,
+            connector_config=DummyConfig(),
+        )
+        assert isinstance(config.connector_config, DummyConfig)
+        assert config.api_key == "valid_key"
+
+    def test_generic_annotation_resolves_to_concrete_type(self):
+        parametrized = ConnectorRootConfig[DummyConfig]
+        ann = parametrized.model_fields["connector_config"].annotation
+        assert ann is DummyConfig
+
+    def test_unparametrized_annotation_is_typevar(self):
+        ann = ConnectorRootConfig.model_fields["connector_config"].annotation
+        assert not isinstance(ann, type)
+
+    def test_generic_dict_connector_config_triggers_model_validator(self, base_kwargs):
+        """Dict passed as connector_config is instantiated via model validator."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        config = ConnectorRootConfig[FieldedConfig](
+            **{**base_kwargs, "connector_type": "test_bot"},
+            connector_config={"some_field": "from_dict"},
+        )
+        assert isinstance(config.connector_config, FieldedConfig)
+        assert config.connector_config.some_field == "from_dict"
+
+    def test_generic_env_var_resolution(self, monkeypatch, base_kwargs):
+        """Env vars resolve through generic parametrization (no subclass needed)."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        config = ConnectorRootConfig[FieldedConfig](
+            **{**base_kwargs, "connector_type": "test_bot"},
+            connector_config={},
+        )
+        assert config.connector_config.some_field == "from_env"
+
+    def test_generic_yaml_overrides_env(self, monkeypatch, base_kwargs):
+        """Init kwargs (YAML) take precedence over env for generic parametrization."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        config = ConnectorRootConfig[FieldedConfig](
+            **{**base_kwargs, "connector_type": "test_bot"},
+            connector_config={"some_field": "from_yaml"},
+        )
+        assert config.connector_config.some_field == "from_yaml"
+
+    def test_to_singular_config_preserves_generic_type(self, base_kwargs):
+        config = ConnectorRootConfig[DummyConfig](
+            **base_kwargs,
+            connector_config=DummyConfig(),
+        )
+        singular = config.to_singular_config("robot1")
+        assert len(singular.fleet) == 1
+        assert isinstance(singular.connector_config, DummyConfig)
+        assert type(singular) is type(config)
+
+
 class TestMapConfigBase:
     """Tests for the MapConfigBase model."""
 
@@ -448,9 +527,7 @@ class TestMetricsConfig:
             MetricsConfig(extra_resource_attributes={"has-hyphen": "ok"})
 
     def test_extra_resource_attributes_accepts_valid_pairs(self):
-        cfg = MetricsConfig(
-            extra_resource_attributes={"site": "lab", "region": "us"}
-        )
+        cfg = MetricsConfig(extra_resource_attributes={"site": "lab", "region": "us"})
         assert cfg.extra_resource_attributes == {"site": "lab", "region": "us"}
 
     def test_discovery_dir_accepts_none(self):

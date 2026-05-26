@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-from inorbit_connector.models import ConnectorRootConfig, ConnectorSpecificConfig
+from inorbit_connector.models import ConnectorSpecificConfig
 
 
 CONNECTOR_TYPE = "example_bot"
@@ -24,15 +24,3 @@ class ExampleBotConfig(ConnectorSpecificConfig):
     example_bot_api_version: str
     example_bot_hw_rev: str
     example_bot_custom_value: str
-
-
-class ExampleBotConnectorConfig(ConnectorRootConfig):
-    """The configuration for the example bot connector.
-
-    Each connector should create a class that inherits from ConnectorRootConfig.
-
-    Attributes:
-        connector_config (ExampleBotConfig): The config with custom fields for the robot
-    """
-
-    connector_config: ExampleBotConfig
