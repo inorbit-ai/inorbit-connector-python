@@ -15,7 +15,7 @@ Connectors should subclass `inorbit_connector.models.ConnectorConfig` and define
 
 - **`api_key`** (str | None): The InOrbit API key. Can be set via environment variable `INORBIT_API_KEY`
 - **`api_url`** (HttpUrl): The URL of the InOrbit API endpoint. Defaults to InOrbit Cloud SDK URL. Can be set via environment variable `INORBIT_API_URL`
-- **`connector_type`** (str): A string identifier for your connector type (e.g., "example_bot")
+- **`connector_type`** (str): A string identifier for your connector type (e.g., "example_bot"). This value is also automatically published to InOrbit as a robot key-value on session init. See [Automatic `connector_type` publishing](publishing.md#automatic-connector-type-publishing).
 - **`connector_config`** (BaseModel): Your custom configuration model that inherits from Pydantic's `BaseModel`. This is where you define connector-specific fields
 - **`update_freq`** (float): Update frequency in Hz for the execution loop. Default is 1.0
 - **`location_tz`** (str): The timezone of the robot location (e.g., "America/Los_Angeles", "UTC"). Must be a valid pytz timezone
@@ -115,4 +115,3 @@ from inorbit_connector.utils import read_yaml
 yaml_data = read_yaml("config.yaml")
 config = MyConnectorConfig(**yaml_data)
 ```
-
