@@ -340,6 +340,65 @@ class TestConnectorRootConfigGeneric:
         assert isinstance(singular.connector_config, DummyConfig)
         assert type(singular) is type(config)
 
+    def test_generic_env_file_forwards_to_connector_config(self, tmp_path):
+        """_env_file passed to root is forwarded to nested connector_config."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n")
+        config = ConnectorRootConfig[FieldedConfig](
+            connector_type="test_bot",
+            connector_config={},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=str(env_file),
+        )
+        assert config.connector_config.some_field == "from_dotenv"
+
+    def test_generic_env_file_none_prevents_connector_config_dotenv(
+        self, tmp_path, monkeypatch
+    ):
+        """_env_file=None on root prevents nested config from reading dotenv."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "config").mkdir()
+        (tmp_path / "config" / ".env").write_text(
+            "INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n"
+        )
+        config = ConnectorRootConfig[FieldedConfig](
+            connector_type="test_bot",
+            connector_config={},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=None,
+        )
+        assert config.connector_config.some_field == "default"
+
+    def test_subclass_env_file_forwards_to_connector_config(self, tmp_path):
+        """_env_file forwarding works with the subclass pattern too."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        class RootWithFielded(ConnectorRootConfig):
+            connector_config: FieldedConfig
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n")
+        config = RootWithFielded(
+            connector_type="test_bot",
+            connector_config={},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=str(env_file),
+        )
+        assert config.connector_config.some_field == "from_dotenv"
+
 
 class TestMapConfigBase:
     """Tests for the MapConfigBase model."""

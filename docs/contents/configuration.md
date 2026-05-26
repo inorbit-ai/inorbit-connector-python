@@ -35,6 +35,8 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 - **`INORBIT_API_KEY`** (required): The InOrbit API key
 - **`INORBIT_API_URL`** (optional): The InOrbit API endpoint URL
 
+When `connector_config` is passed as a dict (e.g. from YAML), the `_env_file` override is forwarded to the nested `ConnectorSpecificConfig` constructor. Passing `_env_file=None` to `ConnectorRootConfig` disables dotenv reading for both root and connector-specific fields.
+
 ## RobotConfig
 
 Represents configuration for a single robot in the fleet:

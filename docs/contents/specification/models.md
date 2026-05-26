@@ -15,6 +15,7 @@ Key points:
 - **Parametrize** with a concrete `ConnectorSpecificConfig` subclass to get typed `connector_config` access: `ConnectorRootConfig[MyConfig](**yaml_data)`.
 - Resolves `INORBIT_*` environment variables and reads `config/.env` at instantiation time via pydantic-settings. Init kwargs (typically values from a YAML file) take precedence over env vars.
 - `fleet` must contain at least one `RobotConfig`, and robot IDs must be unique.
+- When `connector_config` arrives as a dict, the model validator constructs it via `__init__` (not `model_validate`) to preserve env-var resolution. The `_env_file` init kwarg is forwarded to the nested constructor for consistent dotenv behavior.
 
 ### `to_singular_config(robot_id) -> Self`
 

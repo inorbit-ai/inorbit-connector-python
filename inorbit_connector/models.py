@@ -7,6 +7,7 @@
 
 # Standard
 import re
+from contextvars import ContextVar
 from pathlib import Path
 from typing import ClassVar, Generic, List, Optional, TypeVar
 
@@ -207,6 +208,9 @@ class RobotConfig(BaseModel):
     cameras: List[CameraConfig] = []
 
 
+DEFAULT_ENV_FILE = "config/.env"
+
+
 class ConnectorSpecificConfig(BaseSettings):
     """Base for per-connector vendor config.
 
@@ -235,7 +239,7 @@ class ConnectorSpecificConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_ignore_empty=True,
         case_sensitive=False,
-        env_file="config/.env",
+        env_file=DEFAULT_ENV_FILE,
         extra="ignore",
     )
 
@@ -248,37 +252,25 @@ class ConnectorSpecificConfig(BaseSettings):
         dotenv_settings,
         file_secret_settings,
     ):
-        """Override env sources to use ``INORBIT_{CONNECTOR_TYPE}_`` as prefix.
-
-        The ``dotenv_settings.env_file`` value is forwarded so that callers
-        can still override the file via ``_env_file`` at instantiation time.
-
-        Precedence (highest first): init kwargs > env vars > .env file >
-        field defaults.
-        """
+        """Use ``INORBIT_{CONNECTOR_TYPE}_`` as env-var prefix."""
         prefix = f"INORBIT_{cls.CONNECTOR_TYPE.upper()}_"
-        env_settings = EnvSettingsSource(
-            settings_cls,
-            env_prefix=prefix,
-            env_ignore_empty=True,
-            case_sensitive=False,
-        )
-        dotenv_settings = DotEnvSettingsSource(
-            settings_cls,
-            env_file=dotenv_settings.env_file,
-            env_prefix=prefix,
-            env_ignore_empty=True,
-            case_sensitive=False,
-        )
+        common = dict(env_prefix=prefix, env_ignore_empty=True, case_sensitive=False)
         return (
             init_settings,
-            env_settings,
-            dotenv_settings,
+            EnvSettingsSource(settings_cls, **common),
+            DotEnvSettingsSource(
+                settings_cls, env_file=dotenv_settings.env_file, **common
+            ),
             file_secret_settings,
         )
 
 
 T = TypeVar("T", bound=ConnectorSpecificConfig)
+
+# Thread-safe channel for forwarding ``_env_file`` from
+# ConnectorRootConfig.__init__ to its "before" model validator.
+_NOT_SET = object()
+_env_file_var: ContextVar[object] = ContextVar("_env_file_var", default=_NOT_SET)
 
 
 class ConnectorRootConfig(BaseSettings, Generic[T]):
@@ -287,6 +279,16 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
     Reads ``INORBIT_*`` environment variables and ``config/.env`` at
     **instantiation time** via pydantic-settings.  Init kwargs (typically
     loaded from YAML) take precedence over env vars.
+
+    Parametrize with a concrete ``ConnectorSpecificConfig`` subclass to
+    get typed access to ``connector_config``::
+
+        config = ConnectorRootConfig[MyConfig](**yaml_data)
+
+    Subclassing is still supported for connectors that need root-level
+    validators or additional fields.  Pass ``_env_file=None`` to disable
+    dotenv reading for both root and nested config, or an explicit path
+    to make both read from the same file.
 
     Attributes:
         api_key (str | None, optional): The InOrbit API key
@@ -323,7 +325,7 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
         env_prefix="INORBIT_",
         env_ignore_empty=True,
         case_sensitive=False,
-        env_file="config/.env",
+        env_file=DEFAULT_ENV_FILE,
         extra="ignore",
     )
 
@@ -345,21 +347,21 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
     metrics: MetricsConfig = MetricsConfig()
     fleet: list[RobotConfig]
 
+    def __init__(self, **kwargs):
+        # pydantic-settings consumes _env_file before model validators
+        # run. Save it in a ContextVar so _instantiate_connector_config
+        # can forward it to the nested ConnectorSpecificConfig.
+        token = _env_file_var.set(kwargs.get("_env_file", _NOT_SET))
+        try:
+            super().__init__(**kwargs)
+        finally:
+            _env_file_var.reset(token)
+
     @model_validator(mode="before")
     @classmethod
     def _instantiate_connector_config(cls, data):
-        """Explicitly construct the ``connector_config`` via ``__init__`` when
-        it arrives as a raw dict (e.g. from YAML).
-
-        Pydantic's default dict-to-model coercion uses ``model_validate``,
-        which does **not** trigger BaseSettings env-var resolution.  Only
-        ``__init__`` does.  This validator detects a dict value and calls
-        the annotated ConnectorSpecificConfig subclass constructor so that
-        env sources participate in field resolution.
-
-        The abstract ``ConnectorSpecificConfig`` base is skipped (it has no
-        ``CONNECTOR_TYPE``); only concrete subclasses are instantiated.
-        """
+        """Construct ``connector_config`` via ``__init__`` when it arrives as
+        a raw dict so that BaseSettings env-var resolution is triggered."""
         if isinstance(data, dict) and isinstance(data.get("connector_config"), dict):
             ann_type = cls.model_fields["connector_config"].annotation
             if (
@@ -367,9 +369,15 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
                 and issubclass(ann_type, ConnectorSpecificConfig)
                 and ann_type is not ConnectorSpecificConfig
             ):
+                env_file_kwargs = {}
+                env_file = _env_file_var.get()
+                if env_file is not _NOT_SET:
+                    env_file_kwargs["_env_file"] = env_file
                 data = {
                     **data,
-                    "connector_config": ann_type(**data["connector_config"]),
+                    "connector_config": ann_type(
+                        **data["connector_config"], **env_file_kwargs
+                    ),
                 }
         return data
 
