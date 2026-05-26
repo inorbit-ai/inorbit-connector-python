@@ -39,7 +39,8 @@ class ExampleBotFleetConnector(FleetConnector):
 
     Args:
         robot_ids (list[str]): List of robot IDs in the fleet
-        config (ConnectorRootConfig[ExampleBotConfig]): The configuration for the connector
+        config (ConnectorRootConfig[ExampleBotConfig]):
+            The configuration for the connector
     """
 
     def __init__(self, config: ConnectorRootConfig[ExampleBotConfig]) -> None:

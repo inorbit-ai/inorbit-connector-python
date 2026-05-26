@@ -37,10 +37,15 @@ class ExampleBotConnector(Connector):
 
     Args:
         robot_id (str): The ID of the InOrbit robot
-        config (ConnectorRootConfig[ExampleBotConfig]): The configuration for the connector
+        config (ConnectorRootConfig[ExampleBotConfig]):
+            The configuration for the connector
     """
 
-    def __init__(self, robot_id: str, config: ConnectorRootConfig[ExampleBotConfig]) -> None:
+    def __init__(
+        self,
+        robot_id: str,
+        config: ConnectorRootConfig[ExampleBotConfig],
+    ) -> None:
         super().__init__(robot_id, config)
 
         # Setup any other initialization things here

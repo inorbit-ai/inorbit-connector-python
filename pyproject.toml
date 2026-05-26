@@ -106,8 +106,8 @@ python = { "3.10" = "py310", "3.11" = "py311", "3.12" = "py312", "3.13" = "py313
 [tool.tox.env_run_base]
 extras = ["dev"]
 commands = [
-    ["flake8", "inorbit_connector", "tests"],
-    ["black", "--check", "--diff", "inorbit_connector", "tests"],
+    ["flake8", "inorbit_connector", "tests", "examples"],
+    ["black", "--check", "--diff", "inorbit_connector", "tests", "examples"],
     ["coverage", "run", "-m", "pytest"],
     ["coverage", "html", "-d", "{envlogdir}/coverage"],
 ]

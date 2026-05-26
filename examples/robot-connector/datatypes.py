@@ -5,9 +5,6 @@
 from inorbit_connector.models import ConnectorSpecificConfig
 
 
-CONNECTOR_TYPE = "example_bot"
-
-
 class ExampleBotConfig(ConnectorSpecificConfig):
     """The configuration for the example bot.
 

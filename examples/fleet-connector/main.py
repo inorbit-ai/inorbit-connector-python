@@ -30,7 +30,7 @@ class CustomParser(argparse.ArgumentParser):
 
 
 def start():
-    """Parses arguments, processes the configuration file and starts the fleet connector."""
+    """Parse arguments, process config file and start the fleet connector."""
     parser = CustomParser(prog="fleet_connector")
     parser.add_argument(
         "-c",
