@@ -314,6 +314,17 @@ class TestFleetConnector:
         session = base_fleet_connector._get_robot_session(robot_id)
         session.publish_key_values.assert_called()
 
+    def test_initialize_session_publishes_connector_type(
+        self, base_fleet_connector, mock_robot_session_pool
+    ):
+        """Session init publishes inorbit.connector.type as a KV pair."""
+        robot_id = "TestRobot1"
+        base_fleet_connector._FleetConnector__initialize_session(robot_id)
+        session = base_fleet_connector._get_robot_session(robot_id)
+        session.publish_key_values.assert_any_call(
+            {"inorbit.connector.type": base_fleet_connector.config.connector_type}
+        )
+
     def test_publish_robot_system_stats_stores_stats(
         self, base_fleet_connector, mock_robot_session_pool
     ):
@@ -967,6 +978,16 @@ class TestConnector:
 
         session = base_connector._get_session()
         session.publish_key_values.assert_called()
+
+    def test_initialize_session_publishes_connector_type(
+        self, base_connector, mock_robot_session_pool
+    ):
+        """Session init publishes inorbit.connector.type as a KV pair."""
+        base_connector._FleetConnector__initialize_session(base_connector.robot_id)
+        session = base_connector._get_session()
+        session.publish_key_values.assert_any_call(
+            {"inorbit.connector.type": base_connector.config.connector_type}
+        )
 
     def test_publish_system_stats_stores_stats(
         self, base_connector, mock_robot_session_pool
