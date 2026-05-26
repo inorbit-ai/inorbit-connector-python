@@ -16,7 +16,7 @@ from inorbit_connector.models import (
 )
 
 
-class _MinimalConnectorRootConfig(ConnectorSpecificConfig):
+class _MinimalConnectorConfig(ConnectorSpecificConfig):
     CONNECTOR_TYPE = "minimal"
 
 
@@ -40,7 +40,7 @@ def _make_config(tmp_path, **overrides):
     base = dict(
         api_key="ak",
         connector_type="test",
-        connector_config=_MinimalConnectorRootConfig(),
+        connector_config=_MinimalConnectorConfig(),
         fleet=[RobotConfig(robot_id="r1")],
         metrics=MetricsConfig(
             enabled=True,
@@ -100,7 +100,7 @@ def test_metrics_disabled_by_default(tmp_path, patched_run_connector):
     cfg = ConnectorRootConfig(
         api_key="ak",
         connector_type="test",
-        connector_config=_MinimalConnectorRootConfig(),
+        connector_config=_MinimalConnectorConfig(),
         fleet=[RobotConfig(robot_id="r1")],
     )
     conn = _MinimalConnector(cfg)
