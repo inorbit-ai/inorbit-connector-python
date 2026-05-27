@@ -17,7 +17,8 @@ from inorbit_connector.connector import FleetConnector
 from inorbit_connector.models import MapConfigTemp
 
 # Local
-from datatypes import ExampleBotConnectorConfig
+from inorbit_connector.models import ConnectorRootConfig
+from datatypes import ExampleBotConfig
 from fleet_client import FleetManager, FleetManagerAPIWrapper
 
 # Path to the example map image
@@ -38,10 +39,11 @@ class ExampleBotFleetConnector(FleetConnector):
 
     Args:
         robot_ids (list[str]): List of robot IDs in the fleet
-        config (ExampleBotConnectorConfig): The configuration for the connector
+        config (ConnectorRootConfig[ExampleBotConfig]):
+            The configuration for the connector
     """
 
-    def __init__(self, config: ExampleBotConnectorConfig) -> None:
+    def __init__(self, config: ConnectorRootConfig[ExampleBotConfig]) -> None:
         super().__init__(config)
 
         # Setup any other initialization things here

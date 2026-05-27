@@ -93,9 +93,7 @@ def test_server_handles_port_bind_failure(metrics_enabled, tmp_path, caplog):
         server.start()
         assert server.actual_port is None
         assert not (tmp_path / "test-1.json").exists()
-        assert any(
-            "bind" in r.getMessage().lower() for r in caplog.records
-        )
+        assert any("bind" in r.getMessage().lower() for r in caplog.records)
         server.stop()
     finally:
         sock.close()

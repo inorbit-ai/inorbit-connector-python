@@ -9,7 +9,8 @@ import sys
 
 from inorbit_connector.utils import read_yaml
 from connector import ExampleBotConnector
-from datatypes import ExampleBotConnectorConfig
+from inorbit_connector.models import ConnectorRootConfig
+from datatypes import ExampleBotConfig
 
 """
 This is the main entry point for the connector.
@@ -52,7 +53,7 @@ def start():
 
     try:
         yaml_data = read_yaml(config_filename)
-        config = ExampleBotConnectorConfig(**yaml_data)
+        config = ConnectorRootConfig[ExampleBotConfig](**yaml_data)
     except FileNotFoundError:
         LOGGER.error(f"Configuration file '{config_filename}' not found")
         exit(1)

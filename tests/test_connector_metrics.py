@@ -5,19 +5,19 @@ import time
 import urllib.request
 
 import pytest
-from pydantic import BaseModel
 from opentelemetry.metrics import _internal as otel_metrics_internal
 
 from inorbit_connector.connector import FleetConnector
 from inorbit_connector.models import (
-    ConnectorConfig,
+    ConnectorRootConfig,
+    ConnectorSpecificConfig,
     MetricsConfig,
     RobotConfig,
 )
 
 
-class _MinimalConnectorConfig(BaseModel):
-    pass
+class _MinimalConnectorConfig(ConnectorSpecificConfig):
+    CONNECTOR_TYPE = "minimal"
 
 
 class _MinimalConnector(FleetConnector):
@@ -52,7 +52,7 @@ def _make_config(tmp_path, **overrides):
         ),
     )
     base.update(overrides)
-    return ConnectorConfig(**base)
+    return ConnectorRootConfig(**base)
 
 
 @pytest.fixture(autouse=True)
@@ -71,8 +71,7 @@ def _reset_otel_global():
 def patched_run_connector(monkeypatch):
     """Replace the connector run thread target with a no-op."""
     monkeypatch.setattr(
-        "inorbit_connector.connector.FleetConnector."
-        "_FleetConnector__run_connector",
+        "inorbit_connector.connector.FleetConnector." "_FleetConnector__run_connector",
         lambda self: None,
     )
 
@@ -98,7 +97,7 @@ def test_metrics_server_lifecycle(tmp_path, patched_run_connector):
 
 
 def test_metrics_disabled_by_default(tmp_path, patched_run_connector):
-    cfg = ConnectorConfig(
+    cfg = ConnectorRootConfig(
         api_key="ak",
         connector_type="test",
         connector_config=_MinimalConnectorConfig(),

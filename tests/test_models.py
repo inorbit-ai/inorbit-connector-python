@@ -6,34 +6,29 @@
 # SPDX-License-Identifier: MIT
 
 # Standard
-import importlib
 import os
-import re
-import sys
-from unittest import mock
 
 # Third-party
 import pytest
 from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
-from pydantic import ValidationError, BaseModel
+from pydantic import ValidationError
 
 # InOrbit
 from inorbit_connector.models import (
-    ConnectorConfig,
+    ConnectorRootConfig,
+    ConnectorSpecificConfig,
     MapConfig,
     MapConfigBase,
     MapConfigTemp,
     MetricsConfig,
     RobotConfig,
-    LoggingConfig,
 )
 from pathlib import Path
-from inorbit_connector.logging.logger import LogLevels
 
 
-class DummyConfig(BaseModel):
-    pass
+class DummyConfig(ConnectorSpecificConfig):
+    CONNECTOR_TYPE = "dummy"
 
 
 class InvalidDummyConfig(IndexError):
@@ -56,7 +51,7 @@ class TestRobotConfig:
         assert str(robot_config.cameras[0].video_url) == "https://test.com/"
 
 
-class TestConnectorConfig:
+class TestConnectorRootConfig:
     @pytest.fixture
     def base_model(self):
         return {
@@ -71,7 +66,7 @@ class TestConnectorConfig:
         }
 
     def test_with_valid_input(self, base_model):
-        model = ConnectorConfig(**base_model)
+        model = ConnectorRootConfig(**base_model, _env_file=None)
         assert model.api_key == base_model["api_key"]
         assert str(model.api_url) == base_model["api_url"]
         assert model.connector_type == base_model["connector_type"]
@@ -86,7 +81,7 @@ class TestConnectorConfig:
         with pytest.raises(
             ValidationError, match="Fleet must contain at least one robot"
         ):
-            ConnectorConfig(**init_input)
+            ConnectorRootConfig(**init_input, _env_file=None)
 
     def test_robot_ids_must_be_unique(self, base_model):
         init_input = base_model.copy()
@@ -95,7 +90,7 @@ class TestConnectorConfig:
             {"robot_id": "robot1"},
         ]
         with pytest.raises(ValidationError, match="Robot ids must be unique"):
-            ConnectorConfig(**init_input)
+            ConnectorRootConfig(**init_input, _env_file=None)
 
     def test_with_robot_cameras(self, base_model):
         init_input = base_model.copy()
@@ -105,12 +100,12 @@ class TestConnectorConfig:
                 "cameras": [CameraConfig(video_url="https://test.com/")],
             },
         ]
-        model = ConnectorConfig(**init_input)
+        model = ConnectorRootConfig(**init_input, _env_file=None)
         assert len(model.fleet[0].cameras) == 1
         assert str(model.fleet[0].cameras[0].video_url) == "https://test.com/"
 
     def test_to_singular_config(self, base_model):
-        model = ConnectorConfig(**base_model)
+        model = ConnectorRootConfig(**base_model, _env_file=None)
         singular = model.to_singular_config("robot1")
         assert len(singular.fleet) == 1
         assert singular.fleet[0].robot_id == "robot1"
@@ -118,7 +113,7 @@ class TestConnectorConfig:
         assert singular.api_key == model.api_key
 
     def test_to_singular_config_invalid_robot_id(self, base_model):
-        model = ConnectorConfig(**base_model)
+        model = ConnectorRootConfig(**base_model, _env_file=None)
         with pytest.raises(
             ValueError,
             match="Expected 1 robot configuration for robot invalid_robot, got 0",
@@ -126,94 +121,315 @@ class TestConnectorConfig:
             model.to_singular_config("invalid_robot")
 
     def test_to_singular_config_preserves_subclass_type(self, base_model):
-        class CustomConnectorConfig(ConnectorConfig):
+        class CustomConnectorConfig(ConnectorRootConfig):
             pass
 
-        model = CustomConnectorConfig(**base_model)
+        model = CustomConnectorConfig(**base_model, _env_file=None)
         singular = model.to_singular_config("robot1")
         assert isinstance(singular, CustomConnectorConfig)
 
     def test_use_websockets_defaults_to_false(self, base_model):
-        model = ConnectorConfig(**base_model)
+        model = ConnectorRootConfig(**base_model, _env_file=None)
         assert model.use_websockets is False
 
     def test_use_websockets_can_be_enabled(self, base_model):
         init_input = base_model.copy()
         init_input["use_websockets"] = True
-        model = ConnectorConfig(**init_input)
+        model = ConnectorRootConfig(**init_input, _env_file=None)
         assert model.use_websockets is True
 
     def test_use_websockets_must_be_bool(self, base_model):
         init_input = base_model.copy()
         init_input["use_websockets"] = "not-a-bool"
         with pytest.raises(ValidationError):
-            ConnectorConfig(**init_input)
+            ConnectorRootConfig(**init_input, _env_file=None)
 
     def test_use_websockets_preserved_in_to_singular_config(self, base_model):
         init_input = base_model.copy()
         init_input["use_websockets"] = True
-        model = ConnectorConfig(**init_input)
+        model = ConnectorRootConfig(**init_input, _env_file=None)
         singular = model.to_singular_config("robot1")
         assert singular.use_websockets is True
 
-    def test_extra_fields_are_forbidden(self, base_model):
+    def test_extra_fields_are_ignored(self, base_model):
         init_input = base_model.copy()
         init_input["log_level"] = "INFO"
-        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-            ConnectorConfig(**init_input)
+        model = ConnectorRootConfig(**init_input, _env_file=None)
+        assert not hasattr(model, "log_level")
 
-    @mock.patch.dict(os.environ, {"INORBIT_API_KEY": "env_valid_key"})
-    def test_reads_api_key_from_environment_variable(self, base_model):
-        importlib.reload(sys.modules["inorbit_connector.models"])
-        from inorbit_connector.models import ConnectorConfig as ReloadedConfig
-
-        init_input = {
-            "api_url": "https://valid.video_url/",
-            "connector_type": "valid_connector",
-            "connector_config": DummyConfig(),
-            "fleet": [{"robot_id": "robot1"}],
-        }
-        model = ReloadedConfig(**init_input)
+    def test_reads_api_key_from_env(self, monkeypatch):
+        monkeypatch.setenv("INORBIT_API_KEY", "env_valid_key")
+        model = ConnectorRootConfig(
+            connector_type="valid_connector",
+            connector_config=DummyConfig(),
+            fleet=[{"robot_id": "robot1"}],
+            _env_file=None,
+        )
         assert model.api_key == "env_valid_key"
 
-    @mock.patch.dict(os.environ, {"INORBIT_API_URL": "https://valid.env/"})
-    def test_reads_api_url_from_environment_variable(self, base_model):
-        importlib.reload(sys.modules["inorbit_connector.models"])
-        from inorbit_connector.models import ConnectorConfig as ReloadedConfig
-
-        init_input = {
-            "connector_type": "valid_connector",
-            "connector_config": DummyConfig(),
-            "fleet": [{"robot_id": "robot1"}],
-        }
-        model = ReloadedConfig(**init_input)
+    def test_reads_api_url_from_env(self, monkeypatch):
+        monkeypatch.setenv("INORBIT_API_URL", "https://valid.env/")
+        model = ConnectorRootConfig(
+            api_key="valid_key",
+            connector_type="valid_connector",
+            connector_config=DummyConfig(),
+            fleet=[{"robot_id": "robot1"}],
+            _env_file=None,
+        )
         assert str(model.api_url) == "https://valid.env/"
 
-    @mock.patch.dict(os.environ, {}, clear=True)
-    def test_reads_api_url_from_environment_variable_default(self, base_model):
-        importlib.reload(sys.modules["inorbit_connector.models"])
-        from inorbit_connector.models import ConnectorConfig as ReloadedConfig
-
-        init_input = {
-            "connector_type": "valid_connector",
-            "connector_config": DummyConfig(),
-            "fleet": [{"robot_id": "robot1"}],
-        }
-        model = ReloadedConfig(**init_input)
+    def test_api_url_default_when_no_env(self):
+        model = ConnectorRootConfig(
+            api_key="valid_key",
+            connector_type="valid_connector",
+            connector_config=DummyConfig(),
+            fleet=[{"robot_id": "robot1"}],
+            _env_file=None,
+        )
         assert str(model.api_url) == INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
 
-    @mock.patch.dict(os.environ, {}, clear=True)
-    def test_missing_api_key_environment_variable(self, base_model):
-        importlib.reload(sys.modules["inorbit_connector.models"])
-        from inorbit_connector.models import ConnectorConfig as ReloadedConfig
-
-        init_input = {
-            "connector_type": "valid_connector",
-            "connector_config": DummyConfig(),
-            "fleet": [{"robot_id": "robot1"}],
-        }
-        model = ReloadedConfig(**init_input)
+    def test_api_key_none_with_robot_key(self):
+        """api_key can be None when inorbit_robot_key provides authentication."""
+        model = ConnectorRootConfig(
+            inorbit_robot_key="valid_robot_key",
+            connector_type="valid_connector",
+            connector_config=DummyConfig(),
+            fleet=[{"robot_id": "robot1"}],
+            _env_file=None,
+        )
         assert model.api_key is None
+        assert model.inorbit_robot_key == "valid_robot_key"
+
+    def test_init_kwargs_override_env(self, monkeypatch):
+        monkeypatch.setenv("INORBIT_API_KEY", "env_key")
+        model = ConnectorRootConfig(
+            api_key="yaml_key",
+            connector_type="valid_connector",
+            connector_config=DummyConfig(),
+            fleet=[{"robot_id": "robot1"}],
+            _env_file=None,
+        )
+        assert model.api_key == "yaml_key"
+
+    def test_reads_from_env_file(self, tmp_path):
+        env_file = tmp_path / ".env"
+        env_file.write_text("INORBIT_API_KEY=from_dotenv\n")
+        model = ConnectorRootConfig(
+            connector_type="valid_connector",
+            connector_config=DummyConfig(),
+            fleet=[{"robot_id": "robot1"}],
+            _env_file=str(env_file),
+        )
+        assert model.api_key == "from_dotenv"
+
+    def test_requires_api_key_or_robot_key(self, base_model):
+        init_input = base_model.copy()
+        del init_input["api_key"]
+        with pytest.raises(
+            ValidationError,
+            match="At least one of 'api_key' or 'inorbit_robot_key' must be provided",
+        ):
+            ConnectorRootConfig(**init_input, _env_file=None)
+
+    def test_accepts_only_inorbit_robot_key(self, base_model):
+        init_input = base_model.copy()
+        del init_input["api_key"]
+        init_input["inorbit_robot_key"] = "valid_robot_key"
+        model = ConnectorRootConfig(**init_input, _env_file=None)
+        assert model.api_key is None
+        assert model.inorbit_robot_key == "valid_robot_key"
+
+    def test_accepts_both_api_key_and_robot_key(self, base_model):
+        init_input = base_model.copy()
+        init_input["inorbit_robot_key"] = "valid_robot_key"
+        model = ConnectorRootConfig(**init_input, _env_file=None)
+        assert model.api_key == "valid_key"
+        assert model.inorbit_robot_key == "valid_robot_key"
+
+    def test_connector_config_env_resolves_through_root(self, monkeypatch):
+        """Env vars with connector-specific prefix resolve when connector_config
+        is passed as a dict (simulating YAML loading)."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        class RootWithFielded(ConnectorRootConfig):
+            connector_config: FieldedConfig
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        model = RootWithFielded(
+            api_key="ak",
+            connector_type="test_bot",
+            connector_config={},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=None,
+        )
+        assert model.connector_config.some_field == "from_env"
+
+    def test_connector_config_yaml_overrides_env(self, monkeypatch):
+        """Init kwargs (YAML) for connector_config fields take precedence over env."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        class RootWithFielded(ConnectorRootConfig):
+            connector_config: FieldedConfig
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        model = RootWithFielded(
+            api_key="ak",
+            connector_type="test_bot",
+            connector_config={"some_field": "from_yaml"},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=None,
+        )
+        assert model.connector_config.some_field == "from_yaml"
+
+
+class TestConnectorRootConfigGeneric:
+    """Tests for the generic ConnectorRootConfig[T] parametrization."""
+
+    @pytest.fixture
+    def base_kwargs(self):
+        return {
+            "api_key": "valid_key",
+            "connector_type": "dummy",
+            "fleet": [{"robot_id": "robot1"}, {"robot_id": "robot2"}],
+            "_env_file": None,
+        }
+
+    def test_generic_basic_construction(self, base_kwargs):
+        config = ConnectorRootConfig[DummyConfig](
+            **base_kwargs,
+            connector_config=DummyConfig(),
+        )
+        assert isinstance(config.connector_config, DummyConfig)
+        assert config.api_key == "valid_key"
+
+    def test_generic_annotation_resolves_to_concrete_type(self):
+        parametrized = ConnectorRootConfig[DummyConfig]
+        ann = parametrized.model_fields["connector_config"].annotation
+        assert ann is DummyConfig
+
+    def test_unparametrized_annotation_is_typevar(self):
+        ann = ConnectorRootConfig.model_fields["connector_config"].annotation
+        assert not isinstance(ann, type)
+
+    def test_generic_dict_connector_config_triggers_model_validator(self, base_kwargs):
+        """Dict passed as connector_config is instantiated via model validator."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        config = ConnectorRootConfig[FieldedConfig](
+            **{**base_kwargs, "connector_type": "test_bot"},
+            connector_config={"some_field": "from_dict"},
+        )
+        assert isinstance(config.connector_config, FieldedConfig)
+        assert config.connector_config.some_field == "from_dict"
+
+    def test_generic_env_var_resolution(self, monkeypatch, base_kwargs):
+        """Env vars resolve through generic parametrization (no subclass needed)."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        config = ConnectorRootConfig[FieldedConfig](
+            **{**base_kwargs, "connector_type": "test_bot"},
+            connector_config={},
+        )
+        assert config.connector_config.some_field == "from_env"
+
+    def test_generic_yaml_overrides_env(self, monkeypatch, base_kwargs):
+        """Init kwargs (YAML) take precedence over env for generic parametrization."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        config = ConnectorRootConfig[FieldedConfig](
+            **{**base_kwargs, "connector_type": "test_bot"},
+            connector_config={"some_field": "from_yaml"},
+        )
+        assert config.connector_config.some_field == "from_yaml"
+
+    def test_to_singular_config_preserves_generic_type(self, base_kwargs):
+        config = ConnectorRootConfig[DummyConfig](
+            **base_kwargs,
+            connector_config=DummyConfig(),
+        )
+        singular = config.to_singular_config("robot1")
+        assert len(singular.fleet) == 1
+        assert isinstance(singular.connector_config, DummyConfig)
+        assert type(singular) is type(config)
+
+    def test_generic_env_file_forwards_to_connector_config(self, tmp_path):
+        """_env_file passed to root is forwarded to nested connector_config."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n")
+        config = ConnectorRootConfig[FieldedConfig](
+            api_key="ak",
+            connector_type="test_bot",
+            connector_config={},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=str(env_file),
+        )
+        assert config.connector_config.some_field == "from_dotenv"
+
+    def test_generic_env_file_none_prevents_connector_config_dotenv(
+        self, tmp_path, monkeypatch
+    ):
+        """_env_file=None on root prevents nested config from reading dotenv."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "config").mkdir()
+        (tmp_path / "config" / ".env").write_text(
+            "INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n"
+        )
+        config = ConnectorRootConfig[FieldedConfig](
+            api_key="ak",
+            connector_type="test_bot",
+            connector_config={},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=None,
+        )
+        assert config.connector_config.some_field == "default"
+
+    def test_subclass_env_file_forwards_to_connector_config(self, tmp_path):
+        """_env_file forwarding works with the subclass pattern too."""
+
+        class FieldedConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        class RootWithFielded(ConnectorRootConfig):
+            connector_config: FieldedConfig
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n")
+        config = RootWithFielded(
+            api_key="ak",
+            connector_type="test_bot",
+            connector_config={},
+            fleet=[{"robot_id": "r1"}],
+            _env_file=str(env_file),
+        )
+        assert config.connector_config.some_field == "from_dotenv"
 
 
 class TestMapConfigBase:
@@ -390,8 +606,6 @@ class TestMetricsConfig:
         assert cfg.exporter_namespace == "inorbit_connector_v2"
 
     def test_exporter_namespace_accepts_none_for_auto_derive(self):
-        # None means setup_prometheus_metrics derives
-        # `inorbit_<connector_type>_connector` at install time.
         cfg = MetricsConfig(exporter_namespace=None)
         assert cfg.exporter_namespace is None
 
@@ -404,9 +618,7 @@ class TestMetricsConfig:
             MetricsConfig(extra_resource_attributes={"has-hyphen": "ok"})
 
     def test_extra_resource_attributes_accepts_valid_pairs(self):
-        cfg = MetricsConfig(
-            extra_resource_attributes={"site": "lab", "region": "us"}
-        )
+        cfg = MetricsConfig(extra_resource_attributes={"site": "lab", "region": "us"})
         assert cfg.extra_resource_attributes == {"site": "lab", "region": "us"}
 
     def test_discovery_dir_accepts_none(self):
@@ -415,12 +627,78 @@ class TestMetricsConfig:
         assert cfg.discovery_dir is None
 
 
+class TestConnectorSpecificConfig:
+    def test_env_prefix_derived_from_connector_type(self, monkeypatch):
+        class TestConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        config = TestConfig(_env_file=None)
+        assert config.some_field == "from_env"
+
+    def test_init_kwargs_override_env(self, monkeypatch):
+        class TestConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "from_env")
+        config = TestConfig(some_field="from_yaml", _env_file=None)
+        assert config.some_field == "from_yaml"
+
+    def test_field_default_when_no_env(self):
+        class TestConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        config = TestConfig(_env_file=None)
+        assert config.some_field == "default"
+
+    def test_env_prefix_uses_uppercase_connector_type(self, monkeypatch):
+        class TestConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "my_bot"
+            host: str = "localhost"
+
+        monkeypatch.setenv("INORBIT_MY_BOT_HOST", "192.168.1.1")
+        config = TestConfig(_env_file=None)
+        assert config.host == "192.168.1.1"
+
+    def test_unprefixed_env_var_ignored(self, monkeypatch):
+        class TestConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("SOME_FIELD", "should_not_match")
+        config = TestConfig(_env_file=None)
+        assert config.some_field == "default"
+
+    def test_dotenv_file_with_prefix(self, tmp_path):
+        class TestConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("INORBIT_TEST_BOT_SOME_FIELD=from_dotenv\n")
+        config = TestConfig(_env_file=str(env_file))
+        assert config.some_field == "from_dotenv"
+
+    def test_env_ignore_empty(self, monkeypatch):
+        class TestConfig(ConnectorSpecificConfig):
+            CONNECTOR_TYPE = "test_bot"
+            some_field: str = "default"
+
+        monkeypatch.setenv("INORBIT_TEST_BOT_SOME_FIELD", "")
+        config = TestConfig(_env_file=None)
+        assert config.some_field == "default"
+
+
 def test_connector_config_includes_metrics_with_default():
-    cfg = ConnectorConfig(
+    cfg = ConnectorRootConfig(
         api_key="ak",
         connector_type="test",
         connector_config=DummyConfig(),
         fleet=[{"robot_id": "r1"}],
+        _env_file=None,
     )
     assert isinstance(cfg.metrics, MetricsConfig)
     assert cfg.metrics.enabled is False
