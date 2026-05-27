@@ -19,7 +19,10 @@ except ImportError:
 # Third-party
 import pytz
 from inorbit_edge.models import CameraConfig
-from inorbit_edge.robot import INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
+from inorbit_edge.robot import (
+    INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL,
+    INORBIT_DEFAULT_API_URL,
+)
 from pydantic import (
     BaseModel,
     DirectoryPath,
@@ -297,8 +300,12 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
     Attributes:
         api_key (str | None, optional): The InOrbit API key. Required unless
             ``inorbit_robot_key`` is provided.
-        api_url (HttpUrl, optional): The URL of the API or inorbit_edge's
-                                     INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL by default
+        connection_config_url (HttpUrl, optional): The URL of the connection
+            config endpoint or inorbit_edge's INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
+            by default. Reads from ``INORBIT_CONNECTION_CONFIG_URL``.
+        api_url (HttpUrl, optional): The URL of the InOrbit REST API or
+            inorbit_edge's INORBIT_DEFAULT_API_URL by default. Reads from
+            ``INORBIT_API_URL``.
         connector_type (str): The type of connector
         connector_config (ConnectorSpecificConfig): Vendor-specific configuration
         use_websockets (bool, optional): If True, the underlying edge-sdk
@@ -336,8 +343,11 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
     )
 
     api_key: str | None = None
-    api_url: HttpUrl = Field(
+    connection_config_url: HttpUrl = Field(
         default=HttpUrl(INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL),
+    )
+    api_url: HttpUrl = Field(
+        default=HttpUrl(INORBIT_DEFAULT_API_URL),
     )
     connector_type: str
     connector_config: T

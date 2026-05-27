@@ -26,13 +26,11 @@ except ImportError:
 # Third Party
 from inorbit_edge.models import RobotSessionModel
 from inorbit_edge.robot import (
-    INORBIT_REST_API_URL,
     RobotSession,
     RobotSessionPool,
     RobotSessionFactory,
 )
 from inorbit_edge.video import OpenCVCamera
-from pydantic import HttpUrl
 
 # Optional dependency for connector system stats
 try:
@@ -169,17 +167,10 @@ class FleetConnector(ABC):
         # automatically loaded environment variables Robot-specific values (robot_id,
         # robot_name) have to be ommited after initalization before passing the config
         # to the factory.
-        # `rest_api_endpoint` is set explicitly: the SDK's default is a
-        # raw string into a `HttpUrl` field, which trips Pydantic's
-        # serializer warning on every `model_dump()` below. Constructing
-        # a `HttpUrl` here is a no-op for the runtime value but produces
-        # a typed default that serializes cleanly.
         robot_session_config = RobotSessionModel(
             api_key=config.api_key,
-            endpoint=config.api_url,
-            rest_api_endpoint=HttpUrl(
-                os.environ.get("INORBIT_REST_API_URL", INORBIT_REST_API_URL)
-            ),
+            endpoint=config.connection_config_url,
+            rest_api_endpoint=config.api_url,
             account_id=config.account_id,
             robot_key=config.inorbit_robot_key,
             robot_id="required_value",
