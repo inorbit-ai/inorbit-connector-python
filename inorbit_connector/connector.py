@@ -204,7 +204,7 @@ class FleetConnector(ABC):
         )
         metrics_active = setup_prometheus_metrics(
             config=config.metrics,
-            connector_type=config.connector_type,
+            connector_type=self._connector_type,
             connector_id=self._connector_id,
         )
         register_framework_gauges(
@@ -223,6 +223,17 @@ class FleetConnector(ABC):
         """Get the list of robot IDs in the fleet."""
         # Return the cached list of robot IDs
         return self.__robot_ids
+
+    @property
+    def _connector_type(self) -> str:
+        """Connector type identifier read from the ``CONNECTOR_TYPE`` class
+        variable on the ``connector_config`` subclass.
+
+        ``CONNECTOR_TYPE`` is the source of truth for the connector's identity.
+        ``ConnectorRootConfig._check_connector_type_matches_class_var`` guarantees
+        it equals ``config.connector_type``.
+        """
+        return type(self.config.connector_config).CONNECTOR_TYPE
 
     def update_fleet(self, fleet: list[RobotConfig]) -> None:
         """Update the robot fleet.
@@ -357,7 +368,7 @@ class FleetConnector(ABC):
 
         # Publish the connector type so the platform can identify the connector
         # driving this robot.
-        session.publish_key_values({"connector_type": self.config.connector_type})
+        session.publish_key_values({"connector_type": self._connector_type})
 
         return session
 

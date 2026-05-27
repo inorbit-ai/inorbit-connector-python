@@ -15,8 +15,8 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 
 - **`api_key`** (str | None): The InOrbit API key. Can be set via environment variable `INORBIT_API_KEY`. Required unless `inorbit_robot_key` is provided
 - **`api_url`** (HttpUrl): The URL of the InOrbit API endpoint. Defaults to InOrbit Cloud SDK URL. Can be set via environment variable `INORBIT_API_URL`
-- **`connector_type`** (str): A string identifier for your connector type (e.g., "example_bot"). This value is also automatically published to InOrbit as a robot key-value on session init. See [Automatic `connector_type` publishing](publishing.md#automatic-connector-type-publishing).
-- **`connector_config`** (ConnectorSpecificConfig): Your custom configuration model that inherits from `ConnectorSpecificConfig`. Set the `CONNECTOR_TYPE` class variable to get automatic env-var loading with prefix `INORBIT_{CONNECTOR_TYPE}_`
+- **`connector_type`** (str): Defensive load-time check that the configuration in hand was authored for this connector. Its only valid value is the `CONNECTOR_TYPE` declared by the parametrized `connector_config` subclass. A mismatch raises a `ValidationError` at construction time, surfacing wrong-YAML-for-wrong-connector mix-ups before any side effects happen.
+- **`connector_config`** (ConnectorSpecificConfig): Your custom configuration model that inherits from `ConnectorSpecificConfig`. The subclass's `CONNECTOR_TYPE` class variable is the source of truth for the connector's identity: it derives the automatic env-var loading prefix `INORBIT_{CONNECTOR_TYPE}_`, drives the metrics namespace and OpenTelemetry resource attribute, and is the value [auto-published as the `connector_type` robot key-value on session init](publishing.md#automatic-connector-type-publishing).
 - **`update_freq`** (float): Update frequency in Hz for the execution loop. Default is 1.0
 - **`location_tz`** (str): The timezone of the robot location (e.g., "America/Los_Angeles", "UTC"). Must be a valid pytz timezone
 - **`logging`** (LoggingConfig): Logging configuration (see below)
@@ -97,6 +97,26 @@ config = ConnectorRootConfig[MyConnectorConfig](**yaml_data)
 ```
 
 `ConnectorSpecificConfig` automatically loads environment variables with the prefix `INORBIT_{CONNECTOR_TYPE}_` and reads `config/.env`. For example, with `CONNECTOR_TYPE = "my_connector"`, setting `INORBIT_MY_CONNECTOR_API_VERSION=v2` will populate the `api_version` field.
+
+The `connector_type` field on `ConnectorRootConfig` must resolve to the same value as `CONNECTOR_TYPE` on the parametrized config class. Like any other `ConnectorRootConfig` field it can be supplied from init kwargs (typically a YAML file), the `INORBIT_CONNECTOR_TYPE` environment variable, or `config/.env`:
+
+```yaml
+# config.yaml. must match MyConnectorConfig.CONNECTOR_TYPE above
+connector_type: my_connector
+connector_config:
+  api_version: v2
+  hardware_revision: r3
+  custom_setting: something
+fleet:
+  - robot_id: robot-1
+```
+
+```bash
+# ...or via environment variable
+export INORBIT_CONNECTOR_TYPE=my_connector
+```
+
+If the resolved value does not match `CONNECTOR_TYPE`, `ConnectorRootConfig` raises a `ValidationError` at construction time.
 
 ## Configuration Files
 
