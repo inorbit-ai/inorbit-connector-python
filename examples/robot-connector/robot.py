@@ -98,6 +98,7 @@ class Robot:
         """Start the tasks that would fetch data from the robot."""
         self._run_in_loop(self._update_telemetry_data)
         self._run_in_loop(self._update_system_stats, frequency=2)
+        self._run_in_loop(self._update_robot_status, frequency=2)
 
     async def stop(self) -> None:
         """Stop the tasks that would fetch data from the robot."""
