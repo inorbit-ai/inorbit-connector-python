@@ -10,7 +10,7 @@ The framework ships an OpenTelemetry-based metrics subsystem that connectors can
 When `metrics.enabled = true` in your connector configuration, the framework starts a Prometheus HTTP server and exposes:
 
 Every framework metric is namespaced by `connector_type` at the source.
-With `connector_type="acme"` (set on `ConnectorConfig`), the four
+With `connector_type="acme"` (set on `ConnectorRootConfig`), the four
 framework signals come out as:
 
 | Metric | Type | Attributes | Meaning |

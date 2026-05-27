@@ -68,7 +68,8 @@ The table below lists package-defined symbols meant for direct use (call) or ext
 | Call | `Connector.publish_pose()` / `publish_map()` | Publish pose/map for the current robot (map handling included). | [Details](connector.md#spec-connector-connector-publishing) |
 | Call | `Connector.publish_odometry()` / `publish_key_values()` / `publish_system_stats()` | Publish telemetry for the current robot. `publish_system_stats()` defers publishing; defaults published if not called. | [Details](connector.md#spec-connector-connector-publishing) |
 | Call (advanced) | `Connector._get_session()` | Access the underlying Edge SDK `RobotSession` for the current robot. | [Details](connector.md#spec-connector-connector-get-session) |
-| Type | `ConnectorConfig` | Base configuration model for connectors. | [Details](models.md#spec-models-connectorconfig) |
+| Type | `ConnectorRootConfig` | Top-level configuration model for connectors (`BaseSettings`). | [Details](models.md#spec-models-connectorrootconfig) |
+| Type | `ConnectorSpecificConfig` | Base for per-connector vendor config; derives env prefix from `CONNECTOR_TYPE`. | [Details](models.md#spec-models-connectorspecificconfig) |
 | Type | `RobotConfig` | Per-robot configuration (robot_id + cameras). | [Details](models.md#spec-models-robotconfig) |
 | Type | `MapConfig` / `MapConfigTemp` | Map configuration (file-backed vs in-memory bytes) used by map publishing/fetching. | [Details](models.md#spec-models-mapconfig) |
 | Type | `LoggingConfig` / `LogLevels` | Logging configuration and log-level enum. | [Details](logging.md#spec-logging-loggingconfig) |

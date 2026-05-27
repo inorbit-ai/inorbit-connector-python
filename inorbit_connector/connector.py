@@ -56,7 +56,7 @@ from inorbit_connector.metrics import (
     setup_prometheus_metrics,
 )
 from inorbit_connector.models import (
-    ConnectorConfig,
+    ConnectorRootConfig,
     MapConfig,
     MapConfigTemp,
     RobotConfig,
@@ -73,11 +73,11 @@ class FleetConnector(ABC):
     See self.__init__() for more details.
     """
 
-    def __init__(self, config: ConnectorConfig, **kwargs) -> None:
+    def __init__(self, config: ConnectorRootConfig, **kwargs) -> None:
         """Initialize the base connector with common functionality.
 
         Args:
-            config (ConnectorConfig): The connector configuration
+            config (ConnectorRootConfig): The connector configuration
 
         Keyword Args:
             register_user_scripts (bool): Register user scripts automatically.
@@ -908,15 +908,15 @@ class Connector(FleetConnector, ABC):
     FleetConnector.__init__() for more details.
     """
 
-    def __init__(self, robot_id: str, config: ConnectorConfig, **kwargs) -> None:
+    def __init__(self, robot_id: str, config: ConnectorRootConfig, **kwargs) -> None:
         """Initialize a new InOrbit connector.
 
         This class handles bidirectional communication with InOrbit.
 
         Args:
             robot_id (str): The ID of the InOrbit robot
-            config (ConnectorConfig): The connector configuration. Pass a
-                `ConnectorConfig` with a `fleet` field containing robot
+            config (ConnectorRootConfig): The connector configuration. Pass a
+                `ConnectorRootConfig` with a `fleet` field containing robot
                 configurations. The one for the current robot will be selected
                 by the `robot_id` parameter.
 

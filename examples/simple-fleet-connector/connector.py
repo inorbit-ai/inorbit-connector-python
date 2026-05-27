@@ -17,69 +17,33 @@ try:
 except ImportError:
     from typing_extensions import override
 
-# Third-party
-from pydantic import field_validator, BaseModel
-
 # InOrbit
 from inorbit_connector.commands import CommandResultCode
 from inorbit_connector.connector import FleetConnector
-from inorbit_connector.models import ConnectorConfig
+from inorbit_connector.models import ConnectorRootConfig, ConnectorSpecificConfig
 from inorbit_connector.utils import read_yaml
 
 CONFIG_FILE = (
     Path(__file__).resolve().parent.parent / "example.fleet.yaml"
 )  # ../example.fleet.yaml
-CONNECTOR_TYPE = "example_bot"
 
 
-class ExampleBotConfig(BaseModel):
+class ExampleBotConfig(ConnectorSpecificConfig):
     """The configuration for the example bot.
 
     This is where you would define and validate additional custom fields for the fleet.
 
     Attributes:
-        example_bot_api_version (str): An example field for the API version of the fleet manager
+        example_bot_api_version (str): API version of the fleet manager
         example_bot_hw_rev (str): An example field for the HW revision of the fleet
         example_bot_custom_value (str): An example field for a custom value of the fleet
     """
 
+    CONNECTOR_TYPE = "example_bot"
+
     example_bot_api_version: str
     example_bot_hw_rev: str
     example_bot_custom_value: str
-
-
-class ExampleBotConnectorConfig(ConnectorConfig):
-    """The configuration for the example bot connector.
-
-    Each connector should create a class that inherits from ConnectorConfig.
-
-    Attributes:
-        connector_config (ExampleBotConfig): The config with custom fields for the fleet
-    """
-
-    connector_config: ExampleBotConfig
-
-    # noinspection PyMethodParameters
-    @field_validator("connector_type")
-    def check_connector_type(cls, connector_type: str) -> str:
-        """Validate the connector type.
-
-        This should always be equal to the pre-defined constant.
-
-        Args:
-            connector_type (str): The defined connector type passed in
-
-        Returns:
-            str: The validated connector type
-
-        Raises:
-            ValueError: If the connector type is not equal to the pre-defined constant
-        """
-        if connector_type != CONNECTOR_TYPE:
-            raise ValueError(
-                f"Expected connector type '{CONNECTOR_TYPE}' not '{connector_type}'"
-            )
-        return connector_type
 
 
 async def get_fleet_robot_data(robot_id: str) -> dict:
@@ -115,15 +79,17 @@ async def get_fleet_robot_data(robot_id: str) -> dict:
 class ExampleBotFleetConnector(FleetConnector):
     """The example bot fleet connector.
 
-    This demonstrates how to manage a fleet of robots using the FleetConnector base class.
-    It simulates fetching data from a fleet manager API and publishing data for multiple robots.
+    Demonstrates how to manage a fleet of robots using the
+    FleetConnector base class. Simulates fetching data from a fleet
+    manager API and publishing data for multiple robots.
 
     Args:
         robot_ids (list[str]): List of robot IDs in the fleet
-        config (ExampleBotConnectorConfig): The configuration for the connector
+        config (ConnectorRootConfig[ExampleBotConfig]):
+            The configuration for the connector
     """
 
-    def __init__(self, config: ExampleBotConnectorConfig) -> None:
+    def __init__(self, config: ConnectorRootConfig[ExampleBotConfig]) -> None:
         super().__init__(config)
 
         # Setup any other initialization things here
@@ -159,9 +125,9 @@ class ExampleBotFleetConnector(FleetConnector):
     async def _execution_loop(self) -> None:
         """The main execution loop for the fleet connector.
 
-        This demonstrates how to fetch data for multiple robots and publish it to InOrbit.
-        The key difference from single robot connectors is that we need to specify robot_id
-        for each publishing operation.
+        Fetches data for multiple robots and publishes to InOrbit.
+        Unlike single robot connectors, we specify robot_id for each
+        publishing operation.
         """
 
         # Fetch data for all robots concurrently
@@ -250,7 +216,7 @@ def main():
         yaml_data = read_yaml(CONFIG_FILE)
 
         # Create the connector configuration
-        config = ExampleBotConnectorConfig(**yaml_data)
+        config = ConnectorRootConfig[ExampleBotConfig](**yaml_data)
 
         # Extract robot IDs from the fleet configuration for logging purposes
         robot_ids = [robot.robot_id for robot in config.fleet]
