@@ -204,7 +204,7 @@ class FleetConnector(ABC):
         )
         metrics_active = setup_prometheus_metrics(
             config=config.metrics,
-            connector_type=config.connector_type,
+            connector_type=self._connector_type,
             connector_id=self._connector_id,
         )
         register_framework_gauges(
@@ -223,6 +223,17 @@ class FleetConnector(ABC):
         """Get the list of robot IDs in the fleet."""
         # Return the cached list of robot IDs
         return self.__robot_ids
+
+    @property
+    def _connector_type(self) -> str:
+        """Connector type identifier read from the ``CONNECTOR_TYPE`` class
+        variable on the ``connector_config`` subclass.
+
+        ``CONNECTOR_TYPE`` is the source of truth for the connector's identity.
+        ``ConnectorRootConfig._check_connector_type_matches_class_var`` guarantees
+        it equals ``config.connector_type``.
+        """
+        return type(self.config.connector_config).CONNECTOR_TYPE
 
     def update_fleet(self, fleet: list[RobotConfig]) -> None:
         """Update the robot fleet.
@@ -738,12 +749,16 @@ class FleetConnector(ABC):
     def publish_robot_key_values(self, robot_id: str, **kwargs) -> None:
         """Publish key values for a specific robot to InOrbit.
 
+        The ``connector_type`` key is injected automatically so the platform
+        can identify the connector driving each robot. Subclasses may override
+        it by passing their own ``connector_type`` keyword argument.
+
         Args:
             robot_id (str): The robot ID to publish key values for
             **kwargs: Key-value data
         """
         session = self._get_robot_session(robot_id)
-        session.publish_key_values(kwargs)
+        session.publish_key_values({"connector_type": self._connector_type, **kwargs})
 
     def publish_robot_system_stats(self, robot_id: str, **kwargs) -> None:
         """Store system stats for a specific robot to be published at the end of the

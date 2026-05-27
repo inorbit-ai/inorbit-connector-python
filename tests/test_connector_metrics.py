@@ -17,7 +17,7 @@ from inorbit_connector.models import (
 
 
 class _MinimalConnectorConfig(ConnectorSpecificConfig):
-    CONNECTOR_TYPE = "minimal"
+    CONNECTOR_TYPE = "test"
 
 
 class _MinimalConnector(FleetConnector):

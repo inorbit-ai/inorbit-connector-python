@@ -28,7 +28,7 @@ from pathlib import Path
 
 
 class DummyConfig(ConnectorSpecificConfig):
-    CONNECTOR_TYPE = "dummy"
+    CONNECTOR_TYPE = "valid_connector"
 
 
 class InvalidDummyConfig(IndexError):
@@ -246,6 +246,18 @@ class TestConnectorRootConfig:
         assert model.api_key == "valid_key"
         assert model.inorbit_robot_key == "valid_robot_key"
 
+    def test_connector_type_must_match_class_var(self, base_model):
+        """connector_type field must equal the connector_config's CONNECTOR_TYPE."""
+        init_input = {**base_model, "connector_type": "something_else"}
+        with pytest.raises(
+            ValidationError,
+            match=(
+                r"connector_type 'something_else' .* does not match "
+                r"CONNECTOR_TYPE 'valid_connector' declared by DummyConfig"
+            ),
+        ):
+            ConnectorRootConfig(**init_input, _env_file=None)
+
     def test_connector_config_env_resolves_through_root(self, monkeypatch):
         """Env vars with connector-specific prefix resolve when connector_config
         is passed as a dict (simulating YAML loading)."""
@@ -295,7 +307,7 @@ class TestConnectorRootConfigGeneric:
     def base_kwargs(self):
         return {
             "api_key": "valid_key",
-            "connector_type": "dummy",
+            "connector_type": "valid_connector",
             "fleet": [{"robot_id": "robot1"}, {"robot_id": "robot2"}],
             "_env_file": None,
         }
@@ -695,7 +707,7 @@ class TestConnectorSpecificConfig:
 def test_connector_config_includes_metrics_with_default():
     cfg = ConnectorRootConfig(
         api_key="ak",
-        connector_type="test",
+        connector_type="valid_connector",
         connector_config=DummyConfig(),
         fleet=[{"robot_id": "r1"}],
         _env_file=None,
