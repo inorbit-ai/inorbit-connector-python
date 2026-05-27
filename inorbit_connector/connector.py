@@ -758,9 +758,7 @@ class FleetConnector(ABC):
             **kwargs: Key-value data
         """
         session = self._get_robot_session(robot_id)
-        session.publish_key_values(
-            {"connector_type": self._connector_type, **kwargs}
-        )
+        session.publish_key_values({"connector_type": self._connector_type, **kwargs})
 
     def publish_robot_system_stats(self, robot_id: str, **kwargs) -> None:
         """Store system stats for a specific robot to be published at the end of the

@@ -331,13 +331,9 @@ class TestFleetConnector:
     ):
         """Subclass can override connector_type via kwargs."""
         robot_id = "TestRobot1"
-        base_fleet_connector.publish_robot_key_values(
-            robot_id, connector_type="custom"
-        )
+        base_fleet_connector.publish_robot_key_values(robot_id, connector_type="custom")
         session = base_fleet_connector._get_robot_session(robot_id)
-        session.publish_key_values.assert_called_with(
-            {"connector_type": "custom"}
-        )
+        session.publish_key_values.assert_called_with({"connector_type": "custom"})
 
     def test_publish_robot_system_stats_stores_stats(
         self, base_fleet_connector, mock_robot_session_pool
@@ -1014,9 +1010,7 @@ class TestConnector:
         """Subclass can override connector_type via kwargs."""
         base_connector.publish_key_values(connector_type="custom")
         session = base_connector._get_session()
-        session.publish_key_values.assert_called_with(
-            {"connector_type": "custom"}
-        )
+        session.publish_key_values.assert_called_with({"connector_type": "custom"})
 
     def test_publish_system_stats_stores_stats(
         self, base_connector, mock_robot_session_pool
