@@ -25,7 +25,6 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 - **`env_vars`** (dict[str, str]): Environment variables to be set in the connector or user scripts
 - **`fleet`** (list[RobotConfig]): List of robot configurations (see below)
 - **`user_scripts_dir`** (DirectoryPath | None): Path to directory containing user scripts for command execution
-- **`account_id`** (str | None): InOrbit account ID, required for publishing footprints
 - **`inorbit_robot_key`** (str | None): Robot key for InOrbit Connect robots. Required unless `api_key` is provided. See [API documentation](https://api.inorbit.ai/docs/index.html#operation/generateRobotKey)
 - **`metrics`** (MetricsConfig): Optional Prometheus metrics endpoint. Disabled by default. See [Metrics](usage/metrics) for the full guide and [`MetricsConfig`](#metricsconfig) for the field list.
 

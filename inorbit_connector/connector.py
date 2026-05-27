@@ -171,7 +171,6 @@ class FleetConnector(ABC):
             api_key=config.api_key,
             endpoint=config.connection_config_url,
             rest_api_endpoint=config.api_url,
-            account_id=config.account_id,
             robot_key=config.inorbit_robot_key,
             robot_id="required_value",
             robot_name="required_value",

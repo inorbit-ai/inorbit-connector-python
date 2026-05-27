@@ -319,8 +319,6 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
         logging (LoggingConfig, optional): The logging configuration
         user_scripts_dir (DirectoryPath | None, optional): The location of custom user
             scripts
-        account_id (str | None, optional): InOrbit account id, required for publishing
-            footprints
         inorbit_robot_key (str | None, optional): Robot key for InOrbit Connect robots.
             Required unless ``api_key`` is provided.
             See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
@@ -356,7 +354,6 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
     location_tz: str = DEFAULT_TIMEZONE
     logging: LoggingConfig = LoggingConfig()
     user_scripts_dir: DirectoryPath | None = None
-    account_id: str | None = None
     inorbit_robot_key: str | None = None
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
@@ -495,7 +492,7 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
             raise ValueError("Robot ids must be unique")
         return fleet
 
-    @field_validator("api_key", "account_id")
+    @field_validator("api_key")
     def check_whitespace(cls, value: str | None) -> str | None:
         """Check if the api_key contains whitespace.
 
