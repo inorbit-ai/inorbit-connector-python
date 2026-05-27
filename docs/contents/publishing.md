@@ -92,6 +92,25 @@ self.publish_key_values(
 )
 ```
 
+#### Automatic `connector_type` publishing
+
+Every call to `publish_key_values` / `publish_robot_key_values` automatically injects the `connector_type` key. The value comes from the `CONNECTOR_TYPE` class variable on the `ConnectorSpecificConfig` subclass — the source of truth — and is guaranteed by `ConnectorRootConfig` to match the `connector_type` declared in YAML. Subclasses may override the value by passing their own `connector_type` keyword argument.
+
+Exposing `connector_type` through InOrbit enables behavior driven by dynamic collections. For example, defining an account-level data source keyed on `connector_type` and configuring a dynamic collection based on it causes a tag to be created the first time a connector with a given type connects, and robots publishing that value are automatically tagged:
+
+```yaml
+apiVersion: v0.1
+kind: DataSourceDefinition
+metadata:
+  id: connector_type
+  scope: account
+spec:
+  label: Connector Type
+  source:
+    keyValue:
+      key: connector_type
+```
+
 ### System Stats
 
 **Single-Robot:**

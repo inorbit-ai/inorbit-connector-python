@@ -403,6 +403,33 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
             )
         return self
 
+    @model_validator(mode="after")
+    def _check_connector_type_matches_class_var(self) -> Self:
+        """Validate that ``connector_type`` matches the ``CONNECTOR_TYPE`` class
+        variable declared by the ``connector_config`` subclass.
+
+        ``CONNECTOR_TYPE`` is the source of truth for the connector's identity
+        (declared in code); the ``connector_type`` field on this model is a
+        defensive load-time check that the configuration being loaded was
+        authored for this connector. The two must agree.
+
+        Raises:
+            ValueError: If ``connector_type`` does not equal ``CONNECTOR_TYPE``.
+
+        Returns:
+            Self: The validated configuration instance.
+        """
+        config_cls = type(self.connector_config)
+        expected = config_cls.CONNECTOR_TYPE
+        if self.connector_type != expected:
+            raise ValueError(
+                f"connector_type '{self.connector_type}' in configuration does "
+                f"not match CONNECTOR_TYPE '{expected}' declared by "
+                f"{config_cls.__name__}. The configuration appears to target a "
+                "different connector."
+            )
+        return self
+
     def to_singular_config(self, robot_id: str) -> Self:
         """Filters out configurations not related to the given robot. The result is a
         config with a fleet field of length 1.
