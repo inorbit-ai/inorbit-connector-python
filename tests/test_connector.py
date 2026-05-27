@@ -315,16 +315,28 @@ class TestFleetConnector:
         session = base_fleet_connector._get_robot_session(robot_id)
         session.publish_key_values.assert_called()
 
-    def test_initialize_session_publishes_connector_type(
+    def test_publish_robot_key_values_injects_connector_type(
         self, base_fleet_connector, mock_robot_session_pool
     ):
-        """Session init publishes connector_type (from CONNECTOR_TYPE) as a KV
-        pair."""
+        """publish_robot_key_values injects connector_type automatically."""
         robot_id = "TestRobot1"
-        base_fleet_connector._FleetConnector__initialize_session(robot_id)
+        base_fleet_connector.publish_robot_key_values(robot_id, foo="bar")
         session = base_fleet_connector._get_robot_session(robot_id)
-        session.publish_key_values.assert_any_call(
-            {"connector_type": DummyConfig.CONNECTOR_TYPE}
+        session.publish_key_values.assert_called_with(
+            {"connector_type": DummyConfig.CONNECTOR_TYPE, "foo": "bar"}
+        )
+
+    def test_publish_robot_key_values_connector_type_overridable(
+        self, base_fleet_connector, mock_robot_session_pool
+    ):
+        """Subclass can override connector_type via kwargs."""
+        robot_id = "TestRobot1"
+        base_fleet_connector.publish_robot_key_values(
+            robot_id, connector_type="custom"
+        )
+        session = base_fleet_connector._get_robot_session(robot_id)
+        session.publish_key_values.assert_called_with(
+            {"connector_type": "custom"}
         )
 
     def test_publish_robot_system_stats_stores_stats(
@@ -986,15 +998,24 @@ class TestConnector:
         session = base_connector._get_session()
         session.publish_key_values.assert_called()
 
-    def test_initialize_session_publishes_connector_type(
+    def test_publish_key_values_injects_connector_type(
         self, base_connector, mock_robot_session_pool
     ):
-        """Session init publishes connector_type (from CONNECTOR_TYPE) as a KV
-        pair."""
-        base_connector._FleetConnector__initialize_session(base_connector.robot_id)
+        """publish_key_values injects connector_type automatically."""
+        base_connector.publish_key_values(foo="bar")
         session = base_connector._get_session()
-        session.publish_key_values.assert_any_call(
-            {"connector_type": DummyConfig.CONNECTOR_TYPE}
+        session.publish_key_values.assert_called_with(
+            {"connector_type": DummyConfig.CONNECTOR_TYPE, "foo": "bar"}
+        )
+
+    def test_publish_key_values_connector_type_overridable(
+        self, base_connector, mock_robot_session_pool
+    ):
+        """Subclass can override connector_type via kwargs."""
+        base_connector.publish_key_values(connector_type="custom")
+        session = base_connector._get_session()
+        session.publish_key_values.assert_called_with(
+            {"connector_type": "custom"}
         )
 
     def test_publish_system_stats_stores_stats(

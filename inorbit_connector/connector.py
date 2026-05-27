@@ -366,10 +366,6 @@ class FleetConnector(ABC):
                 session, self._inorbit_robot_command_handler
             )
 
-        # Publish the connector type so the platform can identify the connector
-        # driving this robot.
-        session.publish_key_values({"connector_type": self._connector_type})
-
         return session
 
     def __initialize_sessions(self) -> None:
@@ -753,12 +749,18 @@ class FleetConnector(ABC):
     def publish_robot_key_values(self, robot_id: str, **kwargs) -> None:
         """Publish key values for a specific robot to InOrbit.
 
+        The ``connector_type`` key is injected automatically so the platform
+        can identify the connector driving each robot. Subclasses may override
+        it by passing their own ``connector_type`` keyword argument.
+
         Args:
             robot_id (str): The robot ID to publish key values for
             **kwargs: Key-value data
         """
         session = self._get_robot_session(robot_id)
-        session.publish_key_values(kwargs)
+        session.publish_key_values(
+            {"connector_type": self._connector_type, **kwargs}
+        )
 
     def publish_robot_system_stats(self, robot_id: str, **kwargs) -> None:
         """Store system stats for a specific robot to be published at the end of the
