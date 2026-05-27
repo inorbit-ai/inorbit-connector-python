@@ -44,7 +44,6 @@ def test_read_yaml_returns_entire_file(_):
     assert result == expected
 
 
-
 @mock.patch("builtins.open", new_callable=mock.mock_open, read_data="")
 def test_read_yaml_returns_empty_dict_when_file_empty(_):
     result = utils.read_yaml("dummy.yaml")

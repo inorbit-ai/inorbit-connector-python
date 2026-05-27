@@ -8,11 +8,11 @@ Subclass `inorbit_connector.connector.FleetConnector` to manage multiple robots 
 ## Constructor
 
 ```python
-def __init__(self, config: ConnectorConfig, **kwargs) -> None
+def __init__(self, config: ConnectorRootConfig, **kwargs) -> None
 ```
 
 **Parameters:**
-- `config` (ConnectorConfig): The connector configuration containing the fleet
+- `config` (ConnectorRootConfig): The connector configuration containing the fleet
 
 **Keyword Arguments:**
 - `register_user_scripts` (bool): Automatically register user scripts. Default: `False`

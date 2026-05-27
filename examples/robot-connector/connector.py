@@ -17,7 +17,8 @@ from inorbit_connector.connector import Connector
 from inorbit_connector.models import MapConfigTemp
 
 # Local
-from datatypes import ExampleBotConnectorConfig
+from inorbit_connector.models import ConnectorRootConfig
+from datatypes import ExampleBotConfig
 from robot import Robot, ExampleBotAPIWrapper
 
 # Path to the example map image
@@ -36,10 +37,15 @@ class ExampleBotConnector(Connector):
 
     Args:
         robot_id (str): The ID of the InOrbit robot
-        config (ExampleBotConnectorConfig): The configuration for the connector
+        config (ConnectorRootConfig[ExampleBotConfig]):
+            The configuration for the connector
     """
 
-    def __init__(self, robot_id: str, config: ExampleBotConnectorConfig) -> None:
+    def __init__(
+        self,
+        robot_id: str,
+        config: ConnectorRootConfig[ExampleBotConfig],
+    ) -> None:
         super().__init__(robot_id, config)
 
         # Setup any other initialization things here

@@ -8,12 +8,12 @@ Subclass `inorbit_connector.connector.Connector` to create a connector for a sin
 ## Constructor
 
 ```python
-def __init__(self, robot_id: str, config: ConnectorConfig, **kwargs) -> None
+def __init__(self, robot_id: str, config: ConnectorRootConfig, **kwargs) -> None
 ```
 
 **Parameters:**
 - `robot_id` (str): The InOrbit robot ID
-- `config` (ConnectorConfig): The connector configuration
+- `config` (ConnectorRootConfig): The connector configuration
 
 **Keyword Arguments:**
 - `register_user_scripts` (bool): Automatically register user scripts. Default: `False`
