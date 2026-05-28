@@ -56,7 +56,7 @@ class TestConnectorRootConfig:
     def base_model(self):
         return {
             "api_key": "valid_key",
-            "api_url": "https://valid.com/",
+            "connection_config_url": "https://valid.com/",
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
             "fleet": [
@@ -68,7 +68,7 @@ class TestConnectorRootConfig:
     def test_with_valid_input(self, base_model):
         model = ConnectorRootConfig(**base_model, _env_file=None)
         assert model.api_key == base_model["api_key"]
-        assert str(model.api_url) == base_model["api_url"]
+        assert str(model.connection_config_url) == base_model["connection_config_url"]
         assert model.connector_type == base_model["connector_type"]
         assert isinstance(model.connector_config, DummyConfig)
         assert len(model.fleet) == 2
@@ -167,8 +167,8 @@ class TestConnectorRootConfig:
         )
         assert model.api_key == "env_valid_key"
 
-    def test_reads_api_url_from_env(self, monkeypatch):
-        monkeypatch.setenv("INORBIT_API_URL", "https://valid.env/")
+    def test_reads_connection_config_url_from_env(self, monkeypatch):
+        monkeypatch.setenv("INORBIT_CONNECTION_CONFIG_URL", "https://valid.env/")
         model = ConnectorRootConfig(
             api_key="valid_key",
             connector_type="valid_connector",
@@ -176,9 +176,9 @@ class TestConnectorRootConfig:
             fleet=[{"robot_id": "robot1"}],
             _env_file=None,
         )
-        assert str(model.api_url) == "https://valid.env/"
+        assert str(model.connection_config_url) == "https://valid.env/"
 
-    def test_api_url_default_when_no_env(self):
+    def test_connection_config_url_default_when_no_env(self):
         model = ConnectorRootConfig(
             api_key="valid_key",
             connector_type="valid_connector",
@@ -186,7 +186,18 @@ class TestConnectorRootConfig:
             fleet=[{"robot_id": "robot1"}],
             _env_file=None,
         )
-        assert str(model.api_url) == INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
+        assert str(model.connection_config_url) == INORBIT_CLOUD_SDK_ROBOT_CONFIG_URL
+
+    def test_reads_api_url_from_env(self, monkeypatch):
+        monkeypatch.setenv("INORBIT_API_URL", "https://custom-api.env/")
+        model = ConnectorRootConfig(
+            api_key="valid_key",
+            connector_type="valid_connector",
+            connector_config=DummyConfig(),
+            fleet=[{"robot_id": "robot1"}],
+            _env_file=None,
+        )
+        assert str(model.api_url) == "https://custom-api.env/"
 
     def test_api_key_none_with_robot_key(self):
         """api_key can be None when inorbit_robot_key provides authentication."""

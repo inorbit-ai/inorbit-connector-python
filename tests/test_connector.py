@@ -119,7 +119,7 @@ class TestFleetConnectorIsAbstract:
         connector = SubFleetConnector(
             ConnectorRootConfig(
                 api_key="valid_key",
-                api_url="https://valid.com/",
+                connection_config_url="https://valid.com/",
                 connector_type="valid_connector",
                 connector_config=DummyConfig(),
                 fleet=[
@@ -137,7 +137,7 @@ class TestFleetConnector:
     def base_model(self):
         return {
             "api_key": "valid_key",
-            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connection_config_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
         }
@@ -402,7 +402,7 @@ class TestFleetConnectorMapFetching:
     def base_model(self):
         return {
             "api_key": "valid_key",
-            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connection_config_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
         }
@@ -581,7 +581,7 @@ class TestFleetConnectorDeferredSystemStats:
     def base_model(self):
         return {
             "api_key": "valid_key",
-            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connection_config_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
         }
@@ -820,7 +820,7 @@ class TestConnectorIsAbstract:
             "TestRobot",
             ConnectorRootConfig(
                 api_key="valid_key",
-                api_url="https://valid.com/",
+                connection_config_url="https://valid.com/",
                 connector_type="valid_connector",
                 connector_config=DummyConfig(),
                 fleet=[RobotConfig(robot_id="TestRobot")],
@@ -836,7 +836,7 @@ class TestConnector:
     def base_model(self):
         return {
             "api_key": "valid_key",
-            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connection_config_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
         }
@@ -1136,7 +1136,7 @@ class TestConnectorCommandHandler:
     def base_model(self):
         return {
             "api_key": "valid_key",
-            "api_url": AnyHttpUrl("https://valid.com/"),
+            "connection_config_url": AnyHttpUrl("https://valid.com/"),
             "connector_type": "valid_connector",
             "connector_config": DummyConfig(),
         }
