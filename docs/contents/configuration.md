@@ -14,7 +14,8 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 ### Key Fields
 
 - **`api_key`** (str | None): The InOrbit API key. Can be set via environment variable `INORBIT_API_KEY`. Required unless `inorbit_robot_key` is provided
-- **`api_url`** (HttpUrl): The URL of the InOrbit API endpoint. Defaults to InOrbit Cloud SDK URL. Can be set via environment variable `INORBIT_API_URL`
+- **`connection_config_url`** (HttpUrl): The URL of the connection config endpoint. Defaults to the InOrbit Cloud SDK URL. Can be set via the environment variable `INORBIT_CONNECTION_CONFIG_URL`
+- **`api_url`** (HttpUrl): The URL of the InOrbit REST API. Defaults to `https://api.inorbit.ai`. Can be set via the environment variable `INORBIT_API_URL`
 - **`connector_type`** (str): Defensive load-time check that the configuration in hand was authored for this connector. Its only valid value is the `CONNECTOR_TYPE` declared by the parametrized `connector_config` subclass. A mismatch raises a `ValidationError` at construction time, surfacing wrong-YAML-for-wrong-connector mix-ups before any side effects happen.
 - **`connector_config`** (ConnectorSpecificConfig): Your custom configuration model that inherits from `ConnectorSpecificConfig`. The subclass's `CONNECTOR_TYPE` class variable is the source of truth for the connector's identity: it derives the automatic env-var loading prefix `INORBIT_{CONNECTOR_TYPE}_`, drives the metrics namespace and OpenTelemetry resource attribute, and is [automatically published as a key-value](publishing.md#automatic-connector-type-publishing).
 - **`update_freq`** (float): Update frequency in Hz for the execution loop. Default is 1.0
@@ -24,7 +25,6 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 - **`env_vars`** (dict[str, str]): Environment variables to be set in the connector or user scripts
 - **`fleet`** (list[RobotConfig]): List of robot configurations (see below)
 - **`user_scripts_dir`** (DirectoryPath | None): Path to directory containing user scripts for command execution
-- **`account_id`** (str | None): InOrbit account ID, required for publishing footprints
 - **`inorbit_robot_key`** (str | None): Robot key for InOrbit Connect robots. Required unless `api_key` is provided. See [API documentation](https://api.inorbit.ai/docs/index.html#operation/generateRobotKey)
 - **`metrics`** (MetricsConfig): Optional Prometheus metrics endpoint. Disabled by default. See [Metrics](usage/metrics) for the full guide and [`MetricsConfig`](#metricsconfig) for the field list.
 
@@ -33,7 +33,8 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 `ConnectorRootConfig` is a pydantic-settings `BaseSettings` subclass. Environment variables with the `INORBIT_` prefix are resolved at instantiation time (not import time) and `config/.env` is read automatically. Init kwargs (e.g. from YAML) take precedence over env vars.
 
 - **`INORBIT_API_KEY`**: The InOrbit API key. Required unless `inorbit_robot_key` is provided
-- **`INORBIT_API_URL`** (optional): The InOrbit API endpoint URL
+- **`INORBIT_CONNECTION_CONFIG_URL`** (optional): The connection configuration endpoint URL
+- **`INORBIT_API_URL`** (optional): The InOrbit REST API URL
 
 When `connector_config` is passed as a dict (e.g. from YAML), the `_env_file` override is forwarded to the nested `ConnectorSpecificConfig` constructor. Passing `_env_file=None` to `ConnectorRootConfig` disables dotenv reading for both root and connector-specific fields.
 

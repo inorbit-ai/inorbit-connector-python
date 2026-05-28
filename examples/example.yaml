@@ -19,8 +19,6 @@ logging:
 connector_type: example_bot
 # Update rate of the connector's main execution loop in Hz
 update_freq: 1.0
-# The ID of the InOrbit account that owns the robots (optional, required for use of footprints)
-account_id: my_inorbit_account
 # Robot key for InOrbit Connect robots (optional, delete if unused)
 # See https://api.inorbit.ai/docs/index.html#operation/generateRobotKey
 inorbit_robot_key:
