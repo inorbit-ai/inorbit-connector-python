@@ -69,7 +69,7 @@ for robot_id in self.robot_ids:
 
 ### Updating the Fleet
 
-`update_fleet()` reconciles the connector's live fleet to exactly the list you pass: it creates and connects a session for each newly added robot (registering its cameras, command handler and online-status callback) and disconnects and frees the session of each robot that is no longer present. It is idempotent — robots already in the fleet are left untouched.
+`update_fleet()` reconciles the connector's live fleet to exactly the list you passed. It creates and connects a session for each newly added robot, and disconnects and frees the session of each robot that is no longer present. Robots already in the fleet are left untouched.
 
 This makes it the entry point both for **initial provisioning** (declaring the fleet from fleet-manager data instead of hardcoded config) and for **runtime autodiscovery**:
 
@@ -210,4 +210,3 @@ The lifecycle methods are the same as single-robot connectors:
 - **Simple fleet connector**: [examples/simple-fleet-connector/connector.py](https://github.com/inorbit-ai/inorbit-connector-python/blob/main/examples/simple-fleet-connector/connector.py)
 - **Fleet connector (CLI)**: [examples/fleet-connector/](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/fleet-connector)
 - **Examples index**: [examples/README.md](https://github.com/inorbit-ai/inorbit-connector-python/blob/main/examples/README.md)
-
