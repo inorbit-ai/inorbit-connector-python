@@ -158,6 +158,11 @@ class MetricsConfig(BaseModel):
     ``service.instance.id``, ``service.version``, ``inorbit.connector.type``,
     ``inorbit.connector.id``, plus any key/value from
     ``extra_resource_attributes``.
+
+    The wire-level metric prefix is always ``inorbit_connector``; the
+    connector type is exposed as the ``inorbit.connector.type`` Resource
+    attribute, not as part of the metric name. This is intentional — see
+    :mod:`inorbit_connector.metrics` for the rationale.
     """
 
     enabled: bool = False
@@ -166,20 +171,7 @@ class MetricsConfig(BaseModel):
     advertise_host: Optional[str] = None
     discovery_dir: Optional[Path] = Path("/var/run/inorbit-metrics")
     connector_id: Optional[str] = None
-    exporter_namespace: Optional[str] = None
     extra_resource_attributes: dict[str, str] = {}
-
-    @field_validator("exporter_namespace")
-    @classmethod
-    def _validate_exporter_namespace(cls, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        if not _METRICS_IDENTIFIER_RE.fullmatch(value):
-            raise ValueError(
-                "exporter_namespace must match [A-Za-z_][A-Za-z0-9_]* "
-                "(no hyphens, no leading digit) for GCP/Prometheus compatibility"
-            )
-        return value
 
     @field_validator("extra_resource_attributes")
     @classmethod

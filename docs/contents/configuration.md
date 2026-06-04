@@ -75,8 +75,9 @@ Optional Prometheus metrics endpoint. When `enabled` is `false` (the default) no
 - **`advertise_host`** (str | None): Hostname written to the discovery file. Defaults to `socket.gethostname()`
 - **`discovery_dir`** (Path | None): Directory where the connector writes a Prometheus `file_sd`-format JSON file describing its endpoint. Auto-created. Default is `/var/run/inorbit-metrics`. Set to `null` (in YAML) / `None` (in Python) to skip writing the discovery file when the scraper already knows the connector's host and port.
 - **`connector_id`** (str | None): Unique-per-host identifier. Used as the OTEL `service.instance.id` resource attribute and as the discovery filename. Defaults to `socket.gethostname()`
-- **`exporter_namespace`** (str): Prefix prepended to every Prometheus metric name. ASCII identifier (no hyphens). Default is `"inorbit_connector"`
 - **`extra_resource_attributes`** (dict[str, str]): Static OTEL Resource attributes added to every metric (low-cardinality only). Default is `{}`
+
+The wire-level metric prefix is always `inorbit_connector`. The connector type rides on every metric as the `inorbit.connector.type` Resource attribute, not as part of the metric name.
 
 (creating-a-custom-configuration)=
 ## Creating a Custom Configuration

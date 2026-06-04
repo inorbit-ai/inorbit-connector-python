@@ -85,8 +85,9 @@ When `enabled` is `false` (the default), no server is started and all instrument
 | `advertise_host` | `socket.gethostname()` | Hostname written to the discovery file. |
 | `discovery_dir` | `/var/run/inorbit-metrics` | Auto-created on start. Set to `null` to skip writing a discovery file. |
 | `connector_id` | `socket.gethostname()` | Used as `service.instance.id` and as the discovery filename. |
-| `exporter_namespace` | `None` (auto: `inorbit_<connector_type>_connector`) | Prefix prepended to every Prometheus metric name. ASCII / no hyphens. Set explicitly only to override the auto-derived value. |
 | `extra_resource_attributes` | `{}` | Added to every metric as OTEL Resource attributes (low-cardinality only). |
+
+The wire-level metric prefix is always `inorbit_connector`. The connector type rides on every metric as the `inorbit.connector.type` Resource attribute (a Prometheus label), not as part of the metric name — cross-connector aggregation works on a single descriptor per metric.
 
 ## Adding metrics to your connector
 
@@ -96,9 +97,9 @@ For domain metrics, use the SDK helpers directly. The connector framework impose
 
 ```python
 # my_connector/metrics.py
-from inorbit_edge.metrics import get_meter
+from inorbit_connector.metrics import get_connector_meter
 
-meter = get_meter("inorbit_my_connector")
+meter = get_connector_meter("acme")   # match your connector_type
 
 api_requests = meter.create_counter(
     "api.requests", unit="1", description="Calls to the device API",
@@ -108,16 +109,20 @@ api_errors = meter.create_counter(
 )
 ```
 
-The same module-level pattern the SDK uses for its own counters. `get_meter` returns a real OTEL `Meter` when telemetry deps are installed (always the case via `inorbit-edge[telemetry]`), or a no-op `Meter` otherwise.
+Module-level declaration, same pattern the SDK uses for its own counters. `get_connector_meter` wraps an OTEL `Meter` so every instrument name is automatically prefixed with `<connector_type>.` — `api.requests` above is created on the underlying meter as `acme.api.requests` and exports on the wire as `inorbit_connector_acme_api_requests_total`.
 
-#### Naming rule: don't repeat the namespace in instrument names
+#### Naming rule: don't repeat the connector type in instrument names
 
-`exporter_namespace` is prepended to every metric on export — for a connector with `connector_type="acme"`, the framework derives `inorbit_acme_connector`, so `api.requests` above surfaces as `inorbit_acme_connector_api_requests_total` on `/metrics`. Don't add the namespace to the instrument name yourself — the meter name is decorative (it surfaces only as `instrumentation_scope`); the instrument name is the metric.
+The wrapper adds the prefix structurally; doing it again duplicates it on the wire.
 
-- ✅ `meter.create_counter("api.requests", ...)` → `inorbit_acme_connector_api_requests_total`
-- ❌ `meter.create_counter("inorbit.acme.connector.api.requests", ...)` → `inorbit_acme_connector_inorbit_acme_connector_api_requests_total`
+- ✅ `meter.create_counter("api.requests", ...)` → `inorbit_connector_acme_api_requests_total`
+- ❌ `meter.create_counter("acme.api.requests", ...)` → `inorbit_connector_acme_acme_api_requests_total`
 
 A double-prefixed wire name can only be cleaned up by a collector-side `metric_relabel_configs` rule that rewrites `__name__`. Those rewrites strip the Prometheus `# TYPE` line, so the metric arrives at the OTEL pipeline as `UNKNOWN` and is exported as a Gauge regardless of its real type. Downstream metric stores that pin descriptor kind on first write (GCP Cloud Monitoring, for example) then silently drop later writes of the correct type.
+
+#### Upstream HTTP calls: use the canonical helpers
+
+The framework ships `record_upstream_http_request()` / `record_upstream_http_error()` in `inorbit_connector.metrics.http` plus `EndpointMapper` / `PathTemplater` for endpoint normalization. Do not roll your own request/error counters — call the helpers instead, with `vendor=<your connector_type>`. See the SKILL.md in the inorbit-connector-developer skill for the full pattern.
 
 ### Step 2 — Instrument calls
 
