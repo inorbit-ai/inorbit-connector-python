@@ -22,13 +22,14 @@ particular). Each addresses a failure mode that produces sparse data
 with no clear error in the collector log.
 
 > **Note on descriptor isolation.** A separate "one `metric.prefix` per
-> connector type" rule used to live here. The framework now derives a
-> per-connector-type prefix at the source
-> (`inorbit_<connector_type>_connector_*`), so two connectors built on
-> this framework can never share a downstream metric descriptor and the
-> operator no longer picks a prefix per vendor. `connector_type` is also
-> surfaced as a series-key label so cross-vendor queries work without
-> inspecting metric names.
+> connector type" rule used to live here. The framework now emits every
+> metric under a single constant wire prefix (`inorbit_connector_*`) and
+> rides the connector type on every series as the
+> `inorbit_connector_type` Prometheus label (sourced from the
+> `inorbit.connector.type` Resource attribute). Cross-vendor queries
+> work without inspecting metric names — a single descriptor per metric
+> covers every connector. Per-process isolation is provided by the
+> `inorbit_connector_id` label (from `service.instance.id`).
 
 ### Rule 1 — Don't rewrite `__name__` in `metric_relabel_configs`
 

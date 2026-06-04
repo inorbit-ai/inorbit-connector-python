@@ -64,17 +64,21 @@ exporters:
   googlecloud:
     project: ${env:GOOGLE_CLOUD_PROJECT}
     metric:
-      # One shared prefix for every connector type. Descriptor isolation
-      # is guaranteed by the per-connector_type metric NAME prefix that
-      # the framework derives at the source (inorbit_<type>_connector_*),
-      # so the operator no longer picks a prefix per vendor.
+      # One shared prefix for every connector type. The framework emits
+      # every metric under the constant `inorbit_connector_*` wire name;
+      # the connector type rides as the `inorbit.connector.type` Resource
+      # attribute (lifted to a Prometheus / Cloud Monitoring label below).
+      # Per-process isolation comes from `inorbit.connector.id`
+      # (= service.instance.id), unique per connector process per host.
       prefix: workload.googleapis.com/
-      # connector_type is exported as a series-key label too, so a single
-      # query can slice across connector types ("all robots offline for
-      # customer=acme") AND drill into one ("MIR fleet only").
+      # Lift the framework Resource attributes onto every series as labels,
+      # so a single query can slice across connector types ("all robots
+      # offline for customer=acme") AND drill into one ("MIR fleet only").
+      # Resource-attribute names use dots; the regex matches the OTLP key.
       resource_filters:
         - regex: ^customer$
-        - regex: ^connector_type$
+        - regex: ^inorbit\.connector\.type$
+        - regex: ^inorbit\.connector\.id$
     # Default 12s is too aggressive given hourly OAuth-refresh reconnect
     # windows; dials get canceled mid-handshake at 12s.
     timeout: 30s

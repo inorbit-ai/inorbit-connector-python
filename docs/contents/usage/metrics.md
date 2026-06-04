@@ -9,51 +9,57 @@ The framework ships an OpenTelemetry-based metrics subsystem that connectors can
 
 When `metrics.enabled = true` in your connector configuration, the framework starts a Prometheus HTTP server and exposes:
 
-Every framework metric is namespaced by `connector_type` at the source.
-With `connector_type="acme"` (set on `ConnectorRootConfig`), the four
-framework signals come out as:
+Every framework metric uses the constant `inorbit_connector` wire prefix.
+The connector type is NOT part of the metric name — it rides on every
+series as the `inorbit_connector_type` Prometheus label (sourced from the
+`inorbit.connector.type` OpenTelemetry Resource attribute). One descriptor
+per metric covers every connector type; cross-type aggregation works
+without metric-name fan-out.
 
 | Metric | Type | Attributes | Meaning |
 |---|---|---|---|
-| `inorbit_acme_connector_up` | Gauge | — | 1 while the connector's main thread is alive |
-| `inorbit_acme_connector_session_connected` | Gauge | `robot_id` | 1 when the per-robot MQTT session to InOrbit is connected. Catches the "process running but robot offline" failure mode where MQTT drops and reconnect fails |
-| `inorbit_acme_connector_execution_loop_ticks_total` | Counter | — | Successful iterations of `_execution_loop` |
-| `inorbit_acme_connector_execution_loop_errors_total` | Counter | — | Exceptions caught in the run loop |
+| `inorbit_connector_up` | Gauge | — | 1 while the connector's main thread is alive |
+| `inorbit_connector_session_connected` | Gauge | `robot_id` | 1 when the per-robot MQTT session to InOrbit is connected. Catches the "process running but robot offline" failure mode where MQTT drops and reconnect fails |
+| `inorbit_connector_execution_loop_ticks_total` | Counter | — | Successful iterations of `_execution_loop` |
+| `inorbit_connector_execution_loop_errors_total` | Counter | — | Exceptions caught in the run loop |
 
-Plus the per-robot publish counters that come from the SDK (same
-namespacing):
+Plus the canonical upstream-HTTP family (recorded whenever you call the
+helpers in `inorbit_connector.metrics.http`) and the per-robot publish
+counters that come from the SDK:
 
 | Metric | Attributes | Meaning |
 |---|---|---|
-| `inorbit_acme_connector_calls_publish_pose_total` | `robot_id` | Calls to `publish_pose` |
-| `inorbit_acme_connector_calls_publish_odometry_total` | `robot_id` | Calls to `publish_odometry` |
-| `inorbit_acme_connector_calls_publish_key_values_total` | `robot_id` | Calls to `publish_key_values` |
-| `inorbit_acme_connector_calls_publish_system_stats_total` | `robot_id` | Calls to `publish_system_stats` |
-| `inorbit_acme_connector_calls_publish_map_total` | `robot_id` | Calls to `publish_map` |
-| `inorbit_acme_connector_calls_publish_camera_frame_total` | `robot_id` | Calls to `publish_camera_frame` |
-| `inorbit_acme_connector_calls_publish_lasers_total` | `robot_id` | Calls to `publish_lasers` / `publish_laser` |
-| `inorbit_acme_connector_calls_publish_path_total` | `robot_id` | Calls to `publish_path` |
+| `inorbit_connector_upstream_http_requests_total` | `vendor`, `method`, `endpoint` | Successful upstream HTTP calls |
+| `inorbit_connector_upstream_http_errors_total` | `vendor`, `method`, `endpoint`, `error_kind` | Failed upstream HTTP calls |
+| `inorbit_connector_upstream_http_duration_seconds_*` | `vendor`, `method`, `endpoint` | Latency histogram of upstream calls (both paths) |
+| `calls_publish_pose_total` | `robot_id` | Calls to `publish_pose` |
+| `calls_publish_odometry_total` | `robot_id` | Calls to `publish_odometry` |
+| `calls_publish_key_values_total` | `robot_id` | Calls to `publish_key_values` |
+| `calls_publish_system_stats_total` | `robot_id` | Calls to `publish_system_stats` |
+| `calls_publish_map_total` | `robot_id` | Calls to `publish_map` |
+| `calls_publish_camera_frame_total` | `robot_id` | Calls to `publish_camera_frame` |
+| `calls_publish_lasers_total` | `robot_id` | Calls to `publish_lasers` / `publish_laser` |
+| `calls_publish_path_total` | `robot_id` | Calls to `publish_path` |
 
-The per-connector-type prefix means descriptors in any downstream metric
-store are isolated by connector type — two connectors built on this
-framework never collide. To query across connector types, use a wildcard
-(`inorbit_*_connector_*`) and rely on the `connector_type` label
-attached automatically.
+Every series also carries the `inorbit_connector_id` label (one value per process, sourced from `service.instance.id`), so two connectors on the same host never collide on `(metric, labels)` even though they share the wire prefix.
 
 These signals are usually enough for an MVP alerting setup:
 
 ```promql
-# Process is dead or scrape failing — across every connector type
-inorbit_.*_connector_up == 0
+# Process is dead or scrape failing — covers every connector type
+inorbit_connector_up == 0
 
 # Process is up but its MQTT link to InOrbit is down (robot appears offline)
-inorbit_.*_connector_session_connected == 0
+inorbit_connector_session_connected == 0
 
-# Process is up but not progressing
-rate(inorbit_acme_connector_execution_loop_ticks_total[5m]) == 0
+# Process is up but not progressing — slice by connector type if needed
+rate(inorbit_connector_execution_loop_ticks_total[5m]) == 0
 
 # Process is up but erroring
-rate(inorbit_acme_connector_execution_loop_errors_total[5m]) > 0
+rate(inorbit_connector_execution_loop_errors_total[5m]) > 0
+
+# Same query, scoped to one connector type
+rate(inorbit_connector_execution_loop_errors_total{inorbit_connector_type="acme"}[5m]) > 0
 ```
 
 ## Enabling metrics
