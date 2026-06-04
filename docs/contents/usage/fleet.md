@@ -91,31 +91,17 @@ async def _connect(self) -> None:
 For targeted, event-driven changes (e.g. a robot joining or leaving the fleet while the connector runs), use `add_robot()` and `remove_robot()`:
 
 ```python
-# A robot appeared — create and connect its session immediately
+# A robot appeared: create and connect its session immediately
 self.add_robot(RobotConfig(robot_id="robot-42", cameras=[]))
 
-# A robot left — disconnect and free its session, clearing its state
+# A robot left: disconnect and free its session, clearing its state
 self.remove_robot("robot-42")
 ```
 
-A typical autodiscovery loop diffs the fleet manager's current robot set against `self.robot_ids`:
-
-```python
-@override
-async def _execution_loop(self) -> None:
-    discovered = set(await self._fleet_manager.fetch_robot_list())
-    current = set(self.robot_ids)
-    for robot_id in discovered - current:
-        self.add_robot(RobotConfig(robot_id=robot_id))
-    for robot_id in current - discovered:
-        self.remove_robot(robot_id)
-    ...  # publish data for self.robot_ids
-```
-
 :::{note}
-- These methods create or destroy sessions **immediately**, so call them once the connector is connecting or running (from `_connect()` onward), not before `start()`.
+- These methods create or destroy sessions **immediately**. They should be called once the connector is connecting or running (from `_connect()` onwards), not before `start()`.
 - `add_robot()` raises `ValueError` on a duplicate `robot_id`; `remove_robot()` is a no-op (logs a warning) for an unknown id, so it is safe to call from a discovery loop that may fire repeatedly.
-- The fleet may shrink to zero robots at runtime; the execution loop simply idles until robots are discovered again. (The loaded configuration still requires at least one robot at startup.)
+- The fleet may shrink to zero robots at runtime; the execution loop simply idles until robots are discovered again.
 - A robot present in both the old and new fleet is treated as unchanged even if its `RobotConfig` differs (e.g. its cameras changed). To apply a changed config to a running robot, call `remove_robot()` then `add_robot()`.
 - These methods are thread-safe and may be called from the execution loop, a command handler, or any other thread.
 :::
