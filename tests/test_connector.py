@@ -842,9 +842,7 @@ class TestFleetConnectorRuntimeFleet:
         assert "R3" in self._sessions(fleet_connector)
         mock_robot_session_pool.get_session.assert_any_call("R3", robot_name="R3")
 
-    def test_add_robot_duplicate_raises(
-        self, fleet_connector, mock_robot_session_pool
-    ):
+    def test_add_robot_duplicate_raises(self, fleet_connector, mock_robot_session_pool):
         mock_robot_session_pool.get_session.reset_mock()
         with pytest.raises(ValueError):
             fleet_connector.add_robot(RobotConfig(robot_id="TestRobot1"))
@@ -870,9 +868,7 @@ class TestFleetConnectorRuntimeFleet:
             "TestRobot1"
             not in fleet_connector._FleetConnector__last_published_frame_ids
         )
-        assert (
-            "TestRobot1" not in fleet_connector._FleetConnector__pending_system_stats
-        )
+        assert "TestRobot1" not in fleet_connector._FleetConnector__pending_system_stats
 
     def test_remove_robot_unknown_is_noop(
         self, fleet_connector, mock_robot_session_pool, caplog
