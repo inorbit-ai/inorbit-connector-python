@@ -64,13 +64,26 @@ exporters:
   googlecloud:
     project: ${env:GOOGLE_CLOUD_PROJECT}
     metric:
-      # One shared prefix for every connector type. The framework emits
-      # every metric under the constant `inorbit_connector_*` wire name;
-      # the connector type rides as the `inorbit.connector.type` Resource
-      # attribute (lifted to a Prometheus / Cloud Monitoring label below).
-      # Per-process isolation comes from `inorbit.connector.id`
-      # (= service.instance.id), unique per connector process per host.
-      prefix: workload.googleapis.com/
+      # Descriptors are created under the `prometheus.googleapis.com/`
+      # prefix so Cloud Monitoring registers them as the PROMETHEUS metric
+      # type, not Custom. That lifts the per-descriptor caps from 30 to
+      # 200 labels and from 10K to 25K descriptors per project — without
+      # this, descriptor exhaustion is the practical ceiling on fleet
+      # growth across connector types.
+      #
+      # Naming model on the wire: every framework metric exports under the
+      # constant `inorbit_connector_*` wire name; the connector type rides
+      # as the `inorbit.connector.type` Resource attribute (lifted to a
+      # Prometheus / Cloud Monitoring label below). Per-process isolation
+      # comes from `inorbit.connector.id` (= service.instance.id), unique
+      # per connector process per host.
+      #
+      # Note: with the upstream `googlecloud` exporter, this prefix selects
+      # the Prometheus descriptor type only when the project is configured
+      # for Managed Service for Prometheus. If you are on plain Cloud
+      # Monitoring, swap this exporter for `googlemanagedprometheus`
+      # (same descriptor target, fewer config knobs).
+      prefix: prometheus.googleapis.com/
       # Lift the framework Resource attributes onto every series as labels,
       # so a single query can slice across connector types ("all robots
       # offline for customer=acme") AND drill into one ("MIR fleet only").

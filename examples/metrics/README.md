@@ -7,7 +7,12 @@ SPDX-License-Identifier: MIT
 
 This directory holds a reference setup for collecting metrics from one or more
 `inorbit-connector` containers on a single host and forwarding them to GCP
-Cloud Monitoring.
+Cloud Monitoring **as the Prometheus descriptor type** (`prometheus.googleapis.com/...`
+prefix). The Prometheus type lifts the per-descriptor caps to **200 labels**
+and **25K descriptors per project**, versus 30 / 10K on the Custom type — the
+latter is the practical ceiling on fleet growth across connector types and is
+why the `custom.googleapis.com/` / `workload.googleapis.com/` route is not
+used here.
 
 It is intentionally an **example**, not a turn-key deployment: ports,
 hostnames, exporters, and credential mounts will all need to be adjusted for
@@ -170,9 +175,10 @@ For the connector configuration reference and metric catalog, see the
   ```
   Look for `Scrape iteration` entries referring to your connector targets.
 
-- In GCP Cloud Monitoring, under Custom Metrics, look for
-  `workload.googleapis.com/<vendor>_connector/*` series (using whichever
-  `metric.prefix` you set in the exporter — see Rule 1 above).
+- In GCP Cloud Monitoring, under **Prometheus** metrics, look for
+  `prometheus.googleapis.com/inorbit_connector_*` series. They all
+  share the constant `inorbit_connector_*` wire prefix; slice by the
+  `inorbit_connector_type` label to drill into one vendor.
 
 ## Host-networking alternative
 
