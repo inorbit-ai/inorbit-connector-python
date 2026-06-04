@@ -91,7 +91,7 @@ The wire-level metric prefix is always `inorbit_connector`. The connector type r
 
 ## Adding metrics to your connector
 
-For domain metrics, use the SDK helpers directly. The connector framework imposes no wrapper.
+This section covers **domain metrics** — counters and histograms for vendor-specific business state (mission outcomes, command results, queue depths, device state transitions). For outbound HTTP calls to your upstream API, use the canonical helpers instead: `record_upstream_http_request()` / `record_upstream_http_error()` from `inorbit_connector.metrics.http`. They own the request/error/duration descriptors and the endpoint-cardinality normalizers (`EndpointMapper`, `PathTemplater`) — don't reimplement them as domain counters.
 
 ### Step 1 — Declare a meter and instruments
 
@@ -101,68 +101,61 @@ from inorbit_connector.metrics import get_connector_meter
 
 meter = get_connector_meter("acme")   # match your connector_type
 
-api_requests = meter.create_counter(
-    "api.requests", unit="1", description="Calls to the device API",
+mission_failures = meter.create_counter(
+    "mission.failures",
+    unit="1",
+    description="Missions that ended in failure (attribute: reason)",
 )
-api_errors = meter.create_counter(
-    "api.errors", unit="1", description="Failed calls to the device API",
+command_executions = meter.create_counter(
+    "command.executions",
+    unit="1",
+    description="Vendor commands executed (attribute: command_name, result)",
 )
 ```
 
-Module-level declaration, same pattern the SDK uses for its own counters. `get_connector_meter` wraps an OTEL `Meter` so every instrument name is automatically prefixed with `<connector_type>.` — `api.requests` above is created on the underlying meter as `acme.api.requests` and exports on the wire as `inorbit_connector_acme_api_requests_total`.
+Module-level declaration, same pattern the SDK uses for its own counters. `get_connector_meter` wraps an OTEL `Meter` so every instrument name is automatically prefixed with `<connector_type>.` — `mission.failures` above is created on the underlying meter as `acme.mission.failures` and exports on the wire as `inorbit_connector_acme_mission_failures_total`.
 
 #### Naming rule: don't repeat the connector type in instrument names
 
 The wrapper adds the prefix structurally; doing it again duplicates it on the wire.
 
-- ✅ `meter.create_counter("api.requests", ...)` → `inorbit_connector_acme_api_requests_total`
-- ❌ `meter.create_counter("acme.api.requests", ...)` → `inorbit_connector_acme_acme_api_requests_total`
+- ✅ `meter.create_counter("mission.failures", ...)` → `inorbit_connector_acme_mission_failures_total`
+- ❌ `meter.create_counter("acme.mission.failures", ...)` → `inorbit_connector_acme_acme_mission_failures_total`
 
 A double-prefixed wire name can only be cleaned up by a collector-side `metric_relabel_configs` rule that rewrites `__name__`. Those rewrites strip the Prometheus `# TYPE` line, so the metric arrives at the OTEL pipeline as `UNKNOWN` and is exported as a Gauge regardless of its real type. Downstream metric stores that pin descriptor kind on first write (GCP Cloud Monitoring, for example) then silently drop later writes of the correct type.
 
-#### Upstream HTTP calls: use the canonical helpers
+### Step 2 — Instrument call sites
 
-The framework ships `record_upstream_http_request()` / `record_upstream_http_error()` in `inorbit_connector.metrics.http` plus `EndpointMapper` / `PathTemplater` for endpoint normalization. Do not roll your own request/error counters — call the helpers instead, with `vendor=<your connector_type>`. See the SKILL.md in the inorbit-connector-developer skill for the full pattern.
+Two patterns; pick whichever fits the site:
 
-### Step 2 — Instrument calls
-
-Two patterns; pick whichever fits the call site:
-
-**Decorator (counts every call to a method)**
+**Inline (the common case — record on the path that actually produces the event)**
 
 ```python
-from inorbit_edge.metrics import with_counter_metric
-
-class DeviceAPI:
-    @with_counter_metric(api_requests, attributes={"endpoint": "/status"})
-    async def get_status(self):
-        ...
+async def _handle_mission(self, mission):
+    try:
+        await self._executor.run(mission)
+    except MissionError as exc:
+        mission_failures.add(1, {"reason": exc.category})
+        raise
 ```
 
-`with_counter_metric` works on sync and async methods. The `attributes` argument may be a static dict or a callable that returns one. For attributes that come from the bound instance, use `attrs_from_self`:
+`reason` is a bounded enum — drawn from a known set (`timeout`, `aborted`, `precondition_failed`, ...). Don't pass the raw exception message; it explodes the descriptor's label space.
+
+**Decorator (counts every call to a method, regardless of outcome)**
 
 ```python
 from inorbit_edge.metrics import with_counter_metric, attrs_from_self
 
-class DeviceAPI:
+class MissionExecutor:
     def __init__(self, robot_id):
         self.robot_id = robot_id
 
-    @with_counter_metric(api_requests, attributes=attrs_from_self("robot_id"))
-    async def get_status(self):
+    @with_counter_metric(command_executions, attributes=attrs_from_self("robot_id"))
+    async def run(self, command):
         ...
 ```
 
-**Inline (anywhere — error paths, observable state, custom events)**
-
-```python
-async def get_status(self):
-    try:
-        return await self._client.get("/status")
-    except Exception:
-        api_errors.add(1, {"endpoint": "/status"})
-        raise
-```
+`with_counter_metric` works on sync and async methods. `attributes` may be a static dict or a callable that returns one. Use `attrs_from_self("robot_id")` to forward instance attributes onto each recorded sample.
 
 ## When to use which scope
 
@@ -179,30 +172,31 @@ OTEL attributes become Prometheus labels. Each unique label-value combination is
 
 | Attribute | Examples (good) | Examples (bad) |
 |---|---|---|
-| `endpoint` | `/status`, `/missions` | `/missions/<uuid>` |
-| `result` | `success`, `error` | exception messages |
-| `status` | `200`, `404`, `500` (or `2xx`/`4xx`/`5xx`) | full status text |
+| `reason` | `timeout`, `aborted`, `precondition_failed` | exception messages |
+| `result` | `success`, `failure`, `cancelled` | free-form server-returned phrase |
+| `command_name` | `pause_robot`, `resume_robot` | dynamic command strings from upstream |
 | `topic_pattern` | `robot/cmd/velocity` | `robot/<id>/cmd/velocity` |
 
-Forbidden in attributes: full URLs containing IDs, exception messages, query strings, free-form user input.
+Forbidden in attributes: full URLs containing IDs, exception messages, query strings, free-form user input, anything sourced from the upstream API without classification.
 
-If you need to mask out an ID-like segment from a value before recording, do it in the connector before the `.add()` call.
+If you need to mask out an ID-like segment from a value before recording, do it in the connector before the `.add()` call. For HTTP endpoint labels, use `EndpointMapper` / `PathTemplater` from `inorbit_connector.metrics.http`.
 
 ## Observable instruments
 
 For state derived from connector internals (battery level, broker connected, queue depth), prefer `create_observable_gauge` with a callback that reads state at scrape time:
 
 ```python
-from inorbit_edge.metrics import Observation, get_meter
+from inorbit_edge.metrics import Observation
+from inorbit_connector.metrics import get_connector_meter
 
-meter = get_meter("inorbit_my_connector")
+meter = get_connector_meter("acme")
 
 class DeviceClient:
     def __init__(self):
         self._connected = False
 
         meter.create_observable_gauge(
-            "my.broker.connected",
+            "broker.connected",
             callbacks=[self._connected_cb],
             unit="1",
             description="1 when the connector is connected to the broker",
