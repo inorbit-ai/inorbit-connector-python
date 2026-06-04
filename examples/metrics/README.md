@@ -52,11 +52,13 @@ points produce no error log entry, only gaps on the chart. This
 pipeline keeps cumulative counters as CUMULATIVE end to end and relies
 on three invariants to keep writes monotonic:
 
-- **One writer per series.** The framework's per-`connector_type`
-  namespace guarantees this for framework-emitted metrics — a series
-  is keyed by metric name + labels, and the metric name is now
-  vendor-prefixed. If you add custom resource attributes that bridge
-  connector types, keep ownership inside one connector type.
+- **One writer per series.** A series is keyed by metric name + labels.
+  Every framework-emitted metric carries the connector's
+  `service.instance.id` (=`inorbit.connector.id`) Resource attribute,
+  which is unique per process, so two connectors never co-write the same
+  series even though they share the constant `inorbit_connector_*` wire
+  prefix. Don't add custom Resource attributes that would let two
+  connector processes overlap on (metric, labels).
 - **Serial sends.** `sending_queue.num_consumers: 1` makes the
   exporter's queue strictly FIFO. A retry blocks the queue rather
   than racing the next batch.

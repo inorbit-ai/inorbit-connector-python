@@ -9,11 +9,72 @@ robot.
 
 import asyncio
 import random
+import time
 from typing import Coroutine
 
-from inorbit_edge.metrics import with_counter_metric
+from inorbit_connector.metrics.http import (
+    EndpointMapper,
+    record_upstream_http_error,
+    record_upstream_http_request,
+)
 
-from metrics import api_errors, api_requests
+
+_VENDOR = "example_bot"
+
+# Bounded endpoint labels: any path matching one of the prefixes is collapsed
+# to the right-hand label. Unknown paths fall through to "other" — the
+# descriptor's `endpoint` label space is bounded by the number of rows in this
+# table, NOT by the universe of URLs the upstream API can return.
+_endpoint = EndpointMapper(
+    [
+        ("/api/v1/telemetry", "telemetry"),
+        ("/api/v1/system_stats", "system_stats"),
+        ("/api/v1/robot_status", "robot_status"),
+    ]
+)
+
+
+async def _simulated_call(path: str) -> None:
+    """Stand-in for a real httpx call. Sleeps + occasionally fails."""
+    await asyncio.sleep(random.uniform(0.1, 0.3))
+    if random.random() < 0.02:  # 2% simulated failure rate
+        raise TimeoutError("simulated upstream timeout")
+
+
+async def _do_request(method: str, path: str) -> None:
+    """Wrap _simulated_call with canonical metric emission.
+
+    In a real connector this is where you'd put the httpx/requests call.
+    The pattern is identical: time it, record one helper on success, the
+    other on failure, always pass ``endpoint`` through a normalizer.
+    """
+    start = time.perf_counter()
+    try:
+        await _simulated_call(path)
+    except TimeoutError:
+        record_upstream_http_error(
+            vendor=_VENDOR,
+            method=method,
+            endpoint=_endpoint(path),
+            error_kind="timeout",
+            duration_seconds=time.perf_counter() - start,
+        )
+        raise
+    except Exception:
+        record_upstream_http_error(
+            vendor=_VENDOR,
+            method=method,
+            endpoint=_endpoint(path),
+            error_kind="other",
+            duration_seconds=time.perf_counter() - start,
+        )
+        raise
+    record_upstream_http_request(
+        vendor=_VENDOR,
+        method=method,
+        endpoint=_endpoint(path),
+        duration_seconds=time.perf_counter() - start,
+    )
 
 
 class ExampleBotAPIWrapper:
@@ -26,52 +87,37 @@ class ExampleBotAPIWrapper:
         self.endpoint = endpoint
         self.api_key = api_key
 
-    @with_counter_metric(api_requests, attributes={"endpoint": "telemetry"})
     async def fetch_telemetry_data(self) -> dict:
         """Simulate a request to the robot's telemetry API."""
-        try:
-            await asyncio.sleep(random.uniform(0.1, 0.3))
-            return {
-                "linear_speed": random.uniform(0.1, 0.9),
-                "angular_speed": random.uniform(0.1, 0.9),
-                "pose": {
-                    "x": random.uniform(0.1, 0.9),
-                    "y": random.uniform(0.1, 0.9),
-                    "yaw": random.uniform(0.1, 0.9),
-                    "frame_id": "frameIdA",
-                },
-            }
-        except Exception:
-            api_errors.add(1, {"endpoint": "telemetry"})
-            raise
+        await _do_request("GET", "/api/v1/telemetry")
+        return {
+            "linear_speed": random.uniform(0.1, 0.9),
+            "angular_speed": random.uniform(0.1, 0.9),
+            "pose": {
+                "x": random.uniform(0.1, 0.9),
+                "y": random.uniform(0.1, 0.9),
+                "yaw": random.uniform(0.1, 0.9),
+                "frame_id": "frameIdA",
+            },
+        }
 
-    @with_counter_metric(api_requests, attributes={"endpoint": "system_stats"})
     async def fetch_system_stats(self) -> dict:
         """Simulate a request to the robot's system stats API."""
-        try:
-            await asyncio.sleep(random.uniform(0.1, 0.3))
-            return {
-                "cpu": random.uniform(0.1, 0.9),
-                "ram": random.uniform(0.1, 0.9),
-                "hdd": random.uniform(0.1, 0.9),
-            }
-        except Exception:
-            api_errors.add(1, {"endpoint": "system_stats"})
-            raise
+        await _do_request("GET", "/api/v1/system_stats")
+        return {
+            "cpu": random.uniform(0.1, 0.9),
+            "ram": random.uniform(0.1, 0.9),
+            "hdd": random.uniform(0.1, 0.9),
+        }
 
-    @with_counter_metric(api_requests, attributes={"endpoint": "robot_status"})
     async def fetch_robot_status(self) -> dict:
         """Simulate a request to the robot's status API."""
-        try:
-            await asyncio.sleep(random.uniform(0.1, 0.3))
-            return {
-                "status": "running",
-                "error": None,
-                "message": "Robot is executing mission 123",
-            }
-        except Exception:
-            api_errors.add(1, {"endpoint": "robot_status"})
-            raise
+        await _do_request("GET", "/api/v1/robot_status")
+        return {
+            "status": "running",
+            "error": None,
+            "message": "Robot is executing mission 123",
+        }
 
 
 class Robot:
