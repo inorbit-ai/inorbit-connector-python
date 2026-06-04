@@ -77,10 +77,8 @@ This makes it the entry point both for **initial provisioning** (declaring the f
 @override
 async def _connect(self) -> None:
     """Connect to fleet manager and declare the fleet."""
-    # Fetch robot list from fleet manager API
+    # Fetch the robot list from the fleet manager API
     robots = await self._fleet_manager.get_robots()
-
-    # Reconcile the fleet to the discovered robots
     self.update_fleet(
         [RobotConfig(robot_id=robot.id, cameras=robot.cameras) for robot in robots]
     )
@@ -100,7 +98,7 @@ self.remove_robot("robot-42")
 
 :::{note}
 - These methods create or destroy sessions **immediately**. They should be called once the connector is connecting or running (from `_connect()` onwards), not before `start()`.
-- `add_robot()` raises `ValueError` on a duplicate `robot_id`; `remove_robot()` is a no-op (logs a warning) for an unknown id, so it is safe to call from a discovery loop that may fire repeatedly.
+- `add_robot()` raises `ValueError` on a duplicate `robot_id`; `remove_robot()` is a no-op (logs a warning) for an unknown id, so it is safe to call from a loop that may fire repeatedly.
 - A connector may start with an empty fleet (omit `fleet` in the config, or pass `[]`) and add its robots at runtime. The fleet may likewise shrink to zero robots while running.
 - A robot present in both the old and new fleet is treated as unchanged even if its `RobotConfig` differs (e.g. its cameras changed). To apply a changed config to a running robot, call `remove_robot()` then `add_robot()`.
 - These methods are thread-safe and may be called from the execution loop, a command handler, or any other thread.

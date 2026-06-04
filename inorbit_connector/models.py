@@ -328,7 +328,7 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
             value is the value to set.
         fleet (list[RobotConfig], optional): The list of robot configurations.
             Defaults to an empty list, so a connector may start with no robots and
-            discover them at runtime via ``add_robot()``/``update_fleet()``.
+            manage them at runtime via ``add_robot()``/``update_fleet()``.
     """
 
     # All fields are resolvable from ``INORBIT_<FIELD>`` env vars or from
