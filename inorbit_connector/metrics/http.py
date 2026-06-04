@@ -39,11 +39,11 @@ _logger = logging.getLogger(__name__)
 
 # --- Instruments ----------------------------------------------------------
 
-# Module-level so OTEL ties them to the framework provider once it's installed.
+# Module-level so OTel ties them to the framework provider once it's installed.
 # Until then they're no-op (lazy proxy) and stay correct.
 _meter = get_meter(EXPORTER_NAMESPACE)
 
-# 7 explicit boundaries → 9 series per attribute combination (vs. 18 for OTEL's
+# 7 explicit boundaries → 9 series per attribute combination (vs. 18 for OTel's
 # default), tuned for typical upstream-API latencies (50 ms – 5 s). Increase
 # only if your API regularly runs slower; do not extend without a reason.
 _LATENCY_BUCKETS = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0)

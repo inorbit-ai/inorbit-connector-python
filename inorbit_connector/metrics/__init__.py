@@ -29,7 +29,7 @@ instrument name structurally. Instrument names declared on a connector
 meter must NOT repeat the prefix — the wrapper adds it once.
 
 The Prometheus exporter ships transitively via ``inorbit-edge[telemetry]``,
-which is a base dependency of this package, so OTEL is always importable.
+which is a base dependency of this package, so OTel is always importable.
 :func:`setup_prometheus_metrics` returns ``False`` when ``metrics.enabled``
 is ``False`` (the default); when False, no provider is installed and no
 HTTP server is started.
@@ -113,7 +113,7 @@ class MetricsServer:
     The HTTP-serving piece is one call to ``prometheus_client.start_http_server``;
     the value-add of this class is the discovery file. On ``start()`` the
     connector writes ``<discovery_dir>/<connector_id>.json`` (atomic
-    tmp-and-rename) describing its bound ``host:port`` so a host-side OTEL
+    tmp-and-rename) describing its bound ``host:port`` so a host-side OTel
     collector can pick it up via ``file_sd_configs``. ``stop()`` removes the
     file and shuts the HTTP server down.
 
@@ -224,7 +224,7 @@ class MetricsServer:
 
 
 class PrefixedMeter:
-    """OTEL Meter wrapper that prepends a static prefix to instrument names.
+    """OTel Meter wrapper that prepends a static prefix to instrument names.
 
     Used by :func:`get_connector_meter` to give a concrete connector a meter
     whose ``create_*`` methods stamp every instrument name with
@@ -311,7 +311,7 @@ def register_framework_gauges(
     """Register the framework-level ObservableGauges.
 
     All callbacks run on every Prometheus scrape, so they should be cheap
-    and side-effect free. No-ops when the OTEL API is not installed.
+    and side-effect free. No-ops when the OTel API is not installed.
 
     Args:
         is_alive: zero-arg callable returning whether the connector's main

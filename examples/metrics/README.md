@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 InOrbit, Inc.
 SPDX-License-Identifier: MIT
 -->
 
-# Reference: metrics export with an OTEL collector
+# Reference: metrics export with an OTel collector
 
 This directory holds a reference setup for collecting metrics from one or more
 `inorbit-connector` containers on a single host and forwarding them to GCP
@@ -105,7 +105,7 @@ information.
 2. Each connector writes a small JSON file to a shared Docker named volume
    (`inorbit-connector-metrics`). The file uses Prometheus `file_sd` format
    and names the connector's advertised address (for example `brand-1:9090`).
-3. One OTEL collector runs alongside the connectors, mounts the same volume
+3. One OTel collector runs alongside the connectors, mounts the same volume
    read-only, and uses `file_sd_configs` to discover every connector. It
    scrapes them and exports to GCP via the `googlemanagedprometheus`
    exporter.

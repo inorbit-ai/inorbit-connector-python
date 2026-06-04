@@ -14,7 +14,7 @@ from inorbit_connector.metrics import setup_prometheus_metrics
 
 @pytest.fixture(autouse=True)
 def _reset_global_meter_provider():
-    """Reset OTEL global provider state after each test."""
+    """Reset OTel global provider state after each test."""
     yield
     from opentelemetry.util._once import Once
 

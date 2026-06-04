@@ -72,10 +72,10 @@ metrics:
   bind_host: 127.0.0.1   # bind interface; use 0.0.0.0 for bridge networking
   bind_port: 9090        # 0 picks an ephemeral free port
   connector_id: my-bot   # unique per process on a host
-  discovery_dir: /var/run/inorbit-metrics  # for OTEL collector file_sd
+  discovery_dir: /var/run/inorbit-metrics  # for OTel collector file_sd
 ```
 
-When enabled, the connector also writes a Prometheus `file_sd`-format JSON file to `discovery_dir`, naming the bound `host:port`. A host-side OTEL collector can mount this directory and discover every connector running on the host — see [`examples/metrics/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/metrics) for a reference compose stack.
+When enabled, the connector also writes a Prometheus `file_sd`-format JSON file to `discovery_dir`, naming the bound `host:port`. A host-side OTel collector can mount this directory and discover every connector running on the host — see [`examples/metrics/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/metrics) for a reference compose stack.
 
 If your scraper is configured statically (e.g. its `prometheus.yaml` already lists `host:port` targets, or you only run a single connector behind a known address), set `discovery_dir: null` to skip writing the discovery file entirely. The HTTP endpoint still serves `/metrics` as usual.
 
@@ -91,7 +91,7 @@ When `enabled` is `false` (the default), no server is started and all instrument
 | `advertise_host` | `socket.gethostname()` | Hostname written to the discovery file. |
 | `discovery_dir` | `/var/run/inorbit-metrics` | Auto-created on start. Set to `null` to skip writing a discovery file. |
 | `connector_id` | `socket.gethostname()` | Used as `service.instance.id` and as the discovery filename. |
-| `extra_resource_attributes` | `{}` | Added to every metric as OTEL Resource attributes (low-cardinality only). |
+| `extra_resource_attributes` | `{}` | Added to every metric as OTel Resource attributes (low-cardinality only). |
 
 The wire-level metric prefix is always `inorbit_connector`. The connector type rides on every metric as the `inorbit.connector.type` Resource attribute (a Prometheus label), not as part of the metric name — cross-connector aggregation works on a single descriptor per metric.
 
@@ -119,7 +119,7 @@ command_executions = meter.create_counter(
 )
 ```
 
-Module-level declaration, same pattern the SDK uses for its own counters. `get_connector_meter` wraps an OTEL `Meter` so every instrument name is automatically prefixed with `<connector_type>.` — `mission.failures` above is created on the underlying meter as `acme.mission.failures` and exports on the wire as `inorbit_connector_acme_mission_failures_total`.
+Module-level declaration, same pattern the SDK uses for its own counters. `get_connector_meter` wraps an OTel `Meter` so every instrument name is automatically prefixed with `<connector_type>.` — `mission.failures` above is created on the underlying meter as `acme.mission.failures` and exports on the wire as `inorbit_connector_acme_mission_failures_total`.
 
 #### Naming rule: don't repeat the connector type in instrument names
 
@@ -128,7 +128,7 @@ The wrapper adds the prefix structurally; doing it again duplicates it on the wi
 - ✅ `meter.create_counter("mission.failures", ...)` → `inorbit_connector_acme_mission_failures_total`
 - ❌ `meter.create_counter("acme.mission.failures", ...)` → `inorbit_connector_acme_acme_mission_failures_total`
 
-A double-prefixed wire name can only be cleaned up by a collector-side `metric_relabel_configs` rule that rewrites `__name__`. Those rewrites strip the Prometheus `# TYPE` line, so the metric arrives at the OTEL pipeline as `UNKNOWN` and is exported as a Gauge regardless of its real type. Downstream metric stores that pin descriptor kind on first write (GCP Cloud Monitoring, for example) then silently drop later writes of the correct type.
+A double-prefixed wire name can only be cleaned up by a collector-side `metric_relabel_configs` rule that rewrites `__name__`. Those rewrites strip the Prometheus `# TYPE` line, so the metric arrives at the OTel pipeline as `UNKNOWN` and is exported as a Gauge regardless of its real type. Downstream metric stores that pin descriptor kind on first write (GCP Cloud Monitoring, for example) then silently drop later writes of the correct type.
 
 ### Step 2 — Instrument call sites
 
@@ -167,14 +167,14 @@ class MissionExecutor:
 
 The single decision that drives metric design is: **how many upstream entities does one connector process talk to?**
 
-- **N=1** (single-robot connector, single-PLC connector, etc.): `service.instance.id` already identifies the process. Don't add a `robot_id` / `device_id` attribute on per-call metrics — it would duplicate the Resource attribute that the OTEL collector already attaches.
+- **N=1** (single-robot connector, single-PLC connector, etc.): `service.instance.id` already identifies the process. Don't add a `robot_id` / `device_id` attribute on per-call metrics — it would duplicate the Resource attribute that the OTel collector already attaches.
 - **N>1** (`FleetConnector` for a fleet manager API, gateway controlling many doors, etc.): add the entity id as a per-call attribute. Use `attrs_from_self("robot_id")` for instance-bound calls; pass it explicitly to `.add()` / `.record()` for ad-hoc sites.
 
 For non-robot connectors, name the attribute after the domain entity: `device_id`, `plc_id`, `door_id`, `elevator_id`. Same pattern, different label name.
 
 ## Cardinality guardrails
 
-OTEL attributes become Prometheus labels. Each unique label-value combination is a separate time series, and series count is the dominant cost driver for both Prometheus and managed services like GCP Cloud Monitoring. Use bounded enums; never put unbounded values in attributes.
+OTel attributes become Prometheus labels. Each unique label-value combination is a separate time series, and series count is the dominant cost driver for both Prometheus and managed services like GCP Cloud Monitoring. Use bounded enums; never put unbounded values in attributes.
 
 | Attribute | Examples (good) | Examples (bad) |
 |---|---|---|
@@ -216,7 +216,7 @@ The callback runs on every scrape, so it should be cheap and side-effect free.
 
 ## Production deployment
 
-For multi-container deployments, see [`examples/metrics/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/metrics) for a reference OTEL collector compose stack that:
+For multi-container deployments, see [`examples/metrics/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/metrics) for a reference OTel collector compose stack that:
 
 - Discovers all connector containers on a host via Prometheus `file_sd`.
 - Exports to GCP Cloud Monitoring (other backends straightforward to swap in).
