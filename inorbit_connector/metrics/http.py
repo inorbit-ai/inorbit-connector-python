@@ -150,17 +150,19 @@ def record_upstream_http_error(
         endpoint: Normalized endpoint label. See :func:`record_upstream_http_request`.
         error_kind: Bounded enum. One of ``"timeout"``, ``"connect_error"``,
             ``"http_4xx"``, ``"http_5xx"``, ``"other"``. Values outside the
-            set are accepted but logged once at WARNING; do not invent new
+            set are coerced to ``"other"`` (with a WARNING) so the
+            descriptor's label space stays bounded — do not invent new
             kinds without updating the framework.
         duration_seconds: Wall-clock duration of the failed request.
     """
     if error_kind not in _ALLOWED_ERROR_KINDS:
         _logger.warning(
             "upstream.http error_kind=%r is outside the bounded set %s; "
-            "the descriptor will gain a label value permanently",
+            "coercing to 'other' to keep the descriptor bounded",
             error_kind,
             sorted(_ALLOWED_ERROR_KINDS),
         )
+        error_kind = "other"
     _warn_unbounded_endpoint(endpoint)
     duration_attrs = {"vendor": vendor, "method": method, "endpoint": endpoint}
     upstream_http_errors.add(1, {**duration_attrs, "error_kind": error_kind})

@@ -76,14 +76,29 @@ def test_record_error_increments_error_counter_with_error_kind(captured_instrume
     requests.add.assert_not_called()
 
 
-def test_record_error_warns_on_unknown_error_kind(captured_instruments, caplog):
+def test_record_error_coerces_unknown_error_kind_to_other(
+    captured_instruments, caplog
+):
+    requests, errors, duration = captured_instruments
     caplog.set_level(logging.WARNING, logger=http_metrics.__name__)
+
     record_upstream_http_error(
         vendor="acme",
         method="GET",
         endpoint="missions",
         error_kind="banana",
         duration_seconds=0.1,
+    )
+
+    # Out-of-set value must NOT reach the descriptor — coerced to 'other'.
+    errors.add.assert_called_once_with(
+        1,
+        {
+            "vendor": "acme",
+            "method": "GET",
+            "endpoint": "missions",
+            "error_kind": "other",
+        },
     )
     assert any("error_kind=" in r.getMessage() for r in caplog.records)
 
