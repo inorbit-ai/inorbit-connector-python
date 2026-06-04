@@ -12,7 +12,7 @@
 # customer-side repo) and set GCP_PROJECT in your env.
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.118.0
+    image: otel/opentelemetry-collector-contrib:0.143.1
     restart: unless-stopped
     command: ["--config=/etc/otelcol/config.yaml"]
     networks: [inorbit-metrics]

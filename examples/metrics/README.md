@@ -7,12 +7,16 @@ SPDX-License-Identifier: MIT
 
 This directory holds a reference setup for collecting metrics from one or more
 `inorbit-connector` containers on a single host and forwarding them to GCP
-Cloud Monitoring **as the Prometheus descriptor type** (`prometheus.googleapis.com/...`
-prefix). The Prometheus type lifts the per-descriptor caps to **200 labels**
-and **25K descriptors per project**, versus 30 / 10K on the Custom type — the
-latter is the practical ceiling on fleet growth across connector types and is
-why the `custom.googleapis.com/` / `workload.googleapis.com/` route is not
-used here.
+Cloud Monitoring via the **`googlemanagedprometheus` exporter**, which writes
+them as the Prometheus descriptor type (`prometheus.googleapis.com/...`).
+Compared to the Custom type that the plain `googlecloud` exporter produces,
+the Prometheus type lifts the per-descriptor caps to **200 labels** and
+**25K descriptors per project** (versus 30 / 10K), raises the active-series
+cap per descriptor to 1M (versus 200K), and makes every metric queryable
+with **PromQL** in the Cloud Monitoring console and Grafana. Descriptor
+exhaustion on the Custom type is the practical ceiling on fleet growth
+across connector types, which is why the `custom.googleapis.com/` /
+`workload.googleapis.com/` route is not used here.
 
 It is intentionally an **example**, not a turn-key deployment: ports,
 hostnames, exporters, and credential mounts will all need to be adjusted for
@@ -86,10 +90,10 @@ boundary without artifacts.
 
 ### Switching to a different metric backend
 
-If you swap `googlecloud` for Cortex/Mimir/Prometheus remote_write,
-`num_consumers: 1` can be relaxed — those backends accept out-of-order
-writes for cumulative counters and reconcile on the server side. Rule
-1 still applies to any backend that consumes Prometheus type
+If you swap `googlemanagedprometheus` for Cortex/Mimir/Prometheus
+remote_write, `num_consumers: 1` can be relaxed — those backends accept
+out-of-order writes for cumulative counters and reconcile on the server
+side. Rule 1 still applies to any backend that consumes Prometheus type
 information.
 
 ## How it works
@@ -103,7 +107,8 @@ information.
    and names the connector's advertised address (for example `brand-1:9090`).
 3. One OTEL collector runs alongside the connectors, mounts the same volume
    read-only, and uses `file_sd_configs` to discover every connector. It
-   scrapes them and exports to GCP via the `googlecloud` exporter.
+   scrapes them and exports to GCP via the `googlemanagedprometheus`
+   exporter.
 
 ## One-shot host setup
 
@@ -176,9 +181,21 @@ For the connector configuration reference and metric catalog, see the
   Look for `Scrape iteration` entries referring to your connector targets.
 
 - In GCP Cloud Monitoring, under **Prometheus** metrics, look for
-  `prometheus.googleapis.com/inorbit_connector_*` series. They all
-  share the constant `inorbit_connector_*` wire prefix; slice by the
-  `inorbit_connector_type` label to drill into one vendor.
+  `prometheus.googleapis.com/inorbit_connector_*` series. Descriptor
+  names carry a type suffix added by the exporter
+  (`.../inorbit_connector_up/gauge`,
+  `.../inorbit_connector_execution_loop_ticks_total/counter`); in PromQL
+  you query by the bare wire name (`inorbit_connector_up`). Slice by the
+  `connector_type` label to drill into one vendor. Or check from a
+  terminal:
+
+  ```bash
+  PROJECT=$(gcloud config get-value project)
+  curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    --get "https://monitoring.googleapis.com/v3/projects/${PROJECT}/metricDescriptors" \
+    --data-urlencode 'filter=metric.type = starts_with("prometheus.googleapis.com/inorbit_connector")' \
+    | jq -r '.metricDescriptors[].type'
+  ```
 
 ## Host-networking alternative
 

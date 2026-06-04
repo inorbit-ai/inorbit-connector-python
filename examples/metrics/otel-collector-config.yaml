@@ -35,15 +35,18 @@ processors:
     limit_percentage: 80
     spike_limit_percentage: 20
 
-  # Pin the generic_task Monitored Resource fields. The googlecloud
-  # exporter's MR mapping is hardcoded to these standard OTel attributes:
-  #   generic_task.namespace <- service.namespace
-  #   generic_task.job       <- service.name
-  #   generic_task.location  <- cloud.availability_zone | cloud.region
-  #   generic_task.task_id   <- service.instance.id
+  # Pin the prometheus_target Monitored Resource fields. The
+  # googlemanagedprometheus exporter's MR mapping is hardcoded to these
+  # standard OTel attributes:
+  #   prometheus_target.location  <- cloud.availability_zone | cloud.region
+  #                                  (MUST be a real GCP region/zone or
+  #                                  Cloud Monitoring rejects the write)
+  #   prometheus_target.cluster   <- k8s.cluster.name   (unset here)
+  #   prometheus_target.namespace <- k8s.namespace.name (unset here)
+  #   prometheus_target.job       <- service.name
+  #   prometheus_target.instance  <- service.instance.id
   resource:
     attributes:
-      - {key: service.namespace,   value: inorbit_connector_fleet, action: upsert}
       - {key: service.name,        value: inorbit_connector,       action: upsert}
       - {key: cloud.region,        value: us-central1,             action: upsert}
       - {key: service.instance.id, from_attribute: inorbit_connector_id,   action: upsert}
@@ -61,37 +64,43 @@ processors:
     timeout: 10s
 
 exporters:
-  googlecloud:
-    project: ${env:GOOGLE_CLOUD_PROJECT}
+  # Writes to Cloud Monitoring as the PROMETHEUS metric type
+  # (`prometheus.googleapis.com/inorbit_connector_*`). Compared to the
+  # Custom type that the plain `googlecloud` exporter produces, the
+  # per-descriptor caps go from 30 to 200 labels and from 10K to 25K
+  # descriptors per project, the active-series cap per descriptor goes
+  # from 200K to 1M, and the metrics become queryable with PromQL in
+  # both the Cloud Monitoring console and Grafana (via the Managed
+  # Service for Prometheus datasource).
+  #
+  # The exporter owns the prefix (not configurable) and appends a type
+  # suffix to each metric name on the descriptor
+  # (`.../inorbit_connector_up/gauge`,
+  #  `.../inorbit_connector_execution_loop_ticks_total/counter`, ...).
+  # In PromQL you still query by the bare wire name
+  # (`inorbit_connector_up`); the suffix only shows up in descriptor
+  # listings and the console metric selector.
+  #
+  # Naming model on the wire: every framework metric exports under the
+  # constant `inorbit_connector_*` name; the connector type rides as a
+  # label (promoted below). Per-process isolation comes from
+  # `inorbit_connector_id` (= service.instance.id = prometheus_target
+  # `instance`), unique per connector process per host.
+  #
+  # Pricing note: Prometheus-type metrics bill by SAMPLES ingested,
+  # not bytes — run a short staging soak and check the projected cost
+  # before fleet rollout.
+  googlemanagedprometheus:
+    project: ${env:GCP_PROJECT}
     metric:
-      # Descriptors are created under the `prometheus.googleapis.com/`
-      # prefix so Cloud Monitoring registers them as the PROMETHEUS metric
-      # type, not Custom. That lifts the per-descriptor caps from 30 to
-      # 200 labels and from 10K to 25K descriptors per project — without
-      # this, descriptor exhaustion is the practical ceiling on fleet
-      # growth across connector types.
-      #
-      # Naming model on the wire: every framework metric exports under the
-      # constant `inorbit_connector_*` wire name; the connector type rides
-      # as the `inorbit.connector.type` Resource attribute (lifted to a
-      # Prometheus / Cloud Monitoring label below). Per-process isolation
-      # comes from `inorbit.connector.id` (= service.instance.id), unique
-      # per connector process per host.
-      #
-      # Note: with the upstream `googlecloud` exporter, this prefix selects
-      # the Prometheus descriptor type only when the project is configured
-      # for Managed Service for Prometheus. If you are on plain Cloud
-      # Monitoring, swap this exporter for `googlemanagedprometheus`
-      # (same descriptor target, fewer config knobs).
-      prefix: prometheus.googleapis.com/
-      # Lift the framework Resource attributes onto every series as labels,
-      # so a single query can slice across connector types ("all robots
-      # offline for customer=acme") AND drill into one ("MIR fleet only").
-      # Resource-attribute names use dots; the regex matches the OTLP key.
+      # Lift these resource attributes onto every series as labels, so a
+      # single query can slice across connector types ("all robots
+      # offline for customer=acme") AND drill into one ("MiR fleet
+      # only"). The names must match the attribute keys produced by the
+      # `resource` processor above.
       resource_filters:
         - regex: ^customer$
-        - regex: ^inorbit\.connector\.type$
-        - regex: ^inorbit\.connector\.id$
+        - regex: ^connector_type$
     # Default 12s is too aggressive given hourly OAuth-refresh reconnect
     # windows; dials get canceled mid-handshake at 12s.
     timeout: 30s
@@ -130,4 +139,4 @@ service:
     metrics:
       receivers: [prometheus]
       processors: [memory_limiter, resource, batch]
-      exporters: [googlecloud]
+      exporters: [googlemanagedprometheus]
