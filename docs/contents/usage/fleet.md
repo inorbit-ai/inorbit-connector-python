@@ -101,7 +101,7 @@ self.remove_robot("robot-42")
 :::{note}
 - These methods create or destroy sessions **immediately**. They should be called once the connector is connecting or running (from `_connect()` onwards), not before `start()`.
 - `add_robot()` raises `ValueError` on a duplicate `robot_id`; `remove_robot()` is a no-op (logs a warning) for an unknown id, so it is safe to call from a discovery loop that may fire repeatedly.
-- The fleet may shrink to zero robots at runtime; the execution loop simply idles until robots are discovered again.
+- A connector may start with an empty fleet (omit `fleet` in the config, or pass `[]`) and discover all of its robots at runtime. The fleet may likewise shrink to zero robots while running; the execution loop simply idles until robots are discovered again.
 - A robot present in both the old and new fleet is treated as unchanged even if its `RobotConfig` differs (e.g. its cameras changed). To apply a changed config to a running robot, call `remove_robot()` then `add_robot()`.
 - These methods are thread-safe and may be called from the execution loop, a command handler, or any other thread.
 :::

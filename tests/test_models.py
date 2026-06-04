@@ -75,13 +75,19 @@ class TestConnectorRootConfig:
         assert model.fleet[0].robot_id == "robot1"
         assert model.fleet[1].robot_id == "robot2"
 
-    def test_fleet_must_contain_at_least_one_robot(self, base_model):
+    def test_fleet_may_be_empty(self, base_model):
+        """An empty fleet is allowed so connectors can discover robots at runtime."""
         init_input = base_model.copy()
         init_input["fleet"] = []
-        with pytest.raises(
-            ValidationError, match="Fleet must contain at least one robot"
-        ):
-            ConnectorRootConfig(**init_input, _env_file=None)
+        model = ConnectorRootConfig(**init_input, _env_file=None)
+        assert model.fleet == []
+
+    def test_fleet_defaults_to_empty_when_omitted(self, base_model):
+        """``fleet`` is optional and defaults to an empty list."""
+        init_input = base_model.copy()
+        del init_input["fleet"]
+        model = ConnectorRootConfig(**init_input, _env_file=None)
+        assert model.fleet == []
 
     def test_robot_ids_must_be_unique(self, base_model):
         init_input = base_model.copy()
