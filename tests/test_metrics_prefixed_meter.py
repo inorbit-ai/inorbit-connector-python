@@ -33,10 +33,14 @@ def test_prefixed_meter_prepends_prefix_to_every_instrument_type():
     assert underlying.create_up_down_counter.call_args[0][0] == "acme.queue.depth"
     assert underlying.create_histogram.call_args[0][0] == "acme.api.duration"
     assert underlying.create_gauge.call_args[0][0] == "acme.battery.level"
-    assert underlying.create_observable_gauge.call_args[0][0] == "acme.battery.observable"
-    assert underlying.create_observable_counter.call_args[0][0] == "acme.ticks.observable"
-    assert (
-        underlying.create_observable_up_down_counter.call_args[0][0] == "acme.ud.observable"
+    assert underlying.create_observable_gauge.call_args[0][0] == (
+        "acme.battery.observable"
+    )
+    assert underlying.create_observable_counter.call_args[0][0] == (
+        "acme.ticks.observable"
+    )
+    assert underlying.create_observable_up_down_counter.call_args[0][0] == (
+        "acme.ud.observable"
     )
 
 
@@ -61,9 +65,7 @@ def test_get_connector_meter_rejects_empty_connector_type():
 
 def test_get_connector_meter_creates_instrument_with_prefixed_name(monkeypatch):
     underlying = MagicMock()
-    monkeypatch.setattr(
-        "inorbit_connector.metrics.get_meter", lambda _name: underlying
-    )
+    monkeypatch.setattr("inorbit_connector.metrics.get_meter", lambda _name: underlying)
 
     meter = get_connector_meter("acme")
     meter.create_counter("mission.failures")
