@@ -99,13 +99,12 @@ class FleetConnector(ABC):
 
         # Common information
         self.config = config
-        # Cache of robot IDs in config.fleet. Accessed through the robot_ids property
-        # Updated by update_fleet()
-        self.__robot_ids: list[str] = []
-        # update_fleet() may be called during user-defined implementation of _connect()
-        # to update the fleet before initializing the robot sessions
-        # Initialize the robot_ids cache
-        self.update_fleet(config.fleet)
+        # Cache of robot IDs in config.fleet. Accessed through the robot_ids property.
+        # Seeded directly from the config here (no sessions are created during
+        # construction); thereafter kept in sync by update_fleet()/add_robot()/
+        # remove_robot(). The initial robot sessions are created later by __connect(),
+        # which calls update_fleet(self.config.fleet) once the connector thread is up.
+        self.__robot_ids: list[str] = [robot.robot_id for robot in config.fleet]
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
@@ -117,10 +116,13 @@ class FleetConnector(ABC):
         # Managed temp directory for fetched map files (lazily initialized)
         self.__temp_map_dir: tempfile.TemporaryDirectory | None = None
 
-        # Private dictionary for fast internal access (use self._get_session(robot_id)
-        # for thread-safe access) in tight loops. It should not be accessed directly
-        # by subclasses to maintain thread-safety
+        # Private dictionary for fast internal access (use self._get_robot_session(
+        # robot_id) for thread-safe access) in tight loops. It should not be accessed
+        # directly by subclasses to maintain thread-safety
         self.__robot_sessions: dict[str, RobotSession] = {}
+        # Lock guarding fleet mutation: __robot_ids, __robot_sessions membership,
+        # config.fleet, and the per-robot state dicts.
+        self.__fleet_lock = threading.RLock()
 
         # Threading for the main run methods
         # The connector runs an asycio loop within a spawned thread
@@ -211,8 +213,10 @@ class FleetConnector(ABC):
     @property
     def robot_ids(self) -> list[str]:
         """Get the list of robot IDs in the fleet."""
-        # Return the cached list of robot IDs
-        return self.__robot_ids
+        # Return a copy of the cached list so callers can't mutate internal state and
+        # so a captured reference stays consistent if the fleet changes concurrently.
+        with self.__fleet_lock:
+            return self.__robot_ids.copy()
 
     @property
     def _connector_type(self) -> str:
@@ -228,17 +232,133 @@ class FleetConnector(ABC):
     def update_fleet(self, fleet: list[RobotConfig]) -> None:
         """Update the robot fleet.
 
-        This method may be called during the user-defined implementation of _connect()
-        to update the fleet configuration before initializing the robot sessions.
-        e.g. fetching the robot list from a fleet manager API.
+        This is the single entry point for fleet membership. It diffs the requested
+        fleet against the currently active robot sessions and:
+
+        - creates and connects a session for each newly added robot (registering its
+          cameras, command handler and online-status callback), and
+        - disconnects and frees the session of each robot no longer present, clearing
+          its per-robot state.
+
+        It is idempotent: robots already in the fleet are left untouched.
+        ``__connect()`` calls it with ``self.config.fleet`` to create the
+        initial sessions, and subclasses may call it at runtime (from ``_connect()``
+        onward) to implement robot autodiscovery. e.g. fetching the robot list from a
+        fleet manager API.
+
+        Note:
+            Sessions are created/destroyed immediately, so this must be called once the
+            connector is connecting or running (i.e. from ``_connect()`` or the
+            execution loop), not before ``start()``.
+
+            A robot present in both the old and new fleet is treated as unchanged even
+            if its ``RobotConfig`` differs (e.g. its cameras changed). To apply a
+            changed config to a running robot, call ``remove_robot()`` then
+            ``add_robot()``.
 
         Args:
             fleet (list[RobotConfig]): The new fleet configuration
+
+        Raises:
+            ValueError: If ``fleet`` contains duplicate robot IDs.
         """
-        # Update the fleet configuration
-        self.config.fleet = fleet
-        # Update robot ID cache
-        self.__robot_ids = [robot.robot_id for robot in self.config.fleet]
+        self.__apply_fleet(fleet)
+
+    def __apply_fleet(self, fleet: list[RobotConfig]) -> None:
+        """Reconcile the live robot sessions to match ``fleet``.
+
+        This is the implementation behind ``update_fleet()``. It is kept private so the
+        connector's own startup (``__connect``) can reconcile the initial fleet even on
+        the single-robot ``Connector`` subclass, which overrides the public
+        ``update_fleet``/``add_robot``/``remove_robot`` to raise.
+        """
+        new_ids = [robot.robot_id for robot in fleet]
+        if len(set(new_ids)) != len(new_ids):
+            raise ValueError("Robot ids must be unique")
+
+        # The whole reconcile runs under the lock so a fleet change is atomic with
+        # respect to concurrent add_robot()/remove_robot()/update_fleet() calls. The
+        # lock is re-entrant, so the wrappers can hold it across their read+delegate.
+        with self.__fleet_lock:
+            new_id_set = set(new_ids)
+            to_remove = [rid for rid in self.__robot_sessions if rid not in new_id_set]
+            to_add = [rid for rid in new_ids if rid not in self.__robot_sessions]
+
+            # Apply the new membership before touching sessions so the running loop
+            # sees the target fleet and stops iterating removed robots.
+            self.config.fleet = list(fleet)
+            self.__robot_ids = list(new_ids)
+
+            for robot_id in to_remove:
+                self.__last_published_frame_ids.pop(robot_id, None)
+                self.__pending_system_stats.pop(robot_id, None)
+                self.__robot_sessions.pop(robot_id, None)
+                # free_robot_session disconnects and removes the session from the
+                # pool; no-op if the pool has no session for this robot.
+                self.__session_pool.free_robot_session(robot_id)
+            for robot_id in to_add:
+                self.__robot_sessions[robot_id] = self.__initialize_session(robot_id)
+
+    def add_robot(self, robot_config: RobotConfig) -> None:
+        """Add a single robot to the fleet at runtime.
+
+        Convenience wrapper over ``update_fleet()``: appends the robot to the current
+        fleet and reconciles, which creates and connects its session (registering its
+        cameras, command handler and online-status callback).
+
+        Note:
+            The session is created immediately, so call this once the connector is
+            connecting or running (from ``_connect()`` onward), not before ``start()``.
+
+        Args:
+            robot_config (RobotConfig): The configuration of the robot to add.
+
+        Raises:
+            ValueError: If a robot with the same ``robot_id`` is already in the fleet.
+        """
+        with self.__fleet_lock:
+            if robot_config.robot_id in self.__robot_ids:
+                raise ValueError(
+                    f"Robot '{robot_config.robot_id}' is already in the fleet"
+                )
+            self.update_fleet([*self.config.fleet, robot_config])
+
+    def remove_robot(self, robot_id: str) -> None:
+        """Remove a single robot from the fleet at runtime.
+
+        Convenience wrapper over ``update_fleet()``: drops the robot from the current
+        fleet and reconciles, which disconnects and frees its session and clears its
+        per-robot state. Idempotent: removing a robot that is not in the fleet logs a
+        warning and returns without error.
+
+        Args:
+            robot_id (str): The ID of the robot to remove.
+        """
+        with self.__fleet_lock:
+            if robot_id not in self.__robot_ids:
+                self._logger.warning(
+                    f"remove_robot: robot '{robot_id}' is not in the fleet"
+                )
+                return
+            self.update_fleet(
+                [robot for robot in self.config.fleet if robot.robot_id != robot_id]
+            )
+
+    def _get_robot_config(self, robot_id: str) -> RobotConfig | None:
+        """Return the ``RobotConfig`` for ``robot_id`` from the fleet, or None.
+
+        Args:
+            robot_id (str): The robot ID to look up.
+
+        Returns:
+            RobotConfig | None: The matching configuration, or None if the robot is not
+                in the fleet.
+        """
+        with self.__fleet_lock:
+            for robot_config in self.config.fleet:
+                if robot_config.robot_id == robot_id:
+                    return robot_config
+        return None
 
     def _handle_command_exception(
         self,
@@ -356,24 +476,30 @@ class FleetConnector(ABC):
                 session, self._inorbit_robot_command_handler
             )
 
+        # Register cameras declared in this robot's configuration.
+        robot_config = self._get_robot_config(robot_id)
+        if robot_config is not None:
+            for idx, camera_config in enumerate(robot_config.cameras):
+                self._logger.info(
+                    f"Registering camera {idx} for robot {robot_id}: "
+                    f"{str(camera_config.video_url)}"
+                )
+                # If values are None, remove the key from the dictionary to use
+                # edge-sdk defaults
+                dump = camera_config.model_dump()
+                clean = {k: v for k, v in dump.items() if v is not None}
+                session.register_camera(str(idx), OpenCVCamera(**clean))
+
         return session
-
-    def __initialize_sessions(self) -> None:
-        """Initialize the robot sessions."""
-
-        for robot_id in self.robot_ids:
-            self.__robot_sessions[robot_id] = self.__initialize_session(robot_id)
-        self._logger.info(
-            f"Initialized {len(self.__robot_sessions)} robot sessions for robots "
-            f"{', '.join(self.robot_ids)}"
-        )
 
     async def __connect(self) -> None:
         """Initialize the connection to InOrbit based on the provided configuration,
         and connect to external services calling self._connect().
 
-        self.update_fleet() may be called during this method to update the fleet
-        configuration before initializing the robot sessions.
+        After self._connect() returns, the initial robot sessions are created via
+        self.update_fleet(self.config.fleet). Subclasses may also populate the fleet
+        themselves during self._connect() (via update_fleet() or add_robot()), in which
+        case that final reconcile is a no-op.
 
         Raises:
             Exception: If the robot session cannot connect.
@@ -381,15 +507,21 @@ class FleetConnector(ABC):
         # Call the user-implemented connection logic
         await self._connect()
 
-        # Connect to InOrbit
-        self.__initialize_sessions()
+        # Create the InOrbit sessions for the current fleet. Calls the private reconcile
+        # directly so it also works on the single-robot Connector subclass, which blocks
+        # the public update_fleet().
+        self.__apply_fleet(self.config.fleet)
 
     async def __disconnect(self) -> None:
         """Disconnect external services and disconnect from InOrbit."""
 
-        # Disconnect from InOrbit
-        for session in self.__robot_sessions.values():
-            session.disconnect()
+        # Disconnect from InOrbit while holding the lock so no robot can be added (via
+        # add_robot/update_fleet from another thread) while we tear the fleet down, and
+        # clear the session dict so a subsequent start() recreates the sessions.
+        with self.__fleet_lock:
+            for session in self.__robot_sessions.values():
+                session.disconnect()
+            self.__robot_sessions.clear()
 
         # Clean up temporary map files
         if self.__temp_map_dir is not None:
@@ -410,25 +542,9 @@ class FleetConnector(ABC):
         self.__loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.__loop)
 
-        # Connect to external services and create the InOrbit session
-        self.__loop.run_until_complete(self.__connect())
-
-        # Set up camera feeds
-        for robot_config in self.config.fleet:
-            for idx, camera_config in enumerate(robot_config.cameras):
-                self._logger.info(
-                    f"Registering camera {idx} for robot {robot_config.robot_id}: "
-                    f"{str(camera_config.video_url)}"
-                )
-                # If values are None, remove the key from the dictionary to use
-                # edge-sdk defaults
-                dump = camera_config.model_dump()
-                clean = {k: v for k, v in dump.items() if v is not None}
-                self.__robot_sessions[robot_config.robot_id].register_camera(
-                    str(idx), OpenCVCamera(**clean)
-                )
-
         try:
+            # Connect to external services and create the InOrbit sessions.
+            self.__loop.run_until_complete(self.__connect())
             self.__loop.run_until_complete(self.__run_loop())
         except Exception as e:
             self._logger.error(f"Error in execution loop: {e}")
@@ -767,7 +883,8 @@ class FleetConnector(ABC):
             **kwargs: System stats data (cpu_load_percentage, ram_usage_percentage,
                 hdd_usage_percentage, ts)
         """
-        self.__pending_system_stats[robot_id] = kwargs
+        with self.__fleet_lock:
+            self.__pending_system_stats[robot_id] = kwargs
 
     def __get_connector_system_stats(self) -> dict:
         """Get system stats from the connector's host environment.
@@ -807,15 +924,20 @@ class FleetConnector(ABC):
             }
         )
 
-        for robot_id in self.robot_ids:
-            session = self._get_robot_session(robot_id)
-            if pending_status := self.__pending_system_stats.get(robot_id):
+        with self.__fleet_lock:
+            sessions = {
+                robot_id: self.__robot_sessions[robot_id]
+                for robot_id in self.__robot_ids
+                if robot_id in self.__robot_sessions
+            }
+            pending = self.__pending_system_stats
+            self.__pending_system_stats = {}
+
+        for robot_id, session in sessions.items():
+            if pending_status := pending.get(robot_id):
                 session.publish_system_stats(**pending_status)
             else:
                 session.publish_system_stats(**default_values)
-
-        # Clear stored stats for next iteration
-        self.__pending_system_stats.clear()
 
     # Methods meant to be extended by subclasses
     @abstractmethod
@@ -825,8 +947,10 @@ class FleetConnector(ABC):
         This method should not be called directly. Instead, call the start() method to
         start the connector. This ensures that the connector is only started once.
 
-        self.update_fleet() may be called during this method to update the fleet
-        configuration before initializing the robot sessions.
+        self.update_fleet() (or add_robot()) may be called during this method to declare
+        the fleet from an external source, e.g. fetching the robot list from a fleet
+        manager API. Doing so creates the robot sessions immediately; otherwise they are
+        created right after this method returns using data from the fleet configuration.
         """
         ...
 
@@ -912,6 +1036,27 @@ class Connector(FleetConnector, ABC):
     A lot of initialization logic is customizable through the configuration object. See
     FleetConnector.__init__() for more details.
     """
+
+    @override
+    def update_fleet(self, fleet: list[RobotConfig]) -> None:
+        raise NotImplementedError(
+            "udpate_fleet() is not supported on a single-robot Connector; "
+            "use FleetConnector for multi-robot fleets"
+        )
+
+    @override
+    def add_robot(self, robot_config: RobotConfig) -> None:
+        raise NotImplementedError(
+            "add_robot() is not supported on a single-robot Connector; "
+            "use FleetConnector for multi-robot fleets"
+        )
+
+    @override
+    def remove_robot(self, robot_id: str) -> None:
+        raise NotImplementedError(
+            "remove_robot() is not supported on a single-robot Connector; "
+            "use FleetConnector for multi-robot fleets"
+        )
 
     def __init__(self, robot_id: str, config: ConnectorRootConfig, **kwargs) -> None:
         """Initialize a new InOrbit connector.

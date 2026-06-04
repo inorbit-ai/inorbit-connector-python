@@ -7,13 +7,16 @@
 
 # Standard
 import os
+import threading
 from time import sleep
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Third-party
 import pytest
 from pydantic import AnyHttpUrl
+from inorbit_edge.models import CameraConfig
 from inorbit_edge.robot import RobotSession
+from inorbit_edge.video import OpenCVCamera
 
 # InOrbit
 from inorbit_connector.connector import (
@@ -591,8 +594,8 @@ class TestFleetConnectorDeferredSystemStats:
         FleetConnector.__abstractmethods__ = set()
 
     @pytest.fixture
-    def fleet_connector(self, base_model):
-        return FleetConnector(
+    def fleet_connector(self, base_model, mock_robot_session_pool):
+        connector = FleetConnector(
             ConnectorRootConfig(
                 **base_model,
                 fleet=[
@@ -601,6 +604,13 @@ class TestFleetConnectorDeferredSystemStats:
                 ],
             )
         )
+        # Simulate the post-connect state: sessions are created by update_fleet()
+        # during __connect(). __publish_pending_system_stats reads from this dict.
+        connector._FleetConnector__robot_sessions = {
+            robot_id: mock_robot_session_pool.get_session(robot_id)
+            for robot_id in connector.robot_ids
+        }
+        return connector
 
     def test_publish_pending_system_stats_publishes_stored_stats(
         self, fleet_connector, mock_robot_session_pool
@@ -709,6 +719,10 @@ class TestFleetConnectorDeferredSystemStats:
                     ),
                     publish_connector_system_stats=True,
                 )
+                # Simulate the post-connect state (sessions created by update_fleet).
+                connector._FleetConnector__robot_sessions = {
+                    "TestRobot1": mock_robot_session_pool.get_session("TestRobot1")
+                }
 
                 connector._FleetConnector__publish_pending_system_stats()
 
@@ -731,6 +745,10 @@ class TestFleetConnectorDeferredSystemStats:
                 ),
                 publish_connector_system_stats=True,
             )
+            # Simulate the post-connect state (sessions created by update_fleet).
+            connector._FleetConnector__robot_sessions = {
+                "TestRobot1": mock_robot_session_pool.get_session("TestRobot1")
+            }
 
             # Should have fallen back to False
             assert connector._FleetConnector__publish_connector_system_stats is False
@@ -773,6 +791,254 @@ class TestFleetConnectorDeferredSystemStats:
     ):
         """Test that connector system stats are disabled by default."""
         assert fleet_connector._FleetConnector__publish_connector_system_stats is False
+
+
+class TestFleetConnectorRuntimeFleet:
+    """Tests for runtime fleet add/remove (autodiscovery support)."""
+
+    @pytest.fixture
+    def base_model(self):
+        return {
+            "api_key": "valid_key",
+            "connection_config_url": AnyHttpUrl("https://valid.com/"),
+            "connector_type": "valid_connector",
+            "connector_config": DummyConfig(),
+        }
+
+    @pytest.fixture(autouse=True)
+    def make_fleet_connector_not_abstract(self):
+        FleetConnector.__abstractmethods__ = set()
+
+    @pytest.fixture
+    def fleet_connector(self, base_model, mock_robot_session_pool):
+        """A connector in the post-connect state (sessions created for the fleet)."""
+        connector = FleetConnector(
+            ConnectorRootConfig(
+                **base_model,
+                fleet=[
+                    RobotConfig(robot_id="TestRobot1"),
+                    RobotConfig(robot_id="TestRobot2"),
+                ],
+            )
+        )
+        # Simulate the state after __connect() -> update_fleet() created the sessions.
+        connector._FleetConnector__robot_sessions = {
+            robot_id: mock_robot_session_pool.get_session(robot_id)
+            for robot_id in connector.robot_ids
+        }
+        return connector
+
+    @staticmethod
+    def _sessions(connector):
+        return connector._FleetConnector__robot_sessions
+
+    def test_add_robot_creates_and_connects_session(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        fleet_connector.add_robot(RobotConfig(robot_id="R3"))
+
+        assert "R3" in fleet_connector.robot_ids
+        assert any(rc.robot_id == "R3" for rc in fleet_connector.config.fleet)
+        assert "R3" in self._sessions(fleet_connector)
+        mock_robot_session_pool.get_session.assert_any_call("R3", robot_name="R3")
+
+    def test_add_robot_duplicate_raises(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        mock_robot_session_pool.get_session.reset_mock()
+        with pytest.raises(ValueError):
+            fleet_connector.add_robot(RobotConfig(robot_id="TestRobot1"))
+
+        # Fleet unchanged and no new session created.
+        assert fleet_connector.robot_ids == ["TestRobot1", "TestRobot2"]
+        mock_robot_session_pool.get_session.assert_not_called()
+
+    def test_remove_robot_frees_session_and_clears_state(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        # Seed per-robot state that must be cleaned up.
+        fleet_connector._FleetConnector__last_published_frame_ids["TestRobot1"] = "map"
+        fleet_connector._FleetConnector__pending_system_stats["TestRobot1"] = {"x": 1}
+
+        fleet_connector.remove_robot("TestRobot1")
+
+        mock_robot_session_pool.free_robot_session.assert_called_once_with("TestRobot1")
+        assert "TestRobot1" not in fleet_connector.robot_ids
+        assert all(rc.robot_id != "TestRobot1" for rc in fleet_connector.config.fleet)
+        assert "TestRobot1" not in self._sessions(fleet_connector)
+        assert (
+            "TestRobot1"
+            not in fleet_connector._FleetConnector__last_published_frame_ids
+        )
+        assert (
+            "TestRobot1" not in fleet_connector._FleetConnector__pending_system_stats
+        )
+
+    def test_remove_robot_unknown_is_noop(
+        self, fleet_connector, mock_robot_session_pool, caplog
+    ):
+        fleet_connector.remove_robot("does-not-exist")
+
+        mock_robot_session_pool.free_robot_session.assert_not_called()
+        assert fleet_connector.robot_ids == ["TestRobot1", "TestRobot2"]
+        assert "not in the fleet" in caplog.text
+
+    def test_update_fleet_reconciles_diff(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        mock_robot_session_pool.get_session.reset_mock()
+        mock_robot_session_pool.free_robot_session.reset_mock()
+
+        fleet_connector.update_fleet(
+            [RobotConfig(robot_id="TestRobot2"), RobotConfig(robot_id="R3")]
+        )
+
+        # TestRobot1 dropped, R3 added, ordering preserved.
+        assert fleet_connector.robot_ids == ["TestRobot2", "R3"]
+        mock_robot_session_pool.free_robot_session.assert_called_once_with("TestRobot1")
+        mock_robot_session_pool.get_session.assert_any_call("R3", robot_name="R3")
+        # TestRobot2 untouched: not re-created, not freed.
+        assert "TestRobot2" in self._sessions(fleet_connector)
+        assert ("TestRobot2",) not in [
+            c.args for c in mock_robot_session_pool.free_robot_session.call_args_list
+        ]
+
+    def test_update_fleet_duplicate_ids_raises(self, fleet_connector):
+        with pytest.raises(ValueError):
+            fleet_connector.update_fleet(
+                [RobotConfig(robot_id="R3"), RobotConfig(robot_id="R3")]
+            )
+
+    def test_connect_materializes_initial_sessions(
+        self, base_model, mock_robot_session_pool
+    ):
+        """__connect() creates a session per initial robot via update_fleet."""
+        connector = FleetConnector(
+            ConnectorRootConfig(
+                **base_model,
+                fleet=[
+                    RobotConfig(robot_id="TestRobot1"),
+                    RobotConfig(robot_id="TestRobot2"),
+                ],
+            )
+        )
+        connector.start()
+        try:
+            sleep(0.5)
+            mock_robot_session_pool.get_session.assert_any_call(
+                "TestRobot1", robot_name="TestRobot1"
+            )
+            mock_robot_session_pool.get_session.assert_any_call(
+                "TestRobot2", robot_name="TestRobot2"
+            )
+            mock_robot_session_pool.free_robot_session.assert_not_called()
+        finally:
+            connector.stop()
+
+    def test_disconnect_clears_sessions_for_restart(
+        self, base_model, mock_robot_session_pool
+    ):
+        """stop() disconnects + clears sessions so a later start() reconnects."""
+        connector = FleetConnector(
+            ConnectorRootConfig(
+                **base_model,
+                fleet=[RobotConfig(robot_id="TestRobot1")],
+            )
+        )
+        connector.start()
+        sleep(0.5)
+        connector.stop()
+
+        # Session was created and then disconnected, and the dict cleared.
+        session = mock_robot_session_pool.get_session("TestRobot1")
+        session.disconnect.assert_called()
+        assert connector._FleetConnector__robot_sessions == {}
+
+        # Restart must recreate the session (to_add keys off __robot_sessions).
+        session.reset_mock()
+        connector.start()
+        try:
+            sleep(0.5)
+            assert "TestRobot1" in connector._FleetConnector__robot_sessions
+        finally:
+            connector.stop()
+
+    def test_runtime_empty_fleet_does_not_crash(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        fleet_connector.remove_robot("TestRobot1")
+        fleet_connector.remove_robot("TestRobot2")
+
+        assert fleet_connector.robot_ids == []
+        assert self._sessions(fleet_connector) == {}
+        # Publishing pending stats over an empty fleet must be a safe no-op.
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+    def test_cameras_registered_on_runtime_add(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        robot = RobotConfig(
+            robot_id="CamBot",
+            cameras=[CameraConfig(video_url="rtsp://example/stream")],
+        )
+        fleet_connector.add_robot(robot)
+
+        session = mock_robot_session_pool.get_session("CamBot")
+        assert session.register_camera.call_count == 1
+        args = session.register_camera.call_args
+        assert args.args[0] == "0"
+        assert isinstance(args.args[1], OpenCVCamera)
+
+    def test_cameras_registered_once_at_startup(
+        self, base_model, mock_robot_session_pool
+    ):
+        """Regression: moving camera reg into __initialize_session keeps it once."""
+        connector = FleetConnector(
+            ConnectorRootConfig(
+                **base_model,
+                fleet=[
+                    RobotConfig(
+                        robot_id="CamBot",
+                        cameras=[CameraConfig(video_url="rtsp://example/stream")],
+                    )
+                ],
+            )
+        )
+        connector.start()
+        try:
+            sleep(0.5)
+            session = mock_robot_session_pool.get_session("CamBot")
+            assert session.register_camera.call_count == 1
+        finally:
+            connector.stop()
+
+    def test_get_robot_config(self, fleet_connector):
+        assert fleet_connector._get_robot_config("TestRobot1").robot_id == "TestRobot1"
+        assert fleet_connector._get_robot_config("nope") is None
+
+    def test_thread_safety_smoke(self, fleet_connector):
+        """Concurrent add/remove on disjoint ids leaves consistent state."""
+
+        def worker(start):
+            for i in range(start, start + 20):
+                rid = f"T{i}"
+                fleet_connector.add_robot(RobotConfig(robot_id=rid))
+                fleet_connector.remove_robot(rid)
+
+        threads = [
+            threading.Thread(target=worker, args=(base,))
+            for base in (100, 200, 300, 400)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # All transient robots removed; the original fleet remains; no duplicates.
+        ids = fleet_connector.robot_ids
+        assert sorted(ids) == ["TestRobot1", "TestRobot2"]
+        assert len(ids) == len(set(ids))
+        assert set(self._sessions(fleet_connector)) == {"TestRobot1", "TestRobot2"}
 
 
 # ==============================================================================
@@ -888,6 +1154,35 @@ class TestConnector:
         session = base_connector._get_session()
         assert session is not None
         assert session.robot_id == "TestRobot"
+
+    def test_fleet_mutation_methods_raise(self, base_connector):
+        """Single-robot Connector blocks the runtime fleet-mutation API."""
+        with pytest.raises(NotImplementedError):
+            base_connector.update_fleet([RobotConfig(robot_id="X")])
+        with pytest.raises(NotImplementedError):
+            base_connector.add_robot(RobotConfig(robot_id="X"))
+        with pytest.raises(NotImplementedError):
+            base_connector.remove_robot("TestRobot")
+
+    def test_start_still_creates_session_despite_blocked_update_fleet(
+        self, base_model, mock_robot_session_pool
+    ):
+        """__connect uses the private reconcile, so startup works though
+        update_fleet is blocked."""
+        connector = Connector(
+            "TestRobot",
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
+        )
+        connector.start()
+        try:
+            sleep(0.5)
+            mock_robot_session_pool.get_session.assert_any_call(
+                "TestRobot", robot_name="TestRobot"
+            )
+        finally:
+            connector.stop()
         mock_robot_session_pool.get_session.assert_called()
 
     def test_publish_map(self, base_model, mock_robot_session_pool):
