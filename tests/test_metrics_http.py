@@ -76,9 +76,7 @@ def test_record_error_increments_error_counter_with_error_kind(captured_instrume
     requests.add.assert_not_called()
 
 
-def test_record_error_coerces_unknown_error_kind_to_other(
-    captured_instruments, caplog
-):
+def test_record_error_coerces_unknown_error_kind_to_other(captured_instruments, caplog):
     requests, errors, duration = captured_instruments
     caplog.set_level(logging.WARNING, logger=http_metrics.__name__)
 
