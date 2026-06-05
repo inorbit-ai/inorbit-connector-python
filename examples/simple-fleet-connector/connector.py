@@ -130,14 +130,16 @@ class ExampleBotFleetConnector(FleetConnector):
         publishing operation.
         """
 
+        # Snapshot the fleet once: robot_ids may change at runtime where runtime fleet
+        # updates are implemented, so reading it once ensures consistency.
+        robot_ids = self.robot_ids
+
         # Fetch data for all robots concurrently
-        robot_data_tasks = [
-            get_fleet_robot_data(robot_id) for robot_id in self.robot_ids
-        ]
+        robot_data_tasks = [get_fleet_robot_data(robot_id) for robot_id in robot_ids]
         robot_data_list = await asyncio.gather(*robot_data_tasks)
 
         # Create a mapping of robot_id to data
-        robot_data_map = dict(zip(self.robot_ids, robot_data_list))
+        robot_data_map = dict(zip(robot_ids, robot_data_list))
 
         # Publish data for each robot
         for robot_id, data in robot_data_map.items():
@@ -167,7 +169,7 @@ class ExampleBotFleetConnector(FleetConnector):
             self.publish_robot_odometry(robot_id, **odometry)
 
         self._logger.info(
-            f"Fleet data updated and published for {len(self.robot_ids)} robots"
+            f"Fleet data updated and published for {len(robot_ids)} robots"
         )
 
     @override

@@ -69,7 +69,7 @@ for robot_id in self.robot_ids:
 
 ### Updating the Fleet
 
-`update_fleet()` reconciles the connector's live fleet to exactly the list you passed. It creates and connects a session for each newly added robot, and disconnects and frees the session of each robot that is no longer present. Robots already in the fleet are left untouched.
+`update_fleet()` reconciles the connector's live fleet membership to the list passed. It creates and connects a session for each newly added robot, and disconnects and frees the session of each robot that is no longer present. Robots already in the fleet are left untouched and their session is not re-created even if their `RobotConfig` changed.
 
 This makes it the entry point both for **initial provisioning** (declaring the fleet from fleet-manager data instead of hardcoded config) and for **runtime autodiscovery**:
 

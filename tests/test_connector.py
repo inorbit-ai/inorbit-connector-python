@@ -76,6 +76,21 @@ def mock_robot_session_pool():
         yield mock_pool
 
 
+def _seed_sessions(connector):
+    """Mimic the post-``__connect()`` state for tests that don't call ``start()``.
+
+    Production creates the per-robot sessions in ``__connect()``; tests that build a
+    connector directly must seed ``__robot_sessions`` so the ``publish_*`` /
+    ``_get_robot_session`` paths (which read the connector's own session map) work.
+    """
+    pool = connector._FleetConnector__session_pool
+    connector._FleetConnector__robot_sessions = {
+        rc.robot_id: pool.get_session(rc.robot_id, robot_name=rc.robot_id)
+        for rc in connector.config.fleet
+    }
+    return connector
+
+
 # ==============================================================================
 # FleetConnector Tests
 # ==============================================================================
@@ -147,17 +162,22 @@ class TestFleetConnector:
 
     @pytest.fixture(autouse=True)
     def make_fleet_connector_not_abstract(self):
-        FleetConnector.__abstractmethods__ = set()
+        saved = FleetConnector.__abstractmethods__
+        FleetConnector.__abstractmethods__ = frozenset()
+        yield
+        FleetConnector.__abstractmethods__ = saved
 
     @pytest.fixture
     def base_fleet_connector(self, base_model):
-        return FleetConnector(
-            ConnectorRootConfig(
-                **base_model,
-                fleet=[
-                    RobotConfig(robot_id="TestRobot1"),
-                    RobotConfig(robot_id="TestRobot2"),
-                ],
+        return _seed_sessions(
+            FleetConnector(
+                ConnectorRootConfig(
+                    **base_model,
+                    fleet=[
+                        RobotConfig(robot_id="TestRobot1"),
+                        RobotConfig(robot_id="TestRobot2"),
+                    ],
+                )
             )
         )
 
@@ -237,9 +257,7 @@ class TestFleetConnector:
         robot_id = "TestRobot1"
         base_fleet_connector.publish_robot_pose(robot_id, 1.0, 2.0, 3.14, "map1")
 
-        # Verify get_session was called and get the actual session returned
-        mock_robot_session_pool.get_session.assert_called_with(robot_id)
-        # Get the session from the side_effect cache
+        # The robot's active session received the pose.
         session = base_fleet_connector._get_robot_session(robot_id)
         session.publish_pose.assert_called()
 
@@ -255,10 +273,12 @@ class TestFleetConnector:
                 "resolution": 0.1,
             }
         }
-        connector = FleetConnector(
-            ConnectorRootConfig(
-                **base_model,
-                fleet=[RobotConfig(robot_id="TestRobot1")],
+        connector = _seed_sessions(
+            FleetConnector(
+                ConnectorRootConfig(
+                    **base_model,
+                    fleet=[RobotConfig(robot_id="TestRobot1")],
+                )
             )
         )
 
@@ -412,14 +432,19 @@ class TestFleetConnectorMapFetching:
 
     @pytest.fixture(autouse=True)
     def make_fleet_connector_not_abstract(self):
-        FleetConnector.__abstractmethods__ = set()
+        saved = FleetConnector.__abstractmethods__
+        FleetConnector.__abstractmethods__ = frozenset()
+        yield
+        FleetConnector.__abstractmethods__ = saved
 
     @pytest.fixture
     def fleet_connector(self, base_model):
-        return FleetConnector(
-            ConnectorRootConfig(
-                **base_model,
-                fleet=[RobotConfig(robot_id="TestRobot1")],
+        return _seed_sessions(
+            FleetConnector(
+                ConnectorRootConfig(
+                    **base_model,
+                    fleet=[RobotConfig(robot_id="TestRobot1")],
+                )
             )
         )
 
@@ -591,7 +616,10 @@ class TestFleetConnectorDeferredSystemStats:
 
     @pytest.fixture(autouse=True)
     def make_fleet_connector_not_abstract(self):
-        FleetConnector.__abstractmethods__ = set()
+        saved = FleetConnector.__abstractmethods__
+        FleetConnector.__abstractmethods__ = frozenset()
+        yield
+        FleetConnector.__abstractmethods__ = saved
 
     @pytest.fixture
     def fleet_connector(self, base_model, mock_robot_session_pool):
@@ -807,7 +835,10 @@ class TestFleetConnectorRuntimeFleet:
 
     @pytest.fixture(autouse=True)
     def make_fleet_connector_not_abstract(self):
-        FleetConnector.__abstractmethods__ = set()
+        saved = FleetConnector.__abstractmethods__
+        FleetConnector.__abstractmethods__ = frozenset()
+        yield
+        FleetConnector.__abstractmethods__ = saved
 
     @pytest.fixture
     def fleet_connector(self, base_model, mock_robot_session_pool):
@@ -879,6 +910,18 @@ class TestFleetConnectorRuntimeFleet:
         assert fleet_connector.robot_ids == ["TestRobot1", "TestRobot2"]
         assert "not in the fleet" in caplog.text
 
+    def test_publish_to_removed_robot_does_not_resurrect_session(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Accessing/publishing to a removed robot must raise, not silently recreate a
+        zombie session via the pool."""
+        fleet_connector.remove_robot("TestRobot1")
+
+        with pytest.raises(KeyError):
+            fleet_connector._get_robot_session("TestRobot1")
+        with pytest.raises(KeyError):
+            fleet_connector.publish_robot_odometry("TestRobot1", linear_speed=1.0)
+
     def test_update_fleet_reconciles_diff(
         self, fleet_connector, mock_robot_session_pool
     ):
@@ -904,6 +947,44 @@ class TestFleetConnectorRuntimeFleet:
             fleet_connector.update_fleet(
                 [RobotConfig(robot_id="R3"), RobotConfig(robot_id="R3")]
             )
+
+    def test_update_fleet_rolls_back_on_session_failure(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """If a session fails to connect mid-reconcile, the whole change rolls back:
+        membership is untouched and every attempted add is freed from the pool."""
+        before_ids = fleet_connector.robot_ids
+        before_fleet = list(fleet_connector.config.fleet)
+
+        # Fail when creating the 2nd newly-added robot's session.
+        def failing_get_session(robot_id, robot_name=None):
+            if robot_id == "R4":
+                raise RuntimeError("connect failed")
+            session = MagicMock(spec=RobotSession)
+            session.robot_id = robot_id
+            return session
+
+        mock_robot_session_pool.get_session.side_effect = failing_get_session
+
+        with pytest.raises(RuntimeError):
+            fleet_connector.update_fleet(
+                [
+                    RobotConfig(robot_id="TestRobot1"),
+                    RobotConfig(robot_id="TestRobot2"),
+                    RobotConfig(robot_id="R3"),
+                    RobotConfig(robot_id="R4"),
+                ]
+            )
+
+        # Nothing committed: ids, config.fleet and the session map are as before.
+        assert fleet_connector.robot_ids == before_ids
+        assert fleet_connector.config.fleet == before_fleet
+        assert set(self._sessions(fleet_connector)) == set(before_ids)
+        # Both attempted adds were freed from the pool (incl. the half-built one).
+        freed = {
+            c.args[0] for c in mock_robot_session_pool.free_robot_session.call_args_list
+        }
+        assert {"R3", "R4"} <= freed
 
     def test_connect_materializes_initial_sessions(
         self, base_model, mock_robot_session_pool
@@ -934,7 +1015,8 @@ class TestFleetConnectorRuntimeFleet:
     def test_disconnect_clears_sessions_for_restart(
         self, base_model, mock_robot_session_pool
     ):
-        """stop() disconnects + clears sessions so a later start() reconnects."""
+        """stop() frees the pool sessions + clears the map so a later start()
+        rebuilds and reconnects instead of reusing stale, disconnected sessions."""
         connector = FleetConnector(
             ConnectorRootConfig(
                 **base_model,
@@ -945,13 +1027,14 @@ class TestFleetConnectorRuntimeFleet:
         sleep(0.5)
         connector.stop()
 
-        # Session was created and then disconnected, and the dict cleared.
-        session = mock_robot_session_pool.get_session("TestRobot1")
-        session.disconnect.assert_called()
+        # The session was freed from the pool (which disconnects it) and the map
+        # cleared. Freeing the pool — not just disconnecting — is what lets a restart
+        # rebuild a fresh session (get_session skips connect() on a pool cache hit).
+        mock_robot_session_pool.free_robot_session.assert_any_call("TestRobot1")
         assert connector._FleetConnector__robot_sessions == {}
 
         # Restart must recreate the session (to_add keys off __robot_sessions).
-        session.reset_mock()
+        mock_robot_session_pool.free_robot_session.reset_mock()
         connector.start()
         try:
             sleep(0.5)
@@ -1013,24 +1096,35 @@ class TestFleetConnectorRuntimeFleet:
         assert fleet_connector._get_robot_config("nope") is None
 
     def test_thread_safety_smoke(self, fleet_connector):
-        """Concurrent add/remove on disjoint ids leaves consistent state."""
+        """Concurrent add/remove on a SHARED id set must keep the fleet's internal
+        structures consistent. The shared ids force real contention on __fleet_lock —
+        without it the read-modify-write in add/remove would corrupt config.fleet or
+        desync it from the session map. Duplicate adds racing each other are expected
+        and raise ValueError, which the workers swallow."""
+        shared_ids = [f"T{i}" for i in range(8)]
 
-        def worker(start):
-            for i in range(start, start + 20):
-                rid = f"T{i}"
-                fleet_connector.add_robot(RobotConfig(robot_id=rid))
-                fleet_connector.remove_robot(rid)
+        def worker():
+            for _ in range(50):
+                for rid in shared_ids:
+                    try:
+                        fleet_connector.add_robot(RobotConfig(robot_id=rid))
+                    except ValueError:
+                        # Another thread won the race to add this id — expected.
+                        pass
+                    fleet_connector.remove_robot(rid)  # no-op if already gone
 
-        threads = [
-            threading.Thread(target=worker, args=(base,))
-            for base in (100, 200, 300, 400)
-        ]
+        threads = [threading.Thread(target=worker) for _ in range(4)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
 
-        # All transient robots removed; the original fleet remains; no duplicates.
+        # Deterministic cleanup so the final assertion doesn't hinge on interleaving.
+        for rid in shared_ids:
+            fleet_connector.remove_robot(rid)
+
+        # The original fleet remains, with no duplicates, and robot_ids agrees with the
+        # live session map (the invariant the lock protects).
         ids = fleet_connector.robot_ids
         assert sorted(ids) == ["TestRobot1", "TestRobot2"]
         assert len(ids) == len(set(ids))
@@ -1105,15 +1199,20 @@ class TestConnector:
 
     @pytest.fixture(autouse=True)
     def make_connector_not_abstract(self):
-        Connector.__abstractmethods__ = set()
+        saved = Connector.__abstractmethods__
+        Connector.__abstractmethods__ = frozenset()
+        yield
+        Connector.__abstractmethods__ = saved
 
     @pytest.fixture
     def base_connector(self, base_model):
-        return Connector(
-            "TestRobot",
-            ConnectorRootConfig(
-                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
-            ),
+        return _seed_sessions(
+            Connector(
+                "TestRobot",
+                ConnectorRootConfig(
+                    **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+                ),
+            )
         )
 
     def test_init(self, base_model):
@@ -1141,7 +1240,7 @@ class TestConnector:
         )
         robot_id = "TestRobot"
 
-        connector = Connector(robot_id, config)
+        connector = _seed_sessions(Connector(robot_id, config))
         session = connector._get_session()
         assert session.robot_id == "TestRobot"
 
@@ -1179,7 +1278,6 @@ class TestConnector:
             )
         finally:
             connector.stop()
-        mock_robot_session_pool.get_session.assert_called()
 
     def test_publish_map(self, base_model, mock_robot_session_pool):
         """Test publish_map delegates to FleetConnector.publish_robot_map."""
@@ -1193,11 +1291,13 @@ class TestConnector:
                 "resolution": 0.1,
             }
         }
-        connector = Connector(
-            "TestRobot",
-            ConnectorRootConfig(
-                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
-            ),
+        connector = _seed_sessions(
+            Connector(
+                "TestRobot",
+                ConnectorRootConfig(
+                    **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+                ),
+            )
         )
 
         connector.publish_map("frameA")
@@ -1217,11 +1317,13 @@ class TestConnector:
                 "resolution": 0.1,
             }
         }
-        connector = Connector(
-            "TestRobot",
-            ConnectorRootConfig(
-                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
-            ),
+        connector = _seed_sessions(
+            Connector(
+                "TestRobot",
+                ConnectorRootConfig(
+                    **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+                ),
+            )
         )
 
         connector.publish_pose(1.0, 2.0, 3.14, "frameA")
@@ -1248,11 +1350,13 @@ class TestConnector:
                 "resolution": 0.1,
             },
         }
-        connector = Connector(
-            "TestRobot",
-            ConnectorRootConfig(
-                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
-            ),
+        connector = _seed_sessions(
+            Connector(
+                "TestRobot",
+                ConnectorRootConfig(
+                    **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+                ),
+            )
         )
 
         session = connector._get_session()
@@ -1434,15 +1538,20 @@ class TestConnectorCommandHandler:
 
     @pytest.fixture(autouse=True)
     def make_connector_not_abstract(self):
-        Connector.__abstractmethods__ = set()
+        saved = Connector.__abstractmethods__
+        Connector.__abstractmethods__ = frozenset()
+        yield
+        Connector.__abstractmethods__ = saved
 
     @pytest.fixture
     def base_connector(self, base_model):
-        return Connector(
-            "TestRobot",
-            ConnectorRootConfig(
-                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
-            ),
+        return _seed_sessions(
+            Connector(
+                "TestRobot",
+                ConnectorRootConfig(
+                    **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+                ),
+            )
         )
 
     @pytest.mark.asyncio

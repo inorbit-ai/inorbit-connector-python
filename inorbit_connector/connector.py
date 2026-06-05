@@ -99,12 +99,6 @@ class FleetConnector(ABC):
 
         # Common information
         self.config = config
-        # Cache of robot IDs in config.fleet. Accessed through the robot_ids property.
-        # Seeded directly from the config here (no sessions are created during
-        # construction); thereafter kept in sync by update_fleet()/add_robot()/
-        # remove_robot(). The initial robot sessions are created later by __connect(),
-        # which calls update_fleet(self.config.fleet) once the connector thread is up.
-        self.__robot_ids: list[str] = [robot.robot_id for robot in config.fleet]
 
         # Per robot state
         self.__last_published_frame_ids: dict[str, str] = {}
@@ -120,8 +114,8 @@ class FleetConnector(ABC):
         # robot_id) for thread-safe access) in tight loops. It should not be accessed
         # directly by subclasses to maintain thread-safety
         self.__robot_sessions: dict[str, RobotSession] = {}
-        # Lock guarding fleet mutation: __robot_ids, __robot_sessions membership,
-        # config.fleet, and the per-robot state dicts.
+        # Lock guarding fleet mutation: config.fleet, __robot_sessions membership, and
+        # the per-robot state dicts (last-frame-id, pending system stats).
         self.__fleet_lock = threading.RLock()
 
         # Threading for the main run methods
@@ -213,10 +207,9 @@ class FleetConnector(ABC):
     @property
     def robot_ids(self) -> list[str]:
         """Get the list of robot IDs in the fleet."""
-        # Return a copy of the cached list so callers can't mutate internal state and
-        # so a captured reference stays consistent if the fleet changes concurrently.
+        # Return a copy of the fleet robotIds derived from config.fleet under the lock.
         with self.__fleet_lock:
-            return self.__robot_ids.copy()
+            return [robot.robot_id for robot in self.config.fleet]
 
     @property
     def _connector_type(self) -> str:
@@ -240,11 +233,12 @@ class FleetConnector(ABC):
         - disconnects and frees the session of each robot no longer present, clearing
           its per-robot state.
 
-        It is idempotent: robots already in the fleet are left untouched.
-        ``__connect()`` calls it with ``self.config.fleet`` to create the
-        initial sessions, and subclasses may call it at runtime (from ``_connect()``
-        onward) to implement robot autodiscovery. e.g. fetching the robot list from a
-        fleet manager API.
+        It is idempotent: robots already in the fleet are left untouched. It reconciles
+        membership only. A robot present in both the old and new fleet keeps its
+        existing session even if its ``RobotConfig`` changed. The connector's startup
+        reconciles ``self.config.fleet`` to create the initial sessions, and subclasses
+        may call this at runtime (from ``_connect()`` onward) to implement fleet runtime
+        updates, e.g. fetching the robot list from a fleet manager API.
 
         Note:
             Sessions are created/destroyed immediately, so this must be called once the
@@ -280,15 +274,27 @@ class FleetConnector(ABC):
         # respect to concurrent add_robot()/remove_robot()/update_fleet() calls. The
         # lock is re-entrant, so the wrappers can hold it across their read+delegate.
         with self.__fleet_lock:
-            new_id_set = set(new_ids)
-            to_remove = [rid for rid in self.__robot_sessions if rid not in new_id_set]
+            configs = {robot.robot_id: robot for robot in fleet}
+            to_remove = [rid for rid in self.__robot_sessions if rid not in configs]
             to_add = [rid for rid in new_ids if rid not in self.__robot_sessions]
 
-            # Apply the new membership before touching sessions so the running loop
-            # sees the target fleet and stops iterating removed robots.
-            self.config.fleet = list(fleet)
-            self.__robot_ids = list(new_ids)
+            # Create the new sessions before mutating any membership or state, so a
+            # failure to connect rolls back cleanly and never leaves the fleet listing a
+            # robot without a session.
+            created: dict[str, RobotSession] = {}
+            try:
+                for robot_id in to_add:
+                    created[robot_id] = self.__initialize_session(configs[robot_id])
+            except Exception:
+                # get_session() registers the session in the pool before connecting, so
+                # free every attempted add (a no-op when the pool has none) to undo any
+                # half-built session, then re-raise with membership untouched.
+                for robot_id in to_add:
+                    self.__session_pool.free_robot_session(robot_id)
+                raise
 
+            # Commit the membership and drop removed robots.
+            self.config.fleet = list(fleet)
             for robot_id in to_remove:
                 self.__last_published_frame_ids.pop(robot_id, None)
                 self.__pending_system_stats.pop(robot_id, None)
@@ -296,8 +302,7 @@ class FleetConnector(ABC):
                 # free_robot_session disconnects and removes the session from the
                 # pool; no-op if the pool has no session for this robot.
                 self.__session_pool.free_robot_session(robot_id)
-            for robot_id in to_add:
-                self.__robot_sessions[robot_id] = self.__initialize_session(robot_id)
+            self.__robot_sessions.update(created)
 
     def add_robot(self, robot_config: RobotConfig) -> None:
         """Add a single robot to the fleet at runtime.
@@ -317,7 +322,7 @@ class FleetConnector(ABC):
             ValueError: If a robot with the same ``robot_id`` is already in the fleet.
         """
         with self.__fleet_lock:
-            if robot_config.robot_id in self.__robot_ids:
+            if any(r.robot_id == robot_config.robot_id for r in self.config.fleet):
                 raise ValueError(
                     f"Robot '{robot_config.robot_id}' is already in the fleet"
                 )
@@ -335,7 +340,7 @@ class FleetConnector(ABC):
             robot_id (str): The ID of the robot to remove.
         """
         with self.__fleet_lock:
-            if robot_id not in self.__robot_ids:
+            if not any(r.robot_id == robot_id for r in self.config.fleet):
                 self._logger.warning(
                     f"remove_robot: robot '{robot_id}' is not in the fleet"
                 )
@@ -448,9 +453,10 @@ class FleetConnector(ABC):
             # bash scripts
             session.register_commands_path(path, exec_name_regex=r".*\.sh")
 
-    def __initialize_session(self, robot_id: str) -> RobotSession:
-        """Initialize a robot session."""
+    def __initialize_session(self, robot_config: RobotConfig) -> RobotSession:
+        """Initialize a robot session for the given robot configuration."""
 
+        robot_id = robot_config.robot_id
         # The InOrbit hostname of the robot is set to the robot_id by default
         # There is no support for setting the display name of a robot through the
         # edge-sdk yet
@@ -477,18 +483,16 @@ class FleetConnector(ABC):
             )
 
         # Register cameras declared in this robot's configuration.
-        robot_config = self._get_robot_config(robot_id)
-        if robot_config is not None:
-            for idx, camera_config in enumerate(robot_config.cameras):
-                self._logger.info(
-                    f"Registering camera {idx} for robot {robot_id}: "
-                    f"{str(camera_config.video_url)}"
-                )
-                # If values are None, remove the key from the dictionary to use
-                # edge-sdk defaults
-                dump = camera_config.model_dump()
-                clean = {k: v for k, v in dump.items() if v is not None}
-                session.register_camera(str(idx), OpenCVCamera(**clean))
+        for idx, camera_config in enumerate(robot_config.cameras):
+            self._logger.info(
+                f"Registering camera {idx} for robot {robot_id}: "
+                f"{str(camera_config.video_url)}"
+            )
+            # If values are None, remove the key from the dictionary to use
+            # edge-sdk defaults
+            dump = camera_config.model_dump()
+            clean = {k: v for k, v in dump.items() if v is not None}
+            session.register_camera(str(idx), OpenCVCamera(**clean))
 
         return session
 
@@ -515,13 +519,16 @@ class FleetConnector(ABC):
     async def __disconnect(self) -> None:
         """Disconnect external services and disconnect from InOrbit."""
 
-        # Disconnect from InOrbit while holding the lock so no robot can be added (via
-        # add_robot/update_fleet from another thread) while we tear the fleet down, and
-        # clear the session dict so a subsequent start() recreates the sessions.
+        # Tear the fleet down while holding the lock so no robot can be added (via
+        # add_robot/update_fleet from another thread) mid-teardown. Free each session
+        # from the pool (not just disconnect it) so a subsequent start() rebuilds and
+        # reconnects fresh sessions instead of reusing stale, disconnected ones.
         with self.__fleet_lock:
-            for session in self.__robot_sessions.values():
-                session.disconnect()
+            for robot_id in list(self.__robot_sessions):
+                self.__session_pool.free_robot_session(robot_id)
             self.__robot_sessions.clear()
+            self.__last_published_frame_ids.clear()
+            self.__pending_system_stats.clear()
 
         # Clean up temporary map files
         if self.__temp_map_dir is not None:
@@ -578,7 +585,8 @@ class FleetConnector(ABC):
                 _metrics.execution_loop_errors.add(1)
                 self._logger.error(f"Error in execution loop: {e}")
                 self._logger.error(f"Traceback: {traceback.format_exc()}")
-                self.__pending_system_stats.clear()
+                with self.__fleet_lock:
+                    self.__pending_system_stats.clear()
                 # Continue execution after a brief pause to avoid tight error loops
                 await asyncio.sleep(1.0)
 
@@ -588,8 +596,9 @@ class FleetConnector(ABC):
         Usually the connector API is enough to abstract from the edge-sdk, but in some
         cases accessing the robot session directly may be necessary.
 
-        This method provides thread-safe access to robot sessions through the session
-        pool.
+        This method provides thread-safe access to the connector's active robot
+        sessions. It reads the connector's own session map rather than the pool, so it
+        never creates a session for a robot that is not in the fleet.
 
         Args:
             robot_id (str): The robot ID to get the session for
@@ -598,9 +607,12 @@ class FleetConnector(ABC):
             RobotSession: The robot session for the specified robot
 
         Raises:
-            KeyError: If the robot_id is not found in the pool
+            KeyError: If the robot_id is not in the fleet
         """
-        return self.__session_pool.get_session(robot_id)
+        session = self.__robot_sessions.get(robot_id)
+        if session is None:
+            raise KeyError(f"No active session for robot '{robot_id}'")
+        return session
 
     def _is_session_connected(self, robot_id: str) -> bool:
         """Return True if the MQTT session for ``robot_id`` is currently connected.
@@ -694,12 +706,15 @@ class FleetConnector(ABC):
             **kwargs: Additional arguments for pose publishing
         """
         session = self._get_robot_session(robot_id)
-        last_published_frame_id = self.__last_published_frame_ids.get(robot_id, None)
-        if frame_id != last_published_frame_id:
+        with self.__fleet_lock:
+            changed = frame_id != self.__last_published_frame_ids.get(robot_id)
+            if changed:
+                self.__last_published_frame_ids[robot_id] = frame_id
+        if changed:
             self._logger.info(
                 f"Updating map {frame_id} with new pose for robot {robot_id}."
             )
-            self.__last_published_frame_ids[robot_id] = frame_id
+            # map/pose publish is I/O and should not hold the fleet lock
             self.publish_robot_map(robot_id, frame_id, is_update=True)
         session.publish_pose(x, y, yaw, frame_id, **kwargs)
 
@@ -925,11 +940,7 @@ class FleetConnector(ABC):
         )
 
         with self.__fleet_lock:
-            sessions = {
-                robot_id: self.__robot_sessions[robot_id]
-                for robot_id in self.__robot_ids
-                if robot_id in self.__robot_sessions
-            }
+            sessions = dict(self.__robot_sessions)
             pending = self.__pending_system_stats
             self.__pending_system_stats = {}
 
@@ -1040,7 +1051,7 @@ class Connector(FleetConnector, ABC):
     @override
     def update_fleet(self, fleet: list[RobotConfig]) -> None:
         raise NotImplementedError(
-            "udpate_fleet() is not supported on a single-robot Connector; "
+            "update_fleet() is not supported on a single-robot Connector; "
             "use FleetConnector for multi-robot fleets"
         )
 
