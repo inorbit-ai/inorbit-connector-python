@@ -214,6 +214,57 @@ class DeviceClient:
 
 The callback runs on every scrape, so it should be cheap and side-effect free.
 
+## Identity info metrics (robot model, firmware, fleet manager version)
+
+To track *what* is deployed — robot models, firmware versions, fleet manager version — and detect when a customer upgrades, the framework ships two canonical info gauges (the Prometheus `kube_pod_info` idiom: constant value 1, payload in the labels). Register them during `_connect()` once your API client can answer the questions:
+
+```python
+from inorbit_connector.metrics import (
+    register_robot_info_gauge,
+    register_fleet_manager_info_gauge,
+)
+
+# robot.info — one series per robot
+register_robot_info_gauge(
+    robot_ids=lambda: self.robot_ids,
+    robot_info=lambda rid: self._api.robot_identity(rid),
+    # must return {"model": "MiR250", "firmware_version": "2.13.1"} or None
+)
+
+# fleet_manager.info — one series per process
+register_fleet_manager_info_gauge(
+    version=lambda: self._api.fleet_manager_version(),  # "3.4.0" or None
+)
+```
+
+Exports as:
+
+```
+inorbit_connector_robot_info{robot_id="r1", model="MiR250", firmware_version="2.13.1"} 1
+inorbit_connector_fleet_manager_info{version="3.4.0"} 1
+```
+
+Both schemas are **frozen**: `robot.info` carries exactly `robot_id` / `model` / `firmware_version` (the last two optional), `fleet_manager.info` exactly `version`. Unknown keys are dropped with a warning. Return `None` while the info isn't known yet — no placeholder series.
+
+Why a separate info metric instead of a `model` label on every metric: model is per-robot, so it can't be a Resource attribute (those are per-process, like `connector_type`), and the canonical/SDK instruments have frozen schemas. The info-join gives you the slice anyway, against **every** per-robot series the framework emits, with zero call-site changes:
+
+```promql
+# Publish rate by robot model
+sum by (model) (
+  rate(calls_publish_pose_total[5m])
+  * on (robot_id) group_left(model)
+  max by (robot_id, model) (inorbit_connector_robot_info)
+)
+
+# Upgrade detection: a (robot, version) combination that didn't exist 1h ago
+inorbit_connector_robot_info unless inorbit_connector_robot_info offset 1h
+
+# Fleet manager upgraded
+inorbit_connector_fleet_manager_info unless inorbit_connector_fleet_manager_info offset 1h
+```
+
+Label hygiene: values must come from a **normalized catalog** — `"MiR250"`, not the raw upstream string (`"MiR 250 (rev. 4)"` vs `"mir250"` across firmware versions splits the series). Strip build metadata from versions (`2.13.1`, not `2.13.1-build.20260604`). Never include per-device-unique values (serials) — that's what `robot_id` is for.
+
 ## Production deployment
 
 For multi-container deployments, see [`examples/metrics/`](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/metrics) for a reference OTel collector compose stack that:
