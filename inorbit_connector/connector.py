@@ -349,22 +349,6 @@ class FleetConnector(ABC):
                 [robot for robot in self.config.fleet if robot.robot_id != robot_id]
             )
 
-    def _get_robot_config(self, robot_id: str) -> RobotConfig | None:
-        """Return the ``RobotConfig`` for ``robot_id`` from the fleet, or None.
-
-        Args:
-            robot_id (str): The robot ID to look up.
-
-        Returns:
-            RobotConfig | None: The matching configuration, or None if the robot is not
-                in the fleet.
-        """
-        with self.__fleet_lock:
-            for robot_config in self.config.fleet:
-                if robot_config.robot_id == robot_id:
-                    return robot_config
-        return None
-
     def _handle_command_exception(
         self,
         exception: Exception,
