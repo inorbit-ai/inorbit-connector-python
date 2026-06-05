@@ -69,24 +69,40 @@ for robot_id in self.robot_ids:
 
 ### Updating the Fleet
 
-You can update the fleet configuration during `_connect()` by calling the `update_fleet()` method. This is useful for dynamically setting the robots list before the connector starts, for example, when provisioning robots from fleet manager data instead of hardcoded values in the config files:
+`update_fleet()` reconciles the connector's live fleet membership to the list passed. It creates and connects a session for each newly added robot, and disconnects and frees the session of each robot that is no longer present. Robots already in the fleet are left untouched and their session is not re-created even if their `RobotConfig` changed.
+
+This makes it the entry point both for **initial provisioning** (declaring the fleet from fleet-manager data instead of hardcoded config) and for **runtime autodiscovery**:
 
 ```python
 @override
 async def _connect(self) -> None:
-    """Connect to fleet manager and update fleet."""
-    # Fetch robot list from fleet manager API
+    """Connect to fleet manager and declare the fleet."""
+    # Fetch the robot list from the fleet manager API
     robots = await self._fleet_manager.get_robots()
-    
-    # Update fleet configuration
-    fleet_config = [
-        RobotConfig(robot_id=robot.id, cameras=robot.cameras)
-        for robot in robots
-    ]
-    self.update_fleet(fleet_config)
+    self.update_fleet(
+        [RobotConfig(robot_id=robot.id, cameras=robot.cameras) for robot in robots]
+    )
 ```
 
-The `update_fleet()` method updates the fleet configuration and initializes sessions for all robots.
+#### Adding and removing robots at runtime
+
+For targeted, event-driven changes (e.g. a robot joining or leaving the fleet while the connector runs), use `add_robot()` and `remove_robot()`:
+
+```python
+# A robot appeared: create and connect its session immediately
+self.add_robot(RobotConfig(robot_id="robot-42", cameras=[]))
+
+# A robot left: disconnect and free its session, clearing its state
+self.remove_robot("robot-42")
+```
+
+:::{note}
+- These methods create or destroy sessions **immediately**. They should be called once the connector is connecting or running (from `_connect()` onwards), not before `start()`.
+- `add_robot()` raises `ValueError` on a duplicate `robot_id`; `remove_robot()` is a no-op (logs a warning) for an unknown id, so it is safe to call from a loop that may fire repeatedly.
+- A connector may start with an empty fleet (omit `fleet` in the config, or pass `[]`) and add its robots at runtime. The fleet may likewise shrink to zero robots while running.
+- A robot present in both the old and new fleet is treated as unchanged even if its `RobotConfig` differs (e.g. its cameras changed). To apply a changed config to a running robot, call `remove_robot()` then `add_robot()`.
+- These methods are thread-safe and may be called from the execution loop, a command handler, or any other thread.
+:::
 
 ## Publishing Methods
 
@@ -178,4 +194,3 @@ The lifecycle methods are the same as single-robot connectors:
 - **Simple fleet connector**: [examples/simple-fleet-connector/connector.py](https://github.com/inorbit-ai/inorbit-connector-python/blob/main/examples/simple-fleet-connector/connector.py)
 - **Fleet connector (CLI)**: [examples/fleet-connector/](https://github.com/inorbit-ai/inorbit-connector-python/tree/main/examples/fleet-connector)
 - **Examples index**: [examples/README.md](https://github.com/inorbit-ai/inorbit-connector-python/blob/main/examples/README.md)
-

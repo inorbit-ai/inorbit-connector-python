@@ -318,7 +318,11 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
         env_vars (dict[str, str], optional): Environment variables to be set in the
             connector or user scripts. The key is the environment variable name and the
             value is the value to set.
-        fleet (list[RobotConfig]): The list of robot configurations.
+        fleet (list[RobotConfig], optional): The list of robot configurations.
+            Defaults to an empty list. A ``FleetConnector`` may start with no robots
+            and manage them at runtime via ``add_robot()``/``update_fleet()``. A
+            single-robot ``Connector`` still requires exactly one matching robot
+            (``to_singular_config`` raises otherwise).
     """
 
     # All fields are resolvable from ``INORBIT_<FIELD>`` env vars or from
@@ -350,7 +354,7 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
     maps: dict[str, MapConfig] = {}
     env_vars: dict[str, str] = {}
     metrics: MetricsConfig = MetricsConfig()
-    fleet: list[RobotConfig]
+    fleet: list[RobotConfig] = []
 
     def __init__(self, **kwargs):
         # pydantic-settings consumes _env_file before model validators
@@ -453,22 +457,6 @@ class ConnectorRootConfig(BaseSettings, Generic[T]):
             fleet=filtered_fleet,
         )
         return config
-
-    @field_validator("fleet")
-    def must_contain_at_least_one_robot(
-        cls, fleet: list[RobotConfig]
-    ) -> list[RobotConfig]:
-        """Validate that the fleet contains at least one robot.
-
-        Args:
-            fleet (list[RobotConfig]): The fleet configuration
-
-        Returns:
-            list[RobotConfig]: The fleet configuration
-        """
-        if len(fleet) < 1:
-            raise ValueError("Fleet must contain at least one robot")
-        return fleet
 
     @field_validator("fleet")
     def robot_ids_must_be_unique(cls, fleet: list[RobotConfig]) -> list[RobotConfig]:

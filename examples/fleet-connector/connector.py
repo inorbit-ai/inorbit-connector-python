@@ -70,10 +70,18 @@ class ExampleBotFleetConnector(FleetConnector):
         """
         self._fleet_manager.start()
 
-        # Here the connector may fetch a robot list from the fleet manager. e.g.:
-        # robots: list[RobotConfig] = self._fleet_manager.fetch_robot_list()
-        # self.update_fleet(robots)
-        # `robots` will be added to the InOrbit fleet
+        # The connector may fetch the robot list from the fleet manager here and
+        # declare it as the InOrbit fleet via update_fleet(). update_fleet() sets
+        # the live sessions to the given list, so it can be called both here for
+        # initial provisioning and later at runtime in cases of fleet autodiscovery
+        # e.g.:
+        #
+        #   robots = await self._fleet_manager.fetch_robot_list()
+        #   self.update_fleet(
+        #       [RobotConfig(robot_id=r.id, cameras=r.cameras) for r in robots]
+        #   )
+        #
+        # For runtime changes use add_robot()/remove_robot() instead.
 
         self._logger.info(
             f"Connected to fleet manager API {self.api_version} for "
