@@ -9,14 +9,51 @@ multiple robots at once.
 
 import asyncio
 import random
+import time
 
-from inorbit_edge.metrics import with_counter_metric
-
-from metrics import (
-    fleet_api_errors,
-    fleet_api_requests,
-    robot_updates_received,
+from inorbit_connector.metrics.http import (
+    EndpointMapper,
+    record_upstream_http_error,
+    record_upstream_http_request,
 )
+
+from metrics import robot_updates_received
+
+
+_VENDOR = "example_bot_fleet"
+
+_endpoint = EndpointMapper(
+    [
+        ("/api/v1/fleet/telemetry", "telemetry"),
+        ("/api/v1/fleet/system_stats", "system_stats"),
+        ("/api/v1/fleet/robot_status", "robot_status"),
+    ]
+)
+
+
+async def _do_request(method: str, path: str) -> None:
+    """Stand-in for a real httpx call to the fleet manager. Same pattern as
+    a real connector: wrap the call so success / failure are routed to the
+    canonical helpers with a normalized endpoint label.
+    """
+    start = time.perf_counter()
+    try:
+        await asyncio.sleep(random.uniform(0.1, 0.3))
+    except Exception:
+        record_upstream_http_error(
+            vendor=_VENDOR,
+            method=method,
+            endpoint=_endpoint(path),
+            error_kind="other",
+            duration_seconds=time.perf_counter() - start,
+        )
+        raise
+    record_upstream_http_request(
+        vendor=_VENDOR,
+        method=method,
+        endpoint=_endpoint(path),
+        duration_seconds=time.perf_counter() - start,
+    )
 
 
 class FleetManagerAPIWrapper:
@@ -30,7 +67,6 @@ class FleetManagerAPIWrapper:
         self.endpoint = endpoint
         self.api_key = api_key
 
-    @with_counter_metric(fleet_api_requests, attributes={"endpoint": "telemetry"})
     async def fetch_fleet_telemetry_data(self, robot_ids: list[str]) -> dict:
         """Simulate a request to the fleet manager's telemetry API.
 
@@ -42,31 +78,26 @@ class FleetManagerAPIWrapper:
         Returns:
             Dictionary mapping robot_id to telemetry data
         """
-        try:
-            await asyncio.sleep(random.uniform(0.1, 0.3))
+        await _do_request("GET", "/api/v1/fleet/telemetry")
 
-            telemetry_data = {}
-            for robot_index, robot_id in enumerate(robot_ids):
-                telemetry_data[robot_id] = {
-                    "linear_speed": random.uniform(0.1, 0.9) + (robot_index * 0.05),
-                    "angular_speed": random.uniform(0.1, 0.9) + (robot_index * 0.02),
-                    "pose": {
-                        "x": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
-                        "y": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
-                        "yaw": random.uniform(-3.14, 3.14),
-                        "frame_id": "frameIdA",
-                    },
-                }
-                robot_updates_received.add(
-                    1, {"endpoint": "telemetry", "robot_id": robot_id}
-                )
+        telemetry_data = {}
+        for robot_index, robot_id in enumerate(robot_ids):
+            telemetry_data[robot_id] = {
+                "linear_speed": random.uniform(0.1, 0.9) + (robot_index * 0.05),
+                "angular_speed": random.uniform(0.1, 0.9) + (robot_index * 0.02),
+                "pose": {
+                    "x": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
+                    "y": random.uniform(-5.0, 5.0) + (robot_index * 10.0),
+                    "yaw": random.uniform(-3.14, 3.14),
+                    "frame_id": "frameIdA",
+                },
+            }
+            robot_updates_received.add(
+                1, {"endpoint": "telemetry", "robot_id": robot_id}
+            )
 
-            return telemetry_data
-        except Exception:
-            fleet_api_errors.add(1, {"endpoint": "telemetry"})
-            raise
+        return telemetry_data
 
-    @with_counter_metric(fleet_api_requests, attributes={"endpoint": "system_stats"})
     async def fetch_fleet_system_stats(self, robot_ids: list[str]) -> dict:
         """Simulate a request to the fleet manager's system stats API.
 
@@ -78,26 +109,21 @@ class FleetManagerAPIWrapper:
         Returns:
             Dictionary mapping robot_id to system stats
         """
-        try:
-            await asyncio.sleep(random.uniform(0.1, 0.3))
+        await _do_request("GET", "/api/v1/fleet/system_stats")
 
-            stats_data = {}
-            for robot_id in robot_ids:
-                stats_data[robot_id] = {
-                    "cpu": random.uniform(0.1, 0.9),
-                    "ram": random.uniform(0.2, 0.8),
-                    "hdd": random.uniform(0.3, 0.7),
-                }
-                robot_updates_received.add(
-                    1, {"endpoint": "system_stats", "robot_id": robot_id}
-                )
+        stats_data = {}
+        for robot_id in robot_ids:
+            stats_data[robot_id] = {
+                "cpu": random.uniform(0.1, 0.9),
+                "ram": random.uniform(0.2, 0.8),
+                "hdd": random.uniform(0.3, 0.7),
+            }
+            robot_updates_received.add(
+                1, {"endpoint": "system_stats", "robot_id": robot_id}
+            )
 
-            return stats_data
-        except Exception:
-            fleet_api_errors.add(1, {"endpoint": "system_stats"})
-            raise
+        return stats_data
 
-    @with_counter_metric(fleet_api_requests, attributes={"endpoint": "robot_status"})
     async def fetch_fleet_robot_status(self, robot_ids: list[str]) -> dict:
         """Simulate a request to the fleet manager's robot status API.
 
@@ -109,29 +135,25 @@ class FleetManagerAPIWrapper:
         Returns:
             Dictionary mapping robot_id to status data
         """
-        try:
-            await asyncio.sleep(random.uniform(0.1, 0.3))
+        await _do_request("GET", "/api/v1/fleet/robot_status")
 
-            status_data = {}
-            for robot_index, robot_id in enumerate(robot_ids):
-                statuses = ["idle", "running", "charging", "error"]
-                status = random.choice(statuses[:3])  # Avoid errors for demo
+        status_data = {}
+        for robot_index, robot_id in enumerate(robot_ids):
+            statuses = ["idle", "running", "charging", "error"]
+            status = random.choice(statuses[:3])  # Avoid errors for demo
 
-                status_data[robot_id] = {
-                    "status": status,
-                    "error": None,
-                    "message": f"Robot {robot_id} is {status}",
-                    "battery_level": random.uniform(0.3, 1.0),
-                    "mission_id": f"mission_{robot_index}",
-                }
-                robot_updates_received.add(
-                    1, {"endpoint": "robot_status", "robot_id": robot_id}
-                )
+            status_data[robot_id] = {
+                "status": status,
+                "error": None,
+                "message": f"Robot {robot_id} is {status}",
+                "battery_level": random.uniform(0.3, 1.0),
+                "mission_id": f"mission_{robot_index}",
+            }
+            robot_updates_received.add(
+                1, {"endpoint": "robot_status", "robot_id": robot_id}
+            )
 
-            return status_data
-        except Exception:
-            fleet_api_errors.add(1, {"endpoint": "robot_status"})
-            raise
+        return status_data
 
 
 class FleetManager:

@@ -14,7 +14,7 @@ from inorbit_connector.metrics import setup_prometheus_metrics
 
 @pytest.fixture(autouse=True)
 def _reset_global_meter_provider():
-    """Reset OTEL global provider state after each test."""
+    """Reset OTel global provider state after each test."""
     yield
     from opentelemetry.util._once import Once
 
@@ -44,7 +44,6 @@ def test_missing_exporter_returns_false_and_logs(caplog):
 def test_enabled_installs_provider_with_identity_attributes():
     cfg = MetricsConfig(
         enabled=True,
-        exporter_namespace="inorbit_connector",
         extra_resource_attributes={"site": "lab"},
     )
     assert setup_prometheus_metrics(cfg, "brand-1", "rId-1") is True
@@ -60,13 +59,14 @@ def test_enabled_installs_provider_with_identity_attributes():
     assert "service.version" in attrs
 
 
-def test_enabled_derives_namespace_from_connector_type_when_unset():
-    cfg = MetricsConfig(enabled=True)  # exporter_namespace left at None
+def test_wire_namespace_is_constant_across_connector_types():
+    # service.name == exporter namespace == "inorbit_connector" no matter
+    # which connector_type is passed. connector_type is a Resource attribute,
+    # not part of the metric name.
+    cfg = MetricsConfig(enabled=True)
     assert setup_prometheus_metrics(cfg, "acme", "rId-1") is True
 
     provider = otel_metrics.get_meter_provider()
     attrs = dict(provider._sdk_config.resource.attributes)
-    # service.name is the wire-level prefix; the prom exporter prepends
-    # it to every metric. With connector_type="acme" the derived value
-    # gives `inorbit_acme_connector_*` on the wire.
-    assert attrs["service.name"] == "inorbit_acme_connector"
+    assert attrs["service.name"] == "inorbit_connector"
+    assert attrs["inorbit.connector.type"] == "acme"

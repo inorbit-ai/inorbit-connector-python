@@ -143,21 +143,26 @@ _METRICS_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 class MetricsConfig(BaseModel):
     """Configuration for the Prometheus-exported metrics server.
 
-    When ``enabled`` is True, the connector installs a process-global OTEL
+    When ``enabled`` is True, the connector installs a process-global OTel
     MeterProvider with a PrometheusMetricReader and starts an HTTP server
     serving ``/metrics`` on ``bind_host:bind_port``. It also writes a
     Prometheus ``file_sd`` JSON file under ``discovery_dir`` so a host-side
-    OTEL collector can discover and scrape the endpoint. Set
+    OTel collector can discover and scrape the endpoint. Set
     ``discovery_dir`` to ``None`` to disable the discovery file (useful when
     the scraper already knows the connector's host and port).
 
     When ``enabled`` is False (the default), no server is started and all
-    instrument calls are silently dropped by the OTEL no-op provider.
+    instrument calls are silently dropped by the OTel no-op provider.
 
     Identity labels set on every exported metric: ``service.name``,
     ``service.instance.id``, ``service.version``, ``inorbit.connector.type``,
     ``inorbit.connector.id``, plus any key/value from
     ``extra_resource_attributes``.
+
+    The wire-level metric prefix is always ``inorbit_connector``; the
+    connector type is exposed as the ``inorbit.connector.type`` Resource
+    attribute, not as part of the metric name. This is intentional — see
+    :mod:`inorbit_connector.metrics` for the rationale.
     """
 
     enabled: bool = False
@@ -166,20 +171,7 @@ class MetricsConfig(BaseModel):
     advertise_host: Optional[str] = None
     discovery_dir: Optional[Path] = Path("/var/run/inorbit-metrics")
     connector_id: Optional[str] = None
-    exporter_namespace: Optional[str] = None
     extra_resource_attributes: dict[str, str] = {}
-
-    @field_validator("exporter_namespace")
-    @classmethod
-    def _validate_exporter_namespace(cls, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        if not _METRICS_IDENTIFIER_RE.fullmatch(value):
-            raise ValueError(
-                "exporter_namespace must match [A-Za-z_][A-Za-z0-9_]* "
-                "(no hyphens, no leading digit) for GCP/Prometheus compatibility"
-            )
-        return value
 
     @field_validator("extra_resource_attributes")
     @classmethod

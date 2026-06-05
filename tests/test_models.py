@@ -613,24 +613,14 @@ class TestMetricsConfig:
         assert cfg.advertise_host is None
         assert cfg.discovery_dir == Path("/var/run/inorbit-metrics")
         assert cfg.connector_id is None
-        assert cfg.exporter_namespace is None
         assert cfg.extra_resource_attributes == {}
 
-    def test_exporter_namespace_rejects_hyphens(self):
-        with pytest.raises(ValidationError):
-            MetricsConfig(exporter_namespace="inorbit-connector")
-
-    def test_exporter_namespace_rejects_leading_digit(self):
-        with pytest.raises(ValidationError):
-            MetricsConfig(exporter_namespace="1connector")
-
-    def test_exporter_namespace_accepts_underscores_and_digits(self):
-        cfg = MetricsConfig(exporter_namespace="inorbit_connector_v2")
-        assert cfg.exporter_namespace == "inorbit_connector_v2"
-
-    def test_exporter_namespace_accepts_none_for_auto_derive(self):
-        cfg = MetricsConfig(exporter_namespace=None)
-        assert cfg.exporter_namespace is None
+    def test_exporter_namespace_field_no_longer_exists(self):
+        # The wire namespace is structural now ("inorbit_connector"). Passing
+        # the legacy field is a ValidationError under model_config strictness;
+        # at minimum it must not survive on the instance.
+        cfg = MetricsConfig()
+        assert not hasattr(cfg, "exporter_namespace")
 
     def test_extra_resource_attributes_rejects_empty_values(self):
         with pytest.raises(ValidationError):

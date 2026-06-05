@@ -14,25 +14,22 @@ Framework instruments (always declared, no-op when metrics are disabled):
 * ``execution_loop.ticks`` — successful run-loop iterations
 * ``execution_loop.errors`` — exceptions caught in the loop
 
-The Prometheus reader prepends ``exporter_namespace`` to every metric on
-export. When ``MetricsConfig.exporter_namespace`` is left unset (the
-default), :func:`setup_prometheus_metrics` derives it as
-``inorbit_<connector_type>_connector``, so a connector with
-``connector_type="acme"`` exports ``inorbit_acme_connector_up``,
-``inorbit_acme_connector_execution_loop_ticks_total`` etc. Two connector
-types therefore never share a metric name and never collide on a
-downstream metric descriptor. Instrument names must not repeat the
-namespace — the prefix is added once on export, never in the name.
+The Prometheus reader prepends a single, constant namespace
+(``inorbit_connector``) to every metric on export, so the framework's ``up``
+instrument is scraped as ``inorbit_connector_up`` regardless of the
+connector type. The connector type rides on every metric as the
+``inorbit.connector.type`` Resource attribute (a Prometheus label), which
+makes cross-connector aggregation work without exploding the descriptor
+space — Stackdriver caps custom metric descriptors at 10K and per-vendor
+prefixes burn through that budget for no query benefit.
 
-For domain metrics (e.g. ``fleet.api.errors``, ``mqtt.broker.connected``),
-concrete connectors get their own meter via
-``inorbit_edge.metrics.get_meter("inorbit_<vendor>_connector")`` and declare
-instruments on it under the same convention. They share the global
-MeterProvider installed here, so everything flows through the same
-Prometheus endpoint.
+Domain metrics for a concrete connector go through
+:func:`get_connector_meter`, which prepends ``<connector_type>.`` to every
+instrument name structurally. Instrument names declared on a connector
+meter must NOT repeat the prefix — the wrapper adds it once.
 
 The Prometheus exporter ships transitively via ``inorbit-edge[telemetry]``,
-which is a base dependency of this package, so OTEL is always importable.
+which is a base dependency of this package, so OTel is always importable.
 :func:`setup_prometheus_metrics` returns ``False`` when ``metrics.enabled``
 is ``False`` (the default); when False, no provider is installed and no
 HTTP server is started.
@@ -59,6 +56,12 @@ from inorbit_connector.models import MetricsConfig
 _logger = logging.getLogger(__name__)
 
 
+# The single wire-level prefix shared by every connector. The connector type
+# rides as the inorbit.connector.type Resource attribute, not as part of the
+# metric name. Do not parametrize this — it is structural.
+EXPORTER_NAMESPACE = "inorbit_connector"
+
+
 # --- Provider setup -------------------------------------------------------
 
 
@@ -74,25 +77,16 @@ def setup_prometheus_metrics(
     provider was installed; False when metrics are disabled or the telemetry
     dependencies are missing.
 
-    The wire-level metric prefix is derived per connector_type when
-    ``config.exporter_namespace`` is unset (the default). That gives every
-    connector type a unique namespace
-    (``inorbit_<connector_type>_connector``) so two connector types
-    sharing a downstream metric store don't collide on the same metric
-    descriptor — each owns its own. Pass ``exporter_namespace`` explicitly
-    only to opt out of the derivation (e.g. to keep a legacy wire name).
+    The wire-level metric prefix is always ``inorbit_connector``. The
+    connector type is exposed via the ``inorbit.connector.type`` Resource
+    attribute so cross-connector aggregation works on a single descriptor
+    per metric.
     """
     if not config.enabled:
         return False
 
-    namespace = (
-        config.exporter_namespace
-        if config.exporter_namespace is not None
-        else f"inorbit_{connector_type}_connector"
-    )
-
     installed = setup_prometheus_meter_provider(
-        service_name=namespace,
+        service_name=EXPORTER_NAMESPACE,
         service_instance_id=connector_id,
         service_version=_connector_version,
         extra_resource_attributes={
@@ -119,7 +113,7 @@ class MetricsServer:
     The HTTP-serving piece is one call to ``prometheus_client.start_http_server``;
     the value-add of this class is the discovery file. On ``start()`` the
     connector writes ``<discovery_dir>/<connector_id>.json`` (atomic
-    tmp-and-rename) describing its bound ``host:port`` so a host-side OTEL
+    tmp-and-rename) describing its bound ``host:port`` so a host-side OTel
     collector can pick it up via ``file_sd_configs``. ``stop()`` removes the
     file and shuts the HTTP server down.
 
@@ -226,9 +220,76 @@ class MetricsServer:
         os.replace(tmp, path)
 
 
+# --- Vendor meter wrapper -------------------------------------------------
+
+
+class PrefixedMeter:
+    """OTel Meter wrapper that prepends a static prefix to instrument names.
+
+    Used by :func:`get_connector_meter` to give a concrete connector a meter
+    whose ``create_*`` methods stamp every instrument name with
+    ``<connector_type>.``. The point is to make the vendor prefix structural
+    instead of a thing every author has to remember.
+
+    Only the instrument-creation surface is wrapped; everything else is
+    forwarded to the underlying meter via ``__getattr__``.
+    """
+
+    def __init__(self, meter, prefix: str) -> None:
+        self._meter = meter
+        self._prefix = prefix
+
+    def _name(self, name: str) -> str:
+        return f"{self._prefix}{name}"
+
+    def create_counter(self, name, *args, **kwargs):
+        return self._meter.create_counter(self._name(name), *args, **kwargs)
+
+    def create_up_down_counter(self, name, *args, **kwargs):
+        return self._meter.create_up_down_counter(self._name(name), *args, **kwargs)
+
+    def create_histogram(self, name, *args, **kwargs):
+        return self._meter.create_histogram(self._name(name), *args, **kwargs)
+
+    def create_gauge(self, name, *args, **kwargs):
+        return self._meter.create_gauge(self._name(name), *args, **kwargs)
+
+    def create_observable_gauge(self, name, *args, **kwargs):
+        return self._meter.create_observable_gauge(self._name(name), *args, **kwargs)
+
+    def create_observable_counter(self, name, *args, **kwargs):
+        return self._meter.create_observable_counter(self._name(name), *args, **kwargs)
+
+    def create_observable_up_down_counter(self, name, *args, **kwargs):
+        return self._meter.create_observable_up_down_counter(
+            self._name(name), *args, **kwargs
+        )
+
+    def __getattr__(self, item):
+        return getattr(self._meter, item)
+
+
+def get_connector_meter(connector_type: str) -> PrefixedMeter:
+    """Return a vendor-scoped meter for a concrete connector.
+
+    Every instrument name passed to ``create_*`` is automatically prefixed
+    with ``<connector_type>.``. Callers MUST NOT include the connector type
+    in the instrument name — the wrapper owns that.
+
+    Example::
+
+        meter = get_connector_meter("acme")
+        c = meter.create_counter("mission.failures", unit="1", description="...")
+        # exported as: inorbit_connector_acme_mission_failures_total
+    """
+    if not connector_type:
+        raise ValueError("connector_type is required")
+    return PrefixedMeter(get_meter(EXPORTER_NAMESPACE), f"{connector_type}.")
+
+
 # --- Framework instruments ------------------------------------------------
 
-meter = get_meter("inorbit_connector")
+meter = get_meter(EXPORTER_NAMESPACE)
 
 execution_loop_ticks = meter.create_counter(
     "execution_loop.ticks",
@@ -250,7 +311,7 @@ def register_framework_gauges(
     """Register the framework-level ObservableGauges.
 
     All callbacks run on every Prometheus scrape, so they should be cheap
-    and side-effect free. No-ops when the OTEL API is not installed.
+    and side-effect free. No-ops when the OTel API is not installed.
 
     Args:
         is_alive: zero-arg callable returning whether the connector's main

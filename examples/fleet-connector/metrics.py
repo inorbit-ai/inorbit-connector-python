@@ -2,35 +2,32 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Connector-specific metrics for the example bot fleet.
+"""Connector-specific domain metrics for the example bot fleet.
 
-The fleet manager API is bulk — one HTTP call returns data for many robots —
-so wire-level counters are scoped per endpoint. ``robot_updates_received``
-fans the response out to a per-robot counter so you can spot a single robot
-silently dropping out of the fleet API's response. Per-robot MQTT-side
-counters are inherited from the inorbit-edge SDK
-(``calls_publish_*_total{robot_id=...}``).
+Upstream API call counts (success, error, latency) are handled by the
+framework's canonical helpers in ``inorbit_connector.metrics.http`` — see
+``fleet_client.py`` for the call sites. This module owns the one signal
+the canonical helpers cannot see: the fleet API is bulk (one call returns
+data for many robots), so a per-robot counter fanned out from the
+response lets you spot a single robot silently dropping out of the fleet
+API's payload even when the HTTP call keeps succeeding.
 """
 
-from inorbit_edge.metrics import get_meter
+from inorbit_connector.metrics import get_connector_meter
 
-meter = get_meter("example_bot_fleet_connector")
+# Vendor prefix is added structurally. Instrument name below is created on
+# the underlying meter as ``example_bot_fleet.robot.updates_received`` and
+# exports on the wire as
+# ``inorbit_connector_example_bot_fleet_robot_updates_received_total``.
+meter = get_connector_meter("example_bot_fleet")
 
-fleet_api_requests = meter.create_counter(
-    "example_bot.fleet_api.requests",
-    unit="1",
-    description="HTTP calls to the fleet manager API (attribute: endpoint)",
-)
-fleet_api_errors = meter.create_counter(
-    "example_bot.fleet_api.errors",
-    unit="1",
-    description="Failed HTTP calls to the fleet manager API (attribute: endpoint)",
-)
 robot_updates_received = meter.create_counter(
-    "example_bot.robot.updates_received",
+    "robot.updates_received",
     unit="1",
     description=(
         "Data points received from the fleet API, fanned out per robot "
-        "(attributes: endpoint, robot_id)"
+        "(attributes: endpoint, robot_id). Increments once per robot per "
+        "bulk API response, so a robot missing from the payload shows up "
+        "as a drop in its individual rate."
     ),
 )

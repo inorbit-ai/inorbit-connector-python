@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 InOrbit, Inc.
 # SPDX-License-Identifier: MIT
 #
-# Reference OTEL collector config for inorbit-connector fleets exporting to
+# Reference OTel collector config for inorbit-connector fleets exporting to
 # GCP Cloud Monitoring. See README.md in this directory for the rules each
 # block encodes; do not loosen them without reading that file first.
 
@@ -14,7 +14,7 @@ receivers:
       scrape_configs:
         - job_name: inorbit_connectors
           # Preserve target_info series labels so connector-side resource
-          # attributes (notably inorbit_connector_id) surface as OTEL
+          # attributes (notably inorbit_connector_id) surface as OTel
           # resource attributes for the `resource` processor below.
           honor_labels: true
           metrics_path: /metrics
@@ -35,15 +35,18 @@ processors:
     limit_percentage: 80
     spike_limit_percentage: 20
 
-  # Pin the generic_task Monitored Resource fields. The googlecloud
-  # exporter's MR mapping is hardcoded to these standard OTel attributes:
-  #   generic_task.namespace <- service.namespace
-  #   generic_task.job       <- service.name
-  #   generic_task.location  <- cloud.availability_zone | cloud.region
-  #   generic_task.task_id   <- service.instance.id
+  # Pin the prometheus_target Monitored Resource fields. The
+  # googlemanagedprometheus exporter's MR mapping is hardcoded to these
+  # standard OTel attributes:
+  #   prometheus_target.location  <- cloud.availability_zone | cloud.region
+  #                                  (MUST be a real GCP region/zone or
+  #                                  Cloud Monitoring rejects the write)
+  #   prometheus_target.cluster   <- k8s.cluster.name   (unset here)
+  #   prometheus_target.namespace <- k8s.namespace.name (unset here)
+  #   prometheus_target.job       <- service.name
+  #   prometheus_target.instance  <- service.instance.id
   resource:
     attributes:
-      - {key: service.namespace,   value: inorbit_connector_fleet, action: upsert}
       - {key: service.name,        value: inorbit_connector,       action: upsert}
       - {key: cloud.region,        value: us-central1,             action: upsert}
       - {key: service.instance.id, from_attribute: inorbit_connector_id,   action: upsert}
@@ -61,17 +64,40 @@ processors:
     timeout: 10s
 
 exporters:
-  googlecloud:
-    project: ${env:GOOGLE_CLOUD_PROJECT}
+  # Writes to Cloud Monitoring as the PROMETHEUS metric type
+  # (`prometheus.googleapis.com/inorbit_connector_*`). Compared to the
+  # Custom type that the plain `googlecloud` exporter produces, the
+  # per-descriptor caps go from 30 to 200 labels and from 10K to 25K
+  # descriptors per project, the active-series cap per descriptor goes
+  # from 200K to 1M, and the metrics become queryable with PromQL in
+  # both the Cloud Monitoring console and Grafana (via the Managed
+  # Service for Prometheus datasource).
+  #
+  # The exporter owns the prefix (not configurable) and appends a type
+  # suffix to each metric name on the descriptor
+  # (`.../inorbit_connector_up/gauge`,
+  #  `.../inorbit_connector_execution_loop_ticks_total/counter`, ...).
+  # In PromQL you still query by the bare wire name
+  # (`inorbit_connector_up`); the suffix only shows up in descriptor
+  # listings and the console metric selector.
+  #
+  # Naming model on the wire: every framework metric exports under the
+  # constant `inorbit_connector_*` name; the connector type rides as a
+  # label (promoted below). Per-process isolation comes from
+  # `inorbit_connector_id` (= service.instance.id = prometheus_target
+  # `instance`), unique per connector process per host.
+  #
+  # Pricing note: Prometheus-type metrics bill by SAMPLES ingested,
+  # not bytes — run a short staging soak and check the projected cost
+  # before fleet rollout.
+  googlemanagedprometheus:
+    project: ${env:GCP_PROJECT}
     metric:
-      # One shared prefix for every connector type. Descriptor isolation
-      # is guaranteed by the per-connector_type metric NAME prefix that
-      # the framework derives at the source (inorbit_<type>_connector_*),
-      # so the operator no longer picks a prefix per vendor.
-      prefix: workload.googleapis.com/
-      # connector_type is exported as a series-key label too, so a single
-      # query can slice across connector types ("all robots offline for
-      # customer=acme") AND drill into one ("MIR fleet only").
+      # Lift these resource attributes onto every series as labels, so a
+      # single query can slice across connector types ("all robots
+      # offline for customer=acme") AND drill into one ("MiR fleet
+      # only"). The names must match the attribute keys produced by the
+      # `resource` processor above.
       resource_filters:
         - regex: ^customer$
         - regex: ^connector_type$
@@ -113,4 +139,4 @@ service:
     metrics:
       receivers: [prometheus]
       processors: [memory_limiter, resource, batch]
-      exporters: [googlecloud]
+      exporters: [googlemanagedprometheus]

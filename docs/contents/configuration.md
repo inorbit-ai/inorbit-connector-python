@@ -17,7 +17,7 @@ Connectors parametrize `ConnectorRootConfig[T]` with a concrete `ConnectorSpecif
 - **`connection_config_url`** (HttpUrl): The URL of the connection config endpoint. Defaults to the InOrbit Cloud SDK URL. Can be set via the environment variable `INORBIT_CONNECTION_CONFIG_URL`
 - **`api_url`** (HttpUrl): The URL of the InOrbit REST API. Defaults to `https://api.inorbit.ai`. Can be set via the environment variable `INORBIT_API_URL`
 - **`connector_type`** (str): Defensive load-time check that the configuration in hand was authored for this connector. Its only valid value is the `CONNECTOR_TYPE` declared by the parametrized `connector_config` subclass. A mismatch raises a `ValidationError` at construction time, surfacing wrong-YAML-for-wrong-connector mix-ups before any side effects happen.
-- **`connector_config`** (ConnectorSpecificConfig): Your custom configuration model that inherits from `ConnectorSpecificConfig`. The subclass's `CONNECTOR_TYPE` class variable is the source of truth for the connector's identity: it derives the automatic env-var loading prefix `INORBIT_{CONNECTOR_TYPE}_`, drives the metrics namespace and OpenTelemetry resource attribute, and is [automatically published as a key-value](publishing.md#automatic-connector-type-publishing).
+- **`connector_config`** (ConnectorSpecificConfig): Your custom configuration model that inherits from `ConnectorSpecificConfig`. The subclass's `CONNECTOR_TYPE` class variable is the source of truth for the connector's identity: it derives the automatic env-var loading prefix `INORBIT_{CONNECTOR_TYPE}_`, is exposed as the `inorbit.connector.type` OpenTelemetry Resource attribute (Prometheus label `inorbit_connector_type`) on every emitted metric, supplies the structural prefix added by `get_connector_meter(CONNECTOR_TYPE)` to vendor instrument names, and is [automatically published as a key-value](publishing.md#automatic-connector-type-publishing).
 - **`update_freq`** (float): Update frequency in Hz for the execution loop. Default is 1.0
 - **`location_tz`** (str): The timezone of the robot location (e.g., "America/Los_Angeles", "UTC"). Must be a valid pytz timezone
 - **`logging`** (LoggingConfig): Logging configuration (see below)
@@ -74,9 +74,10 @@ Optional Prometheus metrics endpoint. When `enabled` is `false` (the default) no
 - **`bind_port`** (int): HTTP server TCP port. Default is `9090`. Use `0` to let the OS pick an ephemeral free port
 - **`advertise_host`** (str | None): Hostname written to the discovery file. Defaults to `socket.gethostname()`
 - **`discovery_dir`** (Path | None): Directory where the connector writes a Prometheus `file_sd`-format JSON file describing its endpoint. Auto-created. Default is `/var/run/inorbit-metrics`. Set to `null` (in YAML) / `None` (in Python) to skip writing the discovery file when the scraper already knows the connector's host and port.
-- **`connector_id`** (str | None): Unique-per-host identifier. Used as the OTEL `service.instance.id` resource attribute and as the discovery filename. Defaults to `socket.gethostname()`
-- **`exporter_namespace`** (str): Prefix prepended to every Prometheus metric name. ASCII identifier (no hyphens). Default is `"inorbit_connector"`
-- **`extra_resource_attributes`** (dict[str, str]): Static OTEL Resource attributes added to every metric (low-cardinality only). Default is `{}`
+- **`connector_id`** (str | None): Unique-per-host identifier. Used as the OTel `service.instance.id` resource attribute and as the discovery filename. Defaults to `socket.gethostname()`
+- **`extra_resource_attributes`** (dict[str, str]): Static OTel Resource attributes added to every metric (low-cardinality only). Default is `{}`
+
+The wire-level metric prefix is always `inorbit_connector`. The connector type rides on every metric as the `inorbit.connector.type` Resource attribute, not as part of the metric name.
 
 (creating-a-custom-configuration)=
 ## Creating a Custom Configuration
