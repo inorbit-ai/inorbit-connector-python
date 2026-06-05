@@ -1362,7 +1362,9 @@ class TestConnector:
         the robot has no active session, e.g. before the connector connects."""
         connector = Connector(
             "TestRobot",
-            ConnectorRootConfig(**base_model, fleet=[RobotConfig(robot_id="TestRobot")]),
+            ConnectorRootConfig(
+                **base_model, fleet=[RobotConfig(robot_id="TestRobot")]
+            ),
         )
         with pytest.raises(KeyError):
             connector._get_session()
