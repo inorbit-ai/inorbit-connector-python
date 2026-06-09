@@ -95,6 +95,28 @@ class ExampleBotConnector(Connector):
         # Do some magic here...
         self._logger.info(f"Connected to robot services at API {self.api_version}")
 
+        # Schedule a background loop that runs at its own cadence (independent of
+        # update_freq) under framework supervision: if it raises, the framework
+        # logs it with a traceback and restarts it, instead of the task dying
+        # silently and freezing this data source.
+        self._create_supervised_task("speed_poll_loop", self._speed_poll_loop)
+
+    async def _speed_poll_loop(self) -> None:
+        """Poll the robot's speeds at ~5Hz and publish odometry.
+
+        Demonstrates ``_create_supervised_task``: a long-lived loop running on a
+        faster cadence than ``_execution_loop``.
+        """
+        while True:
+            linear_speed, angular_speed = await asyncio.gather(
+                get_robot_linear_speed(),
+                get_robot_angular_speed(),
+            )
+            self.publish_odometry(
+                linear_speed=linear_speed, angular_speed=angular_speed
+            )
+            await asyncio.sleep(0.2)
+
     @override
     async def _disconnect(self) -> None:
         """Disconnect from the robot services."""
@@ -135,17 +157,8 @@ class ExampleBotConnector(Connector):
         frame_id = "frameIdA"
         self.publish_pose(x, y, yaw, frame_id)
 
-        # A common pattern is to poll REST endpoints for fresh robot data.
-        # asyncio-compatible libraries are great for this
-        linear_speed, angular_speed = await asyncio.gather(
-            get_robot_linear_speed(),
-            get_robot_angular_speed(),
-        )
-        odometry = {
-            "linear_speed": linear_speed,
-            "angular_speed": angular_speed,
-        }
-        self.publish_odometry(**odometry)
+        # Odometry is polled on a faster cadence in _speed_poll_loop, scheduled
+        # in _connect via _create_supervised_task.
 
         self._logger.info("Robot data updated and published")
 

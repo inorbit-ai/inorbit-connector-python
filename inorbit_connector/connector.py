@@ -692,10 +692,19 @@ class FleetConnector(ABC):
             except asyncio.CancelledError:
                 raise
             except Exception:
+                # TODO(metrics): increment a `background_task_errors` counter
+                # (via inorbit_connector.metrics, alongside execution_loop_errors)
+                # so a crashing/restarting task is visible in monitoring, not
+                # only in the logs.
                 self._logger.exception(
                     f"Background task '{name}' crashed. "
                     f"Restarting in {restart_delay}s"
                 )
+            # TODO(backoff): use a capped exponential backoff keyed per task on
+            # consecutive failures instead of a fixed restart_delay, so a task
+            # that fails every iteration (e.g. a persistently malformed upstream
+            # response) doesn't hammer-restart. Reset it after a run stays up for
+            # a while. See the MiR connector's circuit breaker for prior art.
             await asyncio.sleep(restart_delay)
 
     def _spawn_logged_task(self, coro, name: str | None = None) -> asyncio.Task:
