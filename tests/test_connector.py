@@ -1908,7 +1908,7 @@ class TestSupervisedBackgroundTasks:
         async def boom():
             raise ValueError("kaboom")
 
-        task = connector._spawn_logged_task(boom(), name="oneshot")
+        task = connector._spawn_logged_task("oneshot", boom())
         with pytest.raises(ValueError):
             await task
         await asyncio.sleep(0)  # let the done-callback run

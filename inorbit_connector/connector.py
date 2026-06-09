@@ -707,13 +707,21 @@ class FleetConnector(ABC):
             # a while. See the MiR connector's circuit breaker for prior art.
             await asyncio.sleep(restart_delay)
 
-    def _spawn_logged_task(self, coro, name: str | None = None) -> asyncio.Task:
+    def _spawn_logged_task(self, name: str, coro) -> asyncio.Task:
         """Schedule a one-shot ``coro`` whose failure is logged, not swallowed.
 
         Use for fire-and-forget tasks that are not long-lived loops. Unlike a
         bare ``asyncio.create_task``, a failure is logged (with traceback) via a
         done-callback instead of being stored silently on an un-awaited task.
         For long-lived loops use ``_create_supervised_task`` instead.
+
+        Args:
+            name: Human-readable name, used in the failure log (mirrors
+                ``_create_supervised_task``'s leading ``name`` argument).
+            coro: The coroutine to run once.
+
+        Returns:
+            The scheduled ``asyncio.Task``.
         """
         task = asyncio.create_task(coro, name=name)
         task.add_done_callback(self.__log_task_exception)

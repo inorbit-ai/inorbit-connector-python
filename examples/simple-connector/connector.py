@@ -110,7 +110,7 @@ class ExampleBotConnector(Connector):
         # One-shot startup work: fire-and-forget, but a failure is logged (not
         # lost on an un-awaited task) via _spawn_logged_task. Unlike a
         # supervised loop, it runs once and is not restarted.
-        self._spawn_logged_task(self._announce_firmware(), name="announce_firmware")
+        self._spawn_logged_task("announce_firmware", self._announce_firmware())
 
     async def _speed_poll_loop(self) -> None:
         """Poll the robot's speeds at ~5Hz and publish odometry.
