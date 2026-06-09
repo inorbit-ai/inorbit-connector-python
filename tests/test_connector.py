@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: MIT
 
 # Standard
+import asyncio
 import logging
 import os
 import threading
@@ -1825,3 +1826,91 @@ class TestConnectorCommandHandler:
             execution_status_details="An error occurred executing custom command",
             stderr="CustomException",
         )
+
+
+# ==============================================================================
+# Supervised background tasks
+# ==============================================================================
+
+
+class TestSupervisedBackgroundTasks:
+    """Tests for _create_supervised_task / _spawn_logged_task.
+
+    These guard against the failure mode where a connector schedules periodic
+    work as a bare asyncio.create_task loop: if it raises, the task dies, the
+    exception is stored on a task nobody awaits (never logged), nothing restarts
+    it, and that datasource freezes until the process is restarted.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _concrete_fleet_connector(self):
+        with _concrete(FleetConnector):
+            yield
+
+    @pytest.fixture
+    def connector(self):
+        return FleetConnector(
+            ConnectorRootConfig(
+                api_key="valid_key",
+                connection_config_url=AnyHttpUrl("https://valid.com/"),
+                connector_type="valid_connector",
+                connector_config=DummyConfig(),
+                fleet=[RobotConfig(robot_id="TestRobot1")],
+            )
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_supervised_task_restarts_on_crash(self, connector, caplog):
+        caplog.set_level(logging.ERROR)
+        calls = 0
+
+        async def factory():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise RuntimeError("boom")
+            await asyncio.Event().wait()  # stay alive once healthy
+
+        task = connector._create_supervised_task("kv-loop", factory, restart_delay=0)
+        try:
+            for _ in range(50):
+                await asyncio.sleep(0.01)
+                if calls >= 2:
+                    break
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        assert calls >= 2  # restarted after the crash
+        assert any("kv-loop" in r.getMessage() for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_supervised_task_cancelled_on_disconnect(self, connector):
+        started = asyncio.Event()
+
+        async def factory():
+            started.set()
+            await asyncio.Event().wait()
+
+        task = connector._create_supervised_task("loop", factory, restart_delay=0)
+        await asyncio.wait_for(started.wait(), timeout=1.0)
+
+        await connector._FleetConnector__disconnect()
+
+        assert task.done()
+        assert connector._FleetConnector__background_tasks == []
+
+    @pytest.mark.asyncio
+    async def test_spawn_logged_task_logs_failure(self, connector, caplog):
+        caplog.set_level(logging.ERROR)
+
+        async def boom():
+            raise ValueError("kaboom")
+
+        task = connector._spawn_logged_task(boom(), name="oneshot")
+        with pytest.raises(ValueError):
+            await task
+        await asyncio.sleep(0)  # let the done-callback run
+
+        assert any("kaboom" in r.getMessage() for r in caplog.records)
