@@ -715,7 +715,7 @@ class FleetConnector(ABC):
         done-callback instead of being stored silently on an un-awaited task.
         For long-lived loops use ``_create_supervised_task`` instead.
         """
-        task = asyncio.create_task(coro)
+        task = asyncio.create_task(coro, name=name)
         task.add_done_callback(self.__log_task_exception)
         self.__background_tasks.append(task)
         return task
@@ -730,7 +730,9 @@ class FleetConnector(ABC):
             return
         exc = task.exception()
         if exc is not None:
-            self._logger.error(f"Background task failed: {exc!r}", exc_info=exc)
+            self._logger.error(
+                f"Background task '{task.get_name()}' failed: {exc!r}", exc_info=exc
+            )
 
     def start(self) -> None:
         """Start the connector in a new thread.

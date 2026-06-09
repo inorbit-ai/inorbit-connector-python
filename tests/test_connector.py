@@ -1913,4 +1913,6 @@ class TestSupervisedBackgroundTasks:
             await task
         await asyncio.sleep(0)  # let the done-callback run
 
-        assert any("kaboom" in r.getMessage() for r in caplog.records)
+        msgs = [r.getMessage() for r in caplog.records]
+        assert any("kaboom" in m for m in msgs)  # the exception is surfaced
+        assert any("oneshot" in m for m in msgs)  # ...tagged with the task name
