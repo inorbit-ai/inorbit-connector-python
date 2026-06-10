@@ -57,6 +57,12 @@ async def get_robot_angular_speed() -> float:
     return random.uniform(0.1, 0.9)
 
 
+async def get_robot_firmware() -> str:
+    """Simulate a one-time request to the robot's firmware version API."""
+    await asyncio.sleep(random.uniform(0.1, 0.3))
+    return "fw-2.4.1"
+
+
 class ExampleBotConnector(Connector):
     """The example bot connector.
 
@@ -94,6 +100,44 @@ class ExampleBotConnector(Connector):
 
         # Do some magic here...
         self._logger.info(f"Connected to robot services at API {self.api_version}")
+
+        # Schedule a background loop that runs at its own cadence (independent of
+        # update_freq) under framework supervision: if it raises, the framework
+        # logs it with a traceback and restarts it, instead of the task dying
+        # silently and freezing this data source.
+        self._create_supervised_task("speed_poll_loop", self._speed_poll_loop)
+
+        # One-shot startup work: fire-and-forget, but a failure is logged (not
+        # lost on an un-awaited task) via _spawn_logged_task. Unlike a
+        # supervised loop, it runs once and is not restarted.
+        self._spawn_logged_task("announce_firmware", self._announce_firmware())
+
+    async def _speed_poll_loop(self) -> None:
+        """Poll the robot's speeds at ~5Hz and publish odometry.
+
+        Demonstrates ``_create_supervised_task``: a long-lived loop running on a
+        faster cadence than ``_execution_loop``.
+        """
+        while True:
+            linear_speed, angular_speed = await asyncio.gather(
+                get_robot_linear_speed(),
+                get_robot_angular_speed(),
+            )
+            self.publish_odometry(
+                linear_speed=linear_speed, angular_speed=angular_speed
+            )
+            await asyncio.sleep(0.2)
+
+    async def _announce_firmware(self) -> None:
+        """Fetch the firmware version once at startup and publish it.
+
+        Demonstrates ``_spawn_logged_task``: a one-shot fire-and-forget task
+        whose failure is logged instead of being silently swallowed on an
+        un-awaited task (but which is not restarted, unlike a supervised loop).
+        """
+        firmware = await get_robot_firmware()
+        self.publish_key_values(firmware_version=firmware)
+        self._logger.info(f"Announced firmware version: {firmware}")
 
     @override
     async def _disconnect(self) -> None:
@@ -135,17 +179,8 @@ class ExampleBotConnector(Connector):
         frame_id = "frameIdA"
         self.publish_pose(x, y, yaw, frame_id)
 
-        # A common pattern is to poll REST endpoints for fresh robot data.
-        # asyncio-compatible libraries are great for this
-        linear_speed, angular_speed = await asyncio.gather(
-            get_robot_linear_speed(),
-            get_robot_angular_speed(),
-        )
-        odometry = {
-            "linear_speed": linear_speed,
-            "angular_speed": angular_speed,
-        }
-        self.publish_odometry(**odometry)
+        # Odometry is polled on a faster cadence in _speed_poll_loop, scheduled
+        # in _connect via _create_supervised_task.
 
         self._logger.info("Robot data updated and published")
 

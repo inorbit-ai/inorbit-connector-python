@@ -126,6 +126,10 @@ class FleetConnector(ABC):
         self.__thread = threading.Thread(target=self.__run_loop)
         self.__loop: asyncio.AbstractEventLoop | None = None
 
+        # Long-lived background tasks scheduled via _create_supervised_task /
+        # _spawn_logged_task. Cancelled and awaited in __disconnect().
+        self.__background_tasks: list[asyncio.Task] = []
+
         # Additional initalization arguments
         self.__register_user_scripts = kwargs.get("register_user_scripts", False)
         self.__default_user_scripts_dir = kwargs.get(
@@ -522,6 +526,16 @@ class FleetConnector(ABC):
     async def __disconnect(self) -> None:
         """Disconnect external services and disconnect from InOrbit."""
 
+        # Stop supervised background tasks first so their loops stop touching
+        # robot sessions before we tear those sessions down. Clear the list
+        # up front so the done-callbacks' self-removal is a no-op.
+        tasks = self.__background_tasks
+        self.__background_tasks = []
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         # Tear the fleet down while holding the lock so no robot can be added (via
         # add_robot/update_fleet from another thread) mid-teardown. Free each session
         # from the pool (not just disconnect it) so a subsequent start() rebuilds and
@@ -631,6 +645,102 @@ class FleetConnector(ABC):
             return bool(session.client.is_connected())
         except Exception:
             return False
+
+    def _create_supervised_task(
+        self, name: str, coro_factory, restart_delay: float = 5.0
+    ) -> asyncio.Task:
+        """Schedule a long-lived background coroutine under supervision.
+
+        Periodic work placed inside ``_execution_loop`` is already supervised by
+        the framework (``__run_loop`` catches, logs and retries it). Work that
+        needs a cadence other than ``config.update_freq`` (e.g. a fast pose loop
+        and a slower key-value loop) must be scheduled here rather than via a
+        bare ``asyncio.create_task``: a bare task that raises dies silently (its
+        exception is stored on a task nobody awaits and is never logged), is
+        never restarted, and freezes that datasource until the process restarts.
+
+        This wraps ``coro_factory`` in a loop that, if the coroutine returns or
+        raises, logs it (with traceback) and restarts it after ``restart_delay``
+        seconds. ``CancelledError`` is propagated so the task stops cleanly on
+        shutdown. The task is tracked and cancelled in teardown.
+
+        Must be called from the connector's event loop (e.g. from ``_connect``).
+
+        Args:
+            name: Human-readable name used in log messages.
+            coro_factory: Zero-arg callable returning a fresh coroutine; called
+                again on each restart.
+            restart_delay: Seconds to wait before restarting after exit/crash.
+
+        Returns:
+            The supervising ``asyncio.Task``.
+        """
+        task = asyncio.create_task(self.__supervise(name, coro_factory, restart_delay))
+        task.add_done_callback(self.__log_task_exception)
+        self.__background_tasks.append(task)
+        return task
+
+    async def __supervise(self, name, coro_factory, restart_delay) -> None:
+        """Run ``coro_factory`` forever, logging+restarting it on exit/crash."""
+        while True:
+            try:
+                await coro_factory()
+                self._logger.warning(
+                    f"Background task '{name}' exited unexpectedly. "
+                    f"Restarting in {restart_delay}s"
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # TODO(metrics): increment a `background_task_errors` counter
+                # (via inorbit_connector.metrics, alongside execution_loop_errors)
+                # so a crashing/restarting task is visible in monitoring, not
+                # only in the logs.
+                self._logger.exception(
+                    f"Background task '{name}' crashed. "
+                    f"Restarting in {restart_delay}s"
+                )
+            # TODO(backoff): use a capped exponential backoff keyed per task on
+            # consecutive failures instead of a fixed restart_delay, so a task
+            # that fails every iteration (e.g. a persistently malformed upstream
+            # response) doesn't hammer-restart. Reset it after a run stays up for
+            # a while. See the MiR connector's circuit breaker for prior art.
+            await asyncio.sleep(restart_delay)
+
+    def _spawn_logged_task(self, name: str, coro) -> asyncio.Task:
+        """Schedule a one-shot ``coro`` whose failure is logged, not swallowed.
+
+        Use for fire-and-forget tasks that are not long-lived loops. Unlike a
+        bare ``asyncio.create_task``, a failure is logged (with traceback) via a
+        done-callback instead of being stored silently on an un-awaited task.
+        For long-lived loops use ``_create_supervised_task`` instead.
+
+        Args:
+            name: Human-readable name, used in the failure log (mirrors
+                ``_create_supervised_task``'s leading ``name`` argument).
+            coro: The coroutine to run once.
+
+        Returns:
+            The scheduled ``asyncio.Task``.
+        """
+        task = asyncio.create_task(coro, name=name)
+        task.add_done_callback(self.__log_task_exception)
+        self.__background_tasks.append(task)
+        return task
+
+    def __log_task_exception(self, task: asyncio.Task) -> None:
+        """Done-callback: surface a task's exception so it is never silent."""
+        try:
+            self.__background_tasks.remove(task)
+        except ValueError:
+            pass
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            self._logger.error(
+                f"Background task '{task.get_name()}' failed: {exc!r}", exc_info=exc
+            )
 
     def start(self) -> None:
         """Start the connector in a new thread.

@@ -114,6 +114,30 @@ All publishing methods require a `robot_id` parameter. See the [Publishing Guide
 - `publish_robot_system_stats(robot_id, **kwargs)`: Defer publishing of system stats for a specific robot; defaults are published if not called
 - `publish_robot_map(robot_id, frame_id, is_update=False)`: Publish map for a specific robot
 
+## Background tasks
+
+For work that needs a different cadence than `_execution_loop` (e.g. a fast per-robot poll), schedule **supervised** background loops from `_connect()` instead of bare `asyncio.create_task` calls. The framework logs and restarts a loop if it crashes — instead of the task dying silently and freezing that data source — and cancels it automatically on shutdown:
+
+```python
+@override
+async def _connect(self) -> None:
+    self._fleet_api = MyFleetApi(...)
+    # One supervised loop per robot. coro_factory is zero-arg, so bind the
+    # robot id with a default-arg lambda:
+    for robot_id in self.robot_ids:
+        self._create_supervised_task(
+            f"poll:{robot_id}", lambda rid=robot_id: self._poll_robot(rid)
+        )
+
+async def _poll_robot(self, robot_id: str) -> None:
+    while True:
+        speed = await self._fleet_api.get_speed(robot_id)
+        self.publish_robot_odometry(robot_id, linear_speed=speed)
+        await asyncio.sleep(0.2)
+```
+
+For one-shot work, use `_spawn_logged_task(name, coro)` — its failure is logged (not silently swallowed), but it is not restarted. See the [Connector API spec](../specification/connector#spec-connector-fleetconnector-background-tasks).
+
 ## Advanced Methods
 
 ### `_get_robot_session()`
