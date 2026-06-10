@@ -31,7 +31,7 @@ Typical responsibilities:
 
 - Connect to your fleet manager / backend services.
 - Optionally fetch the fleet membership and call `update_fleet()` **before** sessions are created.
-- Start background polling tasks that keep fresh state for all robots.
+- Start background polling tasks that keep fresh state for all robots. Schedule them with [`_create_supervised_task()`](#spec-connector-fleetconnector-background-tasks) rather than a bare `asyncio.create_task`, so a crash is logged and the loop restarts instead of dying silently.
 
 <a id="spec-connector-fleetconnector-execution-loop"></a>
 ### `_execution_loop()`
@@ -50,7 +50,19 @@ Typical responsibilities:
 
 **Override.**
 
-Called once during shutdown, after Edge SDK sessions are disconnected. Use this to stop polling tasks, close sockets, and release resources.
+Called once during shutdown, after Edge SDK sessions are disconnected. Use this to stop polling tasks, close sockets, and release resources. (Tasks scheduled via [`_create_supervised_task()` / `_spawn_logged_task()`](#spec-connector-fleetconnector-background-tasks) are cancelled automatically — you only need to clean up tasks you started with a bare `asyncio.create_task`, which is discouraged.)
+
+<a id="spec-connector-fleetconnector-background-tasks"></a>
+### `_create_supervised_task(name, coro_factory, restart_delay=5.0)` / `_spawn_logged_task(name, coro)`
+
+**Callable (advanced).**
+
+Schedule background work that runs alongside `_execution_loop` — for example a fast pose loop and a slower key-value loop, each on its own cadence. Prefer these over a bare `asyncio.create_task`: a fire-and-forget task that raises has its exception stored on a task nobody awaits, so it is never logged, never restarted, and the datasource it fed silently freezes until the process restarts (while unrelated datasources keep working, masking the failure).
+
+- **`_create_supervised_task(name, coro_factory, restart_delay=5.0)`** — for long-lived loops. Runs `coro_factory()` and, if it ever returns or raises, logs it (with a traceback, tagged with `name`) and restarts it after `restart_delay` seconds. `coro_factory` is a zero-argument callable returning a fresh coroutine (it is re-called on each restart). `asyncio.CancelledError` is propagated so the task stops cleanly on shutdown.
+- **`_spawn_logged_task(name, coro)`** — for one-shot work. Runs `coro` once; if it raises, the failure is logged (with a traceback, tagged with `name`) via a done-callback instead of being silently swallowed. It is **not** restarted.
+
+Call these from `_connect()` (they require the connector's event loop to be running). Tasks scheduled this way are tracked by the framework and cancelled automatically during shutdown, so they do not need to be stopped in `_disconnect()`.
 
 <a id="spec-connector-fleetconnector-command-handler"></a>
 ### `_inorbit_robot_command_handler(robot_id, command_name, args, options)`

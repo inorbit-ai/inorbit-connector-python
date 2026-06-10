@@ -61,6 +61,28 @@ async def _execution_loop(self) -> None:
 
 The loop runs at the frequency specified by `config.update_freq` (default: 1.0 Hz).
 
+### Background tasks
+
+For work that needs a different cadence than `_execution_loop` (e.g. a fast sensor poll), schedule a **supervised** background loop from `_connect()` instead of a bare `asyncio.create_task`. The framework logs and restarts it if it crashes — instead of the task dying silently and freezing that data source — and cancels it automatically on shutdown:
+
+```python
+@override
+async def _connect(self) -> None:
+    self._robot_api = MyRobotApi(...)
+    # Long-lived loop on its own cadence, supervised (logged + restarted on crash):
+    self._create_supervised_task("speed_poll", self._poll_speeds)
+
+async def _poll_speeds(self) -> None:
+    while True:
+        speed = await self._robot_api.get_speed()
+        self.publish_odometry(linear_speed=speed)
+        await asyncio.sleep(0.2)
+```
+
+For one-shot startup work, use `_spawn_logged_task("announce_firmware", self._announce_firmware())` — its failure is logged (not silently swallowed), but it is not restarted.
+
+See the [Connector API spec](../specification/connector#spec-connector-fleetconnector-background-tasks) and the [simple-connector example](https://github.com/inorbit-ai/inorbit-connector-python/blob/main/examples/simple-connector/connector.py).
+
 ### `_disconnect()`
 
 Clean up resources and disconnect from external services. This is called when the connector stops.
