@@ -11,7 +11,7 @@ from setuptools import setup
 
 GITHUB_ORG_URL = "https://github.com/inorbit-ai"
 GITHUB_REPO_URL = f"{GITHUB_ORG_URL}/inorbit-connector-python"
-VERSION = "3.1.0"
+VERSION = "3.2.0"
 
 setup(
     download_url=f"{GITHUB_REPO_URL}/archive/refs/tags/v{VERSION}.zip",
