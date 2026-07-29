@@ -9,7 +9,6 @@
 import asyncio
 import logging
 import random
-import signal
 from pathlib import Path
 
 try:
@@ -222,9 +221,8 @@ def main():
     connector = ExampleBotConnector(ROBOT_ID, config)
     connector.start()
 
-    # Register a signal handler for graceful shutdown
-    # When a keyboard interrupt is received (Ctrl+C), the connector will be stopped
-    signal.signal(signal.SIGINT, lambda sig, frame: connector.stop())
+    # Stop cleanly on Ctrl+C and on the SIGTERM a container runtime sends
+    connector.install_signal_handlers()
 
     # Wait for the connector to finish
     connector.join()
