@@ -72,6 +72,13 @@ class FleetConnector(ABC):
     See self.__init__() for more details.
     """
 
+    #: How long stop() waits for the connector thread before giving up. It has to
+    #: cover the whole teardown: RobotSession.disconnect() alone allows up to 12s
+    #: for camera streamers (a worker can be mid-open on an unreachable stream)
+    #: before the MQTT disconnect, so a shorter wait made an ordinary shutdown
+    #: with cameras registered raise "Thread did not stop in time".
+    STOP_TIMEOUT_SECONDS = 30.0
+
     def __init__(self, config: ConnectorRootConfig, **kwargs) -> None:
         """Initialize the base connector with common functionality.
 
@@ -809,18 +816,27 @@ class FleetConnector(ABC):
         for signum in signums:
             signal.signal(signum, _stop)
 
-    def stop(self) -> None:
+    def stop(self, timeout: float | None = None) -> None:
         """Stop the execution loop of this connector.
 
         This method should be called to stop the execution loop of this connector, will
         block until the execution loop is stopped, and will call disconnect() to clean
         up any external connections.
+
+        Args:
+            timeout (float | None): Seconds to wait for the connector thread.
+                Defaults to STOP_TIMEOUT_SECONDS.
+
+        Raises:
+            Exception: If the connector thread is still running after ``timeout``.
         """
 
         # Stop the execution loop
         self._logger.info("Stopping connector")
         self.__stop_event.set()
-        self.__thread.join(timeout=5)
+        self.__thread.join(
+            timeout=self.STOP_TIMEOUT_SECONDS if timeout is None else timeout
+        )
         if self._metrics_server is not None:
             self._metrics_server.stop()
         if self.__thread.is_alive():

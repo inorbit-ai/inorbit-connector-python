@@ -1955,3 +1955,18 @@ class TestSignalHandlers:
             signal.getsignal(signal.SIGTERM)(signal.SIGTERM, None)
 
         connector._logger.exception.assert_called_once()
+
+
+class TestStopTimeout:
+    def test_stop_waits_long_enough_for_camera_teardown(self):
+        """RobotSession.disconnect() alone allows 12s for camera streamers."""
+        assert FleetConnector.STOP_TIMEOUT_SECONDS > 12
+
+    def test_stop_timeout_is_overridable(self):
+        connector = MagicMock()
+        connector._FleetConnector__thread = MagicMock(is_alive=lambda: False)
+        connector._metrics_server = None
+
+        FleetConnector.stop(connector, timeout=0.25)
+
+        connector._FleetConnector__thread.join.assert_called_once_with(timeout=0.25)
