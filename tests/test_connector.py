@@ -9,6 +9,7 @@
 import asyncio
 import logging
 import os
+import signal
 import threading
 from contextlib import contextmanager
 from time import sleep
@@ -1916,3 +1917,41 @@ class TestSupervisedBackgroundTasks:
         msgs = [r.getMessage() for r in caplog.records]
         assert any("kaboom" in m for m in msgs)  # the exception is surfaced
         assert any("oneshot" in m for m in msgs)  # ...tagged with the task name
+
+
+class TestSignalHandlers:
+    """install_signal_handlers() must cover SIGTERM, not just SIGINT.
+
+    A containerized connector is usually PID 1, where an unhandled SIGTERM is
+    ignored and the runtime SIGKILLs it -- skipping stop() and its cleanup.
+    """
+
+    @contextmanager
+    def _restored_handlers(self):
+        signums = (signal.SIGINT, signal.SIGTERM)
+        previous = {signum: signal.getsignal(signum) for signum in signums}
+        try:
+            yield
+        finally:
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
+
+    def test_sigint_and_sigterm_both_stop_the_connector(self):
+        connector = MagicMock()
+        with self._restored_handlers():
+            FleetConnector.install_signal_handlers(connector)
+
+            for signum in (signal.SIGINT, signal.SIGTERM):
+                signal.getsignal(signum)(signum, None)
+
+        assert connector.stop.call_count == 2
+
+    def test_a_failing_stop_does_not_raise_out_of_the_handler(self):
+        connector = MagicMock()
+        connector.stop.side_effect = Exception("did not stop in time")
+        with self._restored_handlers():
+            FleetConnector.install_signal_handlers(connector)
+
+            signal.getsignal(signal.SIGTERM)(signal.SIGTERM, None)
+
+        connector._logger.exception.assert_called_once()

@@ -8,6 +8,7 @@
 # Standard
 import os
 import logging
+import signal
 import socket
 from pathlib import Path
 import tempfile
@@ -777,6 +778,36 @@ class FleetConnector(ABC):
         will block until it ends.
         """
         self.__thread.join()
+
+    def install_signal_handlers(self, signums=(signal.SIGINT, signal.SIGTERM)) -> None:
+        """Stop this connector when the process is asked to terminate.
+
+        Handles SIGTERM as well as SIGINT: SIGTERM is what `docker stop`,
+        `compose restart` and Kubernetes send, and a containerized connector is
+        usually PID 1, where the kernel applies no default action -- an
+        unhandled SIGTERM is ignored outright and the runtime SIGKILLs after its
+        grace period. That skips stop() entirely, so external services are never
+        disconnected, cameras are never released and InOrbit keeps a stale
+        session until it times out.
+
+        Must be called from the main thread (a Python limitation on installing
+        signal handlers). Call it after start() and before join().
+
+        Args:
+            signums: Signals to handle. Defaults to SIGINT and SIGTERM.
+        """
+
+        def _stop(signum, _frame) -> None:
+            self._logger.info(f"Received {signal.Signals(signum).name}; stopping")
+            try:
+                self.stop()
+            except Exception:
+                # Never raise out of a signal handler: the connector thread is
+                # not a daemon, so its teardown still runs as the process exits.
+                self._logger.exception("Connector did not stop cleanly")
+
+        for signum in signums:
+            signal.signal(signum, _stop)
 
     def stop(self) -> None:
         """Stop the execution loop of this connector.
