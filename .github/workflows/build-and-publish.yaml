@@ -116,13 +116,18 @@ jobs:
             RELEASE_TAG="v$VERSION"
           fi
 
-          # Create or update the release
+          # Create the release, or leave an existing one alone. --target pins the
+          # tag to the commit that published: without it `gh release create` tags
+          # whatever the default branch points at when the job runs, which is a
+          # different commit if anything landed while the build was running.
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Updating existing release $RELEASE_TAG"
-            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes ""
+            echo "Release $RELEASE_TAG already exists; leaving its notes untouched"
           else
             echo "Creating new release $RELEASE_TAG"
-            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes ""
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --generate-notes
           fi
 
           # Save the release tag for the next step

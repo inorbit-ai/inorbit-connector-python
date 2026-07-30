@@ -170,4 +170,24 @@ CI automatically publishes to PyPI when either:
 - A tag is pushed, or
 - A commit message contains "Bump version"
 
-After publishing to PyPI, CI also signs the artifacts and creates/updates the GitHub Release.
+After publishing to PyPI, CI also signs the artifacts and creates the GitHub Release,
+tagging the commit that published.
+
+### Bumping through a pull request
+
+If the bump has to go through review instead of straight to `main`, pass `--no-tag`
+and let CI create the tag:
+
+```bash
+git checkout -b bump-version-x.y.z
+bump2version --no-tag minor
+git push -u origin bump-version-x.y.z
+```
+
+**Keep `Bump version: X.Y.Z → A.B.C` as the pull request title.** The publish job
+matches on the commit message and a squash merge takes the title, so a reworded
+title silently skips the release.
+
+`--no-tag` matters because a bump merged from a branch is squashed or rebased into
+a different commit, so a tag `bump2version` created locally would point at something
+that never reaches `main` — that is how `v3.0.0` ended up unreachable from `main`.
