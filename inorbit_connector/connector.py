@@ -72,11 +72,11 @@ class FleetConnector(ABC):
     See self.__init__() for more details.
     """
 
-    #: How long stop() waits for the connector thread before giving up. It has to
-    #: cover the whole teardown: RobotSession.disconnect() alone allows up to 12s
-    #: for camera streamers (a worker can be mid-open on an unreachable stream)
-    #: before the MQTT disconnect, so a shorter wait made an ordinary shutdown
-    #: with cameras registered raise "Thread did not stop in time".
+    # How long stop() waits for the connector thread before giving up. It has to
+    # cover the whole teardown: RobotSession.disconnect() alone allows up to 12s
+    # for camera streamers (a worker can be mid-open on an unreachable stream)
+    # before the MQTT disconnect. A shorter wait with cameras registered may 
+    # raise "Thread did not stop in time".
     STOP_TIMEOUT_SECONDS = 30.0
 
     def __init__(self, config: ConnectorRootConfig, **kwargs) -> None:
