@@ -736,6 +736,53 @@ class TestFleetConnectorDeferredSystemStats:
             hdd_usage_percentage=0.0,
         )
 
+    def test_publish_pending_system_stats_skips_offline_robots(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that nothing is published for robots reported offline."""
+        # TestRobot2 is offline: publishing stats for it would make InOrbit request
+        # state and refresh its offline timestamp on every loop iteration.
+        fleet_connector._is_fleet_robot_online = lambda robot_id: (
+            robot_id != "TestRobot2"
+        )
+        # Stored stats must be dropped too, not just the defaults.
+        fleet_connector.publish_robot_system_stats(
+            "TestRobot2", cpu_load_percentage=0.5
+        )
+
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+        session1 = fleet_connector._get_robot_session("TestRobot1")
+        session2 = fleet_connector._get_robot_session("TestRobot2")
+        session1.publish_system_stats.assert_called_once_with(
+            cpu_load_percentage=0.0,
+            ram_usage_percentage=0.0,
+            hdd_usage_percentage=0.0,
+        )
+        session2.publish_system_stats.assert_not_called()
+        assert len(fleet_connector._FleetConnector__pending_system_stats) == 0
+
+    def test_publish_pending_system_stats_publishes_when_online_check_fails(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that a raising online check falls back to publishing."""
+
+        def boom(robot_id):
+            raise RuntimeError("health check exploded")
+
+        fleet_connector._is_fleet_robot_online = boom
+
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+        for robot_id in ("TestRobot1", "TestRobot2"):
+            fleet_connector._get_robot_session(
+                robot_id
+            ).publish_system_stats.assert_called_once_with(
+                cpu_load_percentage=0.0,
+                ram_usage_percentage=0.0,
+                hdd_usage_percentage=0.0,
+            )
+
     def test_publish_connector_system_stats_uses_psutil(
         self, base_model, mock_robot_session_pool
     ):

@@ -111,7 +111,7 @@ All publishing methods require a `robot_id` parameter. See the [Publishing Guide
 - `publish_robot_pose(robot_id, x, y, yaw, frame_id)`: Publish pose for a specific robot
 - `publish_robot_odometry(robot_id, **kwargs)`: Publish odometry for a specific robot
 - `publish_robot_key_values(robot_id, **kwargs)`: Publish key-values for a specific robot
-- `publish_robot_system_stats(robot_id, **kwargs)`: Defer publishing of system stats for a specific robot; defaults are published if not called
+- `publish_robot_system_stats(robot_id, **kwargs)`: Defer publishing of system stats for a specific robot; defaults are published if not called, and nothing is published while the robot is offline
 - `publish_robot_map(robot_id, frame_id, is_update=False)`: Publish map for a specific robot
 
 ## Background tasks
@@ -178,7 +178,9 @@ def _is_fleet_robot_online(self, robot_id: str) -> bool:
     return self._fleet_manager.is_robot_online(robot_id)
 ```
 
-This callback is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received. The connector framework always publishes system stats for all robots (even zeroed defaults), ensuring that any online/offline discrepancy is detected and corrected.
+This callback is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received. The connector framework publishes system stats for every online robot, ensuring that any online/offline discrepancy is detected and corrected.
+
+It is also called once per robot on every execution loop iteration, to decide whether to publish system stats at all. While it returns `False`, no system stats are published for that robot, keeping the robot offline in InOrbit. Keep it cheap and non-blocking (read cached state; no API call in the hot path), or the connector's event loop will stall.
 
 ## Example Execution Loop
 
