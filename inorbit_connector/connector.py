@@ -1073,6 +1073,9 @@ class FleetConnector(ABC):
         System stats are stored and published after the execution loop completes. If no
         stats are stored for a robot, default zeroed values are published instead.
 
+        Stats stored for a robot whose _is_fleet_robot_online() returns False are
+        dropped rather than published. @see __publish_pending_system_stats.
+
         Note:
             If immediate publishing is required, use `_get_robot_session(robot_id)` to
             access the underlying RobotSession and call `publish_system_stats()`
@@ -1104,7 +1107,9 @@ class FleetConnector(ABC):
 
         This method is called automatically at the end of each execution loop iteration.
         For each robot in the fleet:
-        - If system stats were stored via publish_robot_system_stats(), those are
+        - If _is_fleet_robot_online(robot_id) returns False, nothing is published for
+          that robot and any stats stored for it are dropped
+        - Else if system stats were stored via publish_robot_system_stats(), those are
         published
         - Otherwise, default values are published (connector host stats if
           publish_connector_system_stats is enabled, zeroed values otherwise).
@@ -1113,6 +1118,11 @@ class FleetConnector(ABC):
         stats message is published for each robot, even if the connector does not
         explicitly provide values. This ensures stability of the online status of the
         robot in the UI, as it forces state requests if the robot was to appear offline.
+
+        Offline robots are skipped because that forced state request is answered with
+        the robot's offline status, which refreshes its offline timestamp in InOrbit on
+        every loop iteration. Nothing is lost: the state request only helps when the
+        robot is online but InOrbit believes otherwise.
         """
         default_values = (
             self.__get_connector_system_stats()
@@ -1130,10 +1140,22 @@ class FleetConnector(ABC):
             self.__pending_system_stats = {}
 
         for robot_id, session in sessions.items():
-            if pending_status := pending.get(robot_id):
-                session.publish_system_stats(**pending_status)
-            else:
-                session.publish_system_stats(**default_values)
+            try:
+                online = self._is_fleet_robot_online(robot_id)
+            except Exception as e:
+                # Match the edge-sdk's get_state fallback: assume online on error, so
+                # a broken health check keeps publishing instead of muting the robot.
+                self._logger.warning(f"Online check failed for '{robot_id}': {e}")
+                online = True
+            if not online:
+                # Stats for an offline robot make InOrbit request state, and the
+                # offline reply refreshes the robot's offline timestamp on every
+                # loop iteration. Any stats stored for it are dropped.
+                self._logger.debug(
+                    f"Skipping system stats publish for '{robot_id}': robot is offline"
+                )
+                continue
+            session.publish_system_stats(**(pending.get(robot_id) or default_values))
 
     # Methods meant to be extended by subclasses
     @abstractmethod
@@ -1210,7 +1232,11 @@ class FleetConnector(ABC):
         checks (e.g., API connectivity, robot state, etc.).
 
         NOTE: State will automatically be requested from InOrbit if the robot is marked
-        as offline but system stats are sent.
+        as offline but system stats are sent. Because of that, the framework also calls
+        this method once per robot on every execution loop iteration to decide whether
+        to publish system stats at all (see __publish_pending_system_stats). Keep the
+        implementation cheap and non-blocking: read cached state, do not perform
+        network or other blocking I/O here, or the connector's event loop will stall.
 
         Args:
             robot_id (str): The robot ID to check
@@ -1303,7 +1329,12 @@ class Connector(FleetConnector, ABC):
         health checks (e.g., API connectivity, robot state, etc.).
 
         NOTE: State will automatically be requested from InOrbit if the robot is marked
-        as offline but system stats are sent.
+        as offline but system stats are sent. Because of that, the framework also calls
+        this method on every execution loop iteration to decide whether to publish
+        system stats at all: while it returns False, no system stats are published for
+        the robot, so its offline timestamp in InOrbit stops being refreshed. Keep the
+        implementation cheap and non-blocking: read cached state, do not perform
+        network or other blocking I/O here, or the connector's event loop will stall.
 
         Returns:
             bool: True if robot is online, False otherwise.

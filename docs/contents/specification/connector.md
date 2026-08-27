@@ -97,6 +97,8 @@ Return `None` if the map can’t be fetched.
 
 The Edge SDK uses this callback to determine if a robot should be considered online. It is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received. Default implementation returns `True`.
 
+The framework also calls it once per robot on every execution loop iteration, to decide whether to publish system stats at all: while it returns `False`, no system stats are published for that robot, keeping the robot offline in InOrbit. Keep the implementation cheap and non-blocking (read cached state; no network or other blocking I/O), or the connector's event loop will stall. If it raises, the framework logs a warning and publishes anyway.
+
 <a id="spec-connector-fleetconnector-lifecycle"></a>
 ### `start()` / `join()` / `stop()`
 
@@ -148,6 +150,8 @@ Publishes pose for one robot. If the `frame_id` differs from the last published 
 
 If no stats are stored for a robot during the loop iteration, default values are published automatically. By default, zeroed values are used. To use the connector host's actual system stats as defaults, set `publish_connector_system_stats=True` in the [constructor](#spec-connector-fleetconnector-constructor).
 
+Stats stored for a robot whose [`_is_fleet_robot_online()`](#spec-connector-fleetconnector-is-online) returns `False` are dropped rather than published.
+
 If immediate publishing is required, use `_get_robot_session(robot_id)` to access the underlying `RobotSession` and call `publish_system_stats()` directly.
 
 <a id="spec-connector-fleetconnector-get-robot-session"></a>
@@ -189,7 +193,7 @@ Single-robot convenience for map fetching. The framework uses it by delegating `
 
 **Optional override.**
 
-Single-robot convenience for online status. The fleet-level online check delegates to this method. Called when InOrbit requests state due to a discrepancy between the robot's offline status and incoming system stats.
+Single-robot convenience for online status. The fleet-level online check delegates to this method. Called when InOrbit requests state due to a discrepancy between the robot's offline status and incoming system stats, and once per execution loop iteration to decide whether to publish system stats at all. See [`_is_fleet_robot_online()`](#spec-connector-fleetconnector-is-online) for the constraints that puts on the implementation.
 
 <a id="spec-connector-connector-publishing"></a>
 ### Publishing wrappers
@@ -207,5 +211,3 @@ Single-robot convenience for online status. The fleet-level online check delegat
 **Callable (advanced).**
 
 Returns the underlying Edge SDK session for the current robot.
-
-
