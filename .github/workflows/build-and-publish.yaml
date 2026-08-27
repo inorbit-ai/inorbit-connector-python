@@ -59,6 +59,10 @@ jobs:
           path: dist/
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A re-run of this workflow (e.g. after a later job fails) would
+          # otherwise die here because the version is already on PyPI.
+          skip-existing: true
 
   # Only sign and upload to GitHub Release after publishing to PyPI
   github-release:
@@ -78,7 +82,7 @@ jobs:
           name: python-package-distributions
           path: dist/
       - name: Sign the dists with Sigstore
-        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        uses: sigstore/gh-action-sigstore-python@v3.5.0
         with:
           inputs: >-
             ./dist/*.tar.gz
