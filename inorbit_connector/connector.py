@@ -1110,7 +1110,7 @@ class FleetConnector(ABC):
         - If _is_fleet_robot_online(robot_id) returns False, nothing is published for
           that robot and any stats stored for it are dropped
         - Else if system stats were stored via publish_robot_system_stats(), those are
-        published
+          published
         - Otherwise, default values are published (connector host stats if
           publish_connector_system_stats is enabled, zeroed values otherwise).
 
