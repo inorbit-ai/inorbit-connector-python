@@ -131,6 +131,8 @@ This ensures that system stats are published for every online robot in the fleet
 
 Robots reported offline by `_is_robot_online()` (single-robot) / `_is_fleet_robot_online(robot_id)` (fleet) are skipped, as otherwise their state would be interpreted as online.
 
+The online check's result is also published as the robot's status on every iteration, which the Edge SDK sends only when it changed. That is what marks a robot offline in InOrbit, so its offline timestamp is stamped once, when the robot actually goes offline, and left alone afterwards.
+
 By default, zeroed values are used. To use the connector host's actual system stats as defaults, set `publish_connector_system_stats=True` when initializing the connector. See [FleetConnector constructor](specification/connector#spec-connector-fleetconnector-constructor) for details.
 
 **Example:**

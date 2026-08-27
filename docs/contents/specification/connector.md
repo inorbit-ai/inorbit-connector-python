@@ -97,7 +97,11 @@ Return `None` if the map can’t be fetched.
 
 The Edge SDK uses this callback to determine if a robot should be considered online. It is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received. Default implementation returns `True`.
 
-The framework also calls it once per robot on every execution loop iteration, to decide whether to publish system stats at all: while it returns `False`, no system stats are published for that robot, keeping the robot offline in InOrbit. Keep the implementation cheap and non-blocking (read cached state; no network or other blocking I/O), or the connector's event loop will stall. If it raises, the framework logs a warning and publishes anyway.
+The framework also calls it once per robot on every execution loop iteration. The result decides whether system stats are published for that robot — while it returns `False`, none are, keeping the robot offline in InOrbit — and is handed to the Edge SDK's `publish_status()`, which sends it only when it changed. That status message is what reports the robot offline in the first place: InOrbit requests state only from robots it already has offline, and the robot session answers InOrbit's pings for as long as the connector runs. It is also what leaves the robot's offline timestamp alone afterwards, since the status is sent once per change rather than on every iteration.
+
+Because the default implementation returns `True` unconditionally, a connector that does not override this method never reports any robot as offline. Override it wherever the connector can tell a robot apart from its own health — an unreachable API, a stale heartbeat, a robot missing from the fleet manager's list.
+
+Keep the implementation cheap and non-blocking (read cached state; no network or other blocking I/O), or the connector's event loop will stall. If it raises, the framework logs a warning and publishes anyway.
 
 <a id="spec-connector-fleetconnector-lifecycle"></a>
 ### `start()` / `join()` / `stop()`

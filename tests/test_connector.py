@@ -783,6 +783,27 @@ class TestFleetConnectorDeferredSystemStats:
                 hdd_usage_percentage=0.0,
             )
 
+    def test_publish_pending_system_stats_publishes_online_status(
+        self, fleet_connector, mock_robot_session_pool
+    ):
+        """Test that each robot's online status is handed to its session.
+
+        The edge-sdk publishes it only when it changed, and that status message is
+        what tells InOrbit a robot went offline: it requests state only from robots
+        it already has offline, and the session answers its pings while the
+        connector runs.
+        """
+        fleet_connector._is_fleet_robot_online = lambda robot_id: (
+            robot_id != "TestRobot2"
+        )
+
+        fleet_connector._FleetConnector__publish_pending_system_stats()
+
+        session1 = fleet_connector._get_robot_session("TestRobot1")
+        session2 = fleet_connector._get_robot_session("TestRobot2")
+        session1.publish_status.assert_called_once_with(True)
+        session2.publish_status.assert_called_once_with(False)
+
     def test_publish_connector_system_stats_uses_psutil(
         self, base_model, mock_robot_session_pool
     ):
@@ -1765,7 +1786,12 @@ class TestConnectorCommandHandler:
     async def test_sets_online_status_callback(
         self, base_model, mock_robot_session_pool
     ):
-        """Test that online status callback is set on EdgeSDK."""
+        """Test that the online status callback is set on the session factory.
+
+        Registered on the factory rather than on each session: the pool connects a
+        session as soon as it builds it, so a session-level registration would come
+        too late for the status published on that first connection.
+        """
         connector = Connector(
             "TestRobot",
             ConnectorRootConfig(
@@ -1777,13 +1803,13 @@ class TestConnectorCommandHandler:
         # Initialize sessions
         await connector._FleetConnector__connect()
 
-        # Verify callback was set
-        session = connector._get_session()
-        session.set_online_status_callback.assert_called_once()
+        # Verify the callback was registered on the factory, and calls
+        # _is_robot_online
+        factory = connector._FleetConnector__session_factory
+        assert factory.online_status_callback == connector._is_fleet_robot_online
+        assert factory.online_status_callback("TestRobot") is True  # True by default
 
-        # Verify the callback calls _is_robot_online
-        callback = session.set_online_status_callback.call_args[0][0]
-        assert callback() is True  # Should return True by default
+        connector._get_session().set_online_status_callback.assert_not_called()
 
     def test_handle_command_exception_with_command_failure(
         self, base_model, mock_robot_session_pool

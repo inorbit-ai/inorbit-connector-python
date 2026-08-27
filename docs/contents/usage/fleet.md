@@ -180,7 +180,7 @@ def _is_fleet_robot_online(self, robot_id: str) -> bool:
 
 This callback is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received. The connector framework publishes system stats for every online robot, ensuring that any online/offline discrepancy is detected and corrected.
 
-It is also called once per robot on every execution loop iteration, to decide whether to publish system stats at all. While it returns `False`, no system stats are published for that robot, keeping the robot offline in InOrbit. Keep it cheap and non-blocking (read cached state; no API call in the hot path), or the connector's event loop will stall.
+It is also called once per robot on every execution loop iteration. While it returns `False`, no system stats are published for that robot, keeping the robot offline in InOrbit. The result is also reported to InOrbit as the robot's status, once per change — that status message is what marks the robot offline in the first place. Keep it cheap and non-blocking (read cached state; no API call in the hot path), or the connector's event loop will stall.
 
 ## Example Execution Loop
 
