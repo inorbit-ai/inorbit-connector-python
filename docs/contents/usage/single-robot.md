@@ -180,7 +180,7 @@ async def _execution_loop(self) -> None:
 
 Override this method to provide custom robot health checks. The default implementation assumes the robot is online if the connector is running. This callback is invoked when InOrbit sends a `get_state` request, which happens automatically when the robot is marked as offline but system stats are still being received.
 
-It is also called on every execution loop iteration, to decide whether to publish system stats at all. While it returns `False`, no system stats are published, keeping the robot offline in InOrbit. Keep it cheap and non-blocking (read cached state; no API call in the hot path), or the connector's event loop will stall.
+It is also called on every execution loop iteration. While it returns `False`, no system stats are published, keeping the robot offline in InOrbit. The result is also reported to InOrbit as the robot's status, once per change — that status message is what marks the robot offline in the first place. Keep it cheap and non-blocking (read cached state; no API call in the hot path), or the connector's event loop will stall.
 
 ```python
 def _is_robot_online(self) -> bool:

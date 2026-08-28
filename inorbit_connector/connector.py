@@ -192,6 +192,10 @@ class FleetConnector(ABC):
         # controlling TLS, so True+True yields a wss:// connection).
         factory_kwargs["use_websockets"] = config.use_websockets
         self.__session_factory = RobotSessionFactory(**factory_kwargs)
+        # Registered on the factory, not on each session: the pool connects a session
+        # as soon as it builds it, and that first connection reports this callback's
+        # result as the robot's status.
+        self.__session_factory.set_online_status_callback(self._is_fleet_robot_online)
 
         # Create RobotSessionPool
         self.__session_pool = RobotSessionPool(self.__session_factory)
@@ -480,11 +484,6 @@ class FleetConnector(ABC):
             self.__register_user_scripts_for_session(
                 session, path, self.__create_user_scripts_dir
             )
-
-        # Set online status callback for EdgeSDK
-        session.set_online_status_callback(
-            lambda: self._is_fleet_robot_online(robot_id)
-        )
 
         # If enabled, register the provided custom commands handler
         if self.__register_custom_command_handler:
@@ -1106,8 +1105,9 @@ class FleetConnector(ABC):
         """Publish stored system stats for all robots, or defaults if none stored.
 
         This method is called automatically at the end of each execution loop iteration.
-        For each robot in the fleet:
-        - If _is_fleet_robot_online(robot_id) returns False, nothing is published for
+        For each robot in the fleet the online status is published (the edge-sdk drops
+        it unless it changed), and then:
+        - If _is_fleet_robot_online(robot_id) returns False, no stats are published for
           that robot and any stats stored for it are dropped
         - Else if system stats were stored via publish_robot_system_stats(), those are
           published
@@ -1122,7 +1122,8 @@ class FleetConnector(ABC):
         Offline robots are skipped because that forced state request is answered with
         the robot's offline status, which refreshes its offline timestamp in InOrbit on
         every loop iteration. Nothing is lost: the state request only helps when the
-        robot is online but InOrbit believes otherwise.
+        robot is online but InOrbit believes otherwise, and the robot going offline is
+        reported directly instead, once, through the status message.
         """
         default_values = (
             self.__get_connector_system_stats()
@@ -1147,10 +1148,15 @@ class FleetConnector(ABC):
                 # a broken health check keeps publishing instead of muting the robot.
                 self._logger.warning(f"Online check failed for '{robot_id}': {e}")
                 online = True
+            # Reported every iteration; the edge-sdk publishes it only when it
+            # changed. This is what tells InOrbit a robot went offline: it requests
+            # state only from robots it already has offline, and the robot session
+            # answers InOrbit's pings for as long as the connector runs.
+            session.publish_status(online)
             if not online:
                 # Stats for an offline robot make InOrbit request state, and the
-                # offline reply refreshes the robot's offline timestamp on every
-                # loop iteration. Any stats stored for it are dropped.
+                # offline reply moves the robot's offline timestamp. Any stats
+                # stored for it are dropped.
                 self._logger.debug(
                     f"Skipping system stats publish for '{robot_id}': robot is offline"
                 )
