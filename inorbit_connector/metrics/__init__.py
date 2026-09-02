@@ -355,3 +355,131 @@ def register_framework_gauges(
             "process is alive but its MQTT link to InOrbit is down."
         ),
     )
+
+
+# --- Identity info gauges ---------------------------------------------------
+#
+# Prometheus "info metric" idiom (kube_pod_info-style): a gauge whose value is
+# the constant 1 and whose payload lives in the labels. Joining any per-robot
+# series against robot.info via `* on (robot_id) group_left(model) ...` lets
+# dashboards slice every metric by robot model or firmware version without
+# stamping those labels on each metric — the canonical and SDK instruments
+# have frozen schemas and could not carry them anyway.
+#
+# Both schemas are frozen by the framework: robot.info carries exactly
+# {robot_id, model, firmware_version} and fleet_manager.info exactly
+# {version}. Unknown keys are dropped (with a warning) so a typo at a call
+# site cannot permanently pollute the descriptor downstream.
+
+_ROBOT_INFO_ALLOWED_KEYS = frozenset({"model", "firmware_version"})
+
+
+def register_robot_info_gauge(robot_ids, robot_info) -> None:
+    """Register the canonical per-robot identity info gauge (``robot.info``).
+
+    Emits one series per robot with the constant value 1 and identity
+    attributes as labels::
+
+        inorbit_connector_robot_info{robot_id="r1", model="MiR250",
+                                     firmware_version="2.13.1"} 1
+
+    A robot upgrading its firmware (or being swapped for a different model)
+    shows up as a label change: the old series goes stale and a new one
+    appears — which is the alertable event for "the customer changed
+    something".
+
+    All callbacks run on every Prometheus scrape, so they should be cheap
+    and side-effect free — return cached values, never make an upstream
+    call. No-op when the OTel API is not installed.
+
+    Args:
+        robot_ids: zero-arg callable returning the current list of robot ids
+            in the fleet.
+        robot_info: callable ``(robot_id: str) -> dict | None`` returning the
+            identity attributes for that robot. Supported keys: ``model``,
+            ``firmware_version`` — both optional; unknown keys are dropped
+            with a warning. Values MUST come from a normalized catalog
+            (``"MiR250"``, not the raw upstream string) — see the metrics
+            guide on label normalization. Return ``None`` (or ``{}``) while
+            the info is not yet known to omit that robot from the scrape
+            instead of emitting placeholder values.
+    """
+    if not OTEL_API_AVAILABLE:
+        return
+
+    def _robot_info_callback(_options):
+        observations = []
+        for rid in robot_ids():
+            info = robot_info(rid)
+            if not info:
+                continue
+            unknown = set(info) - _ROBOT_INFO_ALLOWED_KEYS
+            if unknown:
+                _logger.warning(
+                    "robot.info attributes %s for robot %s are outside the "
+                    "frozen schema %s and were dropped",
+                    sorted(unknown),
+                    rid,
+                    sorted(_ROBOT_INFO_ALLOWED_KEYS),
+                )
+            attrs = {
+                key: value
+                for key, value in info.items()
+                if key in _ROBOT_INFO_ALLOWED_KEYS and value
+            }
+            if not attrs:
+                continue
+            observations.append(Observation(1, {"robot_id": rid, **attrs}))
+        return observations
+
+    meter.create_observable_gauge(
+        "robot.info",
+        callbacks=[_robot_info_callback],
+        unit="1",
+        description=(
+            "Constant 1; per-robot identity (model, firmware_version) rides "
+            "in the labels. Join other per-robot series against this metric "
+            "to slice them by model or firmware version."
+        ),
+    )
+
+
+def register_fleet_manager_info_gauge(version) -> None:
+    """Register the fleet manager identity info gauge (``fleet_manager.info``).
+
+    Emits a single series with the constant value 1 and the upstream fleet
+    manager's software version as a label::
+
+        inorbit_connector_fleet_manager_info{version="3.4.0"} 1
+
+    An upstream upgrade shows up as a label change — the old series goes
+    stale and a new one appears.
+
+    The callback runs on every Prometheus scrape: return a cached value,
+    never make an upstream call. No-op when the OTel API is not installed.
+
+    Args:
+        version: zero-arg callable returning the fleet manager's version
+            string, normalized (e.g. ``"3.4.0"``, stripped of build
+            metadata). Return ``None`` while unknown to emit nothing
+            instead of a placeholder.
+    """
+    if not OTEL_API_AVAILABLE:
+        return
+
+    def _fleet_manager_info_callback(_options):
+        value = version()
+        if not value:
+            return []
+        return [Observation(1, {"version": value})]
+
+    meter.create_observable_gauge(
+        "fleet_manager.info",
+        callbacks=[_fleet_manager_info_callback],
+        unit="1",
+        description=(
+            "Constant 1; the upstream fleet manager's software version rides "
+            "in the 'version' label. A version change indicates the customer "
+            "upgraded their fleet manager."
+        ),
+    )
