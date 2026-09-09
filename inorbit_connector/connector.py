@@ -16,7 +16,7 @@ import asyncio
 import threading
 import traceback
 from abc import ABC, abstractmethod
-from typing import Coroutine
+from typing import Any, Callable, Coroutine
 
 # Python 3.12+ compatibility for override decorator
 try:
@@ -60,6 +60,12 @@ from inorbit_connector.models import (
     MapConfigTemp,
     RobotConfig,
 )
+
+# Zero-arg callable returning a fresh coroutine: what ``_create_supervised_task`` runs.
+CoroutineFactory = Callable[[], Coroutine[Any, Any, None]]
+# Scheduler signature of ``_create_supervised_task``; pollers that accept an injected
+# scheduler (so they can be tested standalone) should type the parameter with this.
+SupervisedTaskFactory = Callable[[str, CoroutineFactory], asyncio.Task]
 
 
 class FleetConnector(ABC):
@@ -654,7 +660,7 @@ class FleetConnector(ABC):
             return False
 
     def _create_supervised_task(
-        self, name: str, coro_factory, restart_delay: float = 5.0
+        self, name: str, coro_factory: CoroutineFactory, restart_delay: float = 5.0
     ) -> asyncio.Task:
         """Schedule a long-lived background coroutine under supervision.
 
@@ -687,7 +693,9 @@ class FleetConnector(ABC):
         self.__background_tasks.append(task)
         return task
 
-    async def __supervise(self, name, coro_factory, restart_delay) -> None:
+    async def __supervise(
+        self, name: str, coro_factory: CoroutineFactory, restart_delay: float
+    ) -> None:
         """Run ``coro_factory`` forever, logging+restarting it on exit/crash."""
         while True:
             try:
