@@ -15,6 +15,14 @@
     "ground-control/robot-integration/connector-framework/configuration",
     "ground-control/robot-integration/connector-framework/publishing",
     {
+      "group": "Standards",
+      "pages": [
+        "ground-control/robot-integration/connector-framework/standards/index",
+        "ground-control/robot-integration/connector-framework/standards/cleaning-robot-datasources",
+        "ground-control/robot-integration/connector-framework/standards/material-moving-robot-datasources"
+      ]
+    },
+    {
       "group": "Specification",
       "pages": [
         "ground-control/robot-integration/connector-framework/specification/index",

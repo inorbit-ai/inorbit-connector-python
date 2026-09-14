@@ -36,3 +36,4 @@ Both connector types provide:
 - **Configuration**: Connector configuration models and file formats ([Configuration](configuration))
 - **Publishing**: How to publish data to InOrbit ([Publishing](publishing))
 - **Metrics**: Expose connector health metrics over Prometheus ([Metrics](usage/metrics))
+- **Standards**: Canonical datasource contracts shared across connectors in a robot vertical ([Standards](standards/index))
