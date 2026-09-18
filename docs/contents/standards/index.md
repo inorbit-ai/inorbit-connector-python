@@ -16,4 +16,4 @@ These pages define those shared contracts:
 
 When implementing a new connector in one of these verticals, publish the fields the
 standard defines under their canonical names, and treat anything the robot's API can't
-provide as an accepted per-OEM gap rather than a value to guess at.
+provide as an accepted per-OEM gap.
