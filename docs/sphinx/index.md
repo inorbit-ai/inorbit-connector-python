@@ -20,4 +20,5 @@ specification/index
 usage/index
 configuration
 publishing
+standards/index
 ```
