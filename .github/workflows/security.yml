@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 InOrbit, Inc.
+#
+# SPDX-License-Identifier: MIT
+
 # Security scan (Semgrep, Trivy, Gitleaks) on pull requests, on pushes to the default branch and
 # weekly. The scan itself lives in inorbit-ai/.github; it reports and never fails the build.
 name: security
